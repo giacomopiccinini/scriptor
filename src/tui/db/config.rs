@@ -10,7 +10,7 @@ const DEFAULT_DB_FILE: &str = "archivum.db";
 const DEFAULT_MODEL: &str = "parakeet-int8";
 const DEFAULT_DEVICE: &str = "cuda";
 const DEFAULT_GRAPH_OPTIMIZATION_LEVEL: usize = 3;
-const DEFAULT_N_INTRA_THREADS: usize =  4;
+const DEFAULT_N_INTRA_THREADS: usize = 4;
 const DEFAULT_PARALLEL_EXECUTION: bool = true;
 
 const DEFAULT_BACKGROUND_COLOR: &str = "#F3E5AB";
@@ -33,7 +33,7 @@ pub struct DefaultConfig {
     pub device: String,
     pub graph_optimization_level: usize,
     pub n_intra_threads: usize,
-    pub parallel_execution: bool
+    pub parallel_execution: bool,
 }
 
 /// Theme configuration
@@ -41,7 +41,7 @@ pub struct DefaultConfig {
 pub struct Theme {
     pub background: String,
     pub foreground: String,
-    pub highlight: String
+    pub highlight: String,
 }
 
 /// Database configuration
@@ -53,8 +53,7 @@ pub struct DBConfig {
 
 impl Default for DefaultConfig {
     fn default() -> Self {
-        
-        Self{
+        Self {
             db: DBConfig::default(),
             model: DEFAULT_MODEL.to_string(),
             device: DEFAULT_DEVICE.to_string(),
@@ -73,7 +72,6 @@ impl Default for Theme {
             highlight: DEFAULT_HIGHLIGHT_COLOR.to_string(),
         }
     }
-
 }
 
 impl Default for DBConfig {
@@ -96,8 +94,6 @@ impl Default for DBConfig {
         }
     }
 }
-
-
 
 impl Default for Config {
     /// By default, the name is the default name with default config

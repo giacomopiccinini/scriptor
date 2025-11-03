@@ -25,10 +25,6 @@ fn render_list_popup_kernel<T: CursorState>(
             "[Esc]",
             Style::default().fg(Color::from_str("#FFA69E").unwrap()),
         ),
-        // Span::styled(
-        //     "sc",
-        //     Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-        // ),
         Span::raw(" "),
     ]);
 

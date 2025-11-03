@@ -21,7 +21,7 @@ async fn get_db_pool(db_connection_str: &str) -> Result<SqlitePool> {
 /// Run database migrations
 async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     // Embed the migration files into binary
-    static MIGRATOR: Migrator = sqlx::migrate!();
+    static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
     MIGRATOR
         .run(pool)

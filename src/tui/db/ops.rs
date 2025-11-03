@@ -1,122 +1,125 @@
 use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use sqlx::SqlitePool;
 
 use crate::tui::db::models::{
-    NewCodex, NewFolio, NewFragmentum, Codex, Folio, Fragmentum, UICodex, UIFolio, UIFragmentum,
+    Codex, Folio, Fragmentum, NewCodex, NewFolio, NewFragmentum, UICodex, UIFolio, UIFragmentum,
 };
 use ratatui::widgets::ListState;
 
+// ============================================================================
+// Codex Operations
+// ============================================================================
+
 impl Codex {
-    /// Create a new todo list
-    pub async fn create(pool: &SqlitePool, new_list: NewTodoList) -> Result<Codex> {
+    /// Create a new codex (project)
+    pub async fn create(pool: &SqlitePool, new_codex: NewCodex) -> Result<Codex> {
         let now = Utc::now();
 
         // Get the next ordering value (max + 1)
         let next_ordering: i64 =
-            sqlx::query_scalar("SELECT COALESCE(MAX(ordering), 0) + 1 FROM todo_lists")
+            sqlx::query_scalar("SELECT COALESCE(MAX(ordering), 0) + 1 FROM codices")
                 .fetch_one(pool)
                 .await
-                .with_context(|| "Failed to get next ordering value")?;
+                .with_context(|| "Failed to get next ordering value for codex")?;
 
-        // Use query_as to map results to a struct
         let row = sqlx::query_as::<_, Codex>(
             r#"
-            INSERT INTO todo_lists (name, ordering, created_at, updated_at)
+            INSERT INTO codices (name, ordering, created_at, updated_at)
             VALUES (?1, ?2, ?3, ?4)
             RETURNING id, name, ordering, created_at, updated_at
             "#,
         )
-        .bind(&new_list.name)
+        .bind(&new_codex.name)
         .bind(next_ordering)
         .bind(now)
         .bind(now)
         .fetch_one(pool)
         .await
-        .with_context(|| "Failed to create todo list")?;
+        .with_context(|| "Failed to create codex")?;
 
         Ok(row)
     }
 
-    /// Get all todo lists
+    /// Get all codices ordered by ordering
     pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Codex>> {
-        let lists = sqlx::query_as::<_, Codex>(
-            "SELECT id, name, ordering, created_at, updated_at FROM todo_lists ORDER BY ordering",
+        let codices = sqlx::query_as::<_, Codex>(
+            "SELECT id, name, ordering, created_at, updated_at FROM codices ORDER BY ordering",
         )
         .fetch_all(pool)
         .await
-        .with_context(|| "Failed to fetch all todo lists")?;
+        .with_context(|| "Failed to fetch all codices")?;
 
-        Ok(lists)
+        Ok(codices)
     }
 
-    /// Get a specific todo list by ID
+    /// Get a specific codex by ID
     pub async fn get_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Codex>> {
-        let list = sqlx::query_as::<_, Codex>(
-            "SELECT id, name, ordering, created_at, updated_at FROM todo_lists WHERE id = ?1",
+        let codex = sqlx::query_as::<_, Codex>(
+            "SELECT id, name, ordering, created_at, updated_at FROM codices WHERE id = ?1",
         )
         .bind(id)
         .fetch_optional(pool)
         .await
-        .with_context(|| "Failed to fetch todo list by id")?;
+        .with_context(|| "Failed to fetch codex by id")?;
 
-        Ok(list)
+        Ok(codex)
     }
 
-    /// Update todo list name
+    /// Update codex name
     pub async fn update_name(&mut self, pool: &SqlitePool, new_name: String) -> Result<()> {
         let now = Utc::now();
 
-        sqlx::query("UPDATE todo_lists SET name = ?1, updated_at = ?2 WHERE id = ?3")
+        sqlx::query("UPDATE codices SET name = ?1, updated_at = ?2 WHERE id = ?3")
             .bind(&new_name)
             .bind(now)
             .bind(self.id)
             .execute(pool)
             .await
-            .with_context(|| "Failed to update todo list")?;
+            .with_context(|| "Failed to update codex name")?;
 
         self.name = new_name;
         self.updated_at = now;
         Ok(())
     }
 
-    /// Delete todo list (and all its items due to CASCADE)
+    /// Delete codex (cascades to folia and fragmenta)
     pub async fn delete(self, pool: &SqlitePool) -> Result<()> {
-        sqlx::query("DELETE FROM todo_lists WHERE id = ?1")
+        sqlx::query("DELETE FROM codices WHERE id = ?1")
             .bind(self.id)
             .execute(pool)
             .await
-            .with_context(|| "Failed to delete todo list")?;
+            .with_context(|| "Failed to delete codex")?;
 
         Ok(())
     }
 
-    /// Move list up (decrease ordering, swap with previous)
+    /// Move codex up (decrease ordering, swap with previous)
     pub async fn move_up(&mut self, pool: &SqlitePool) -> Result<()> {
-        // Find the list with the next lower ordering value
-        let prev_list: Option<(i64, i64)> = sqlx::query_as(
-            "SELECT id, ordering FROM todo_lists WHERE ordering < ?1 ORDER BY ordering DESC LIMIT 1"
+        // Find the codex with the next lower ordering value
+        let prev_codex: Option<(i64, i64)> = sqlx::query_as(
+            "SELECT id, ordering FROM codices WHERE ordering < ?1 ORDER BY ordering DESC LIMIT 1",
         )
         .bind(self.ordering)
         .fetch_optional(pool)
         .await
-        .with_context(|| "Failed to find previous list")?;
+        .with_context(|| "Failed to find previous codex")?;
 
-        if let Some((prev_id, prev_ordering)) = prev_list {
+        if let Some((prev_id, prev_ordering)) = prev_codex {
             // Swap orderings
-            sqlx::query("UPDATE todo_lists SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE codices SET ordering = ?1 WHERE id = ?2")
                 .bind(self.ordering)
                 .bind(prev_id)
                 .execute(pool)
                 .await
-                .with_context(|| "Failed to update previous list ordering")?;
+                .with_context(|| "Failed to update previous codex ordering")?;
 
-            sqlx::query("UPDATE todo_lists SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE codices SET ordering = ?1 WHERE id = ?2")
                 .bind(prev_ordering)
                 .bind(self.id)
                 .execute(pool)
                 .await
-                .with_context(|| "Failed to update current list ordering")?;
+                .with_context(|| "Failed to update current codex ordering")?;
 
             self.ordering = prev_ordering;
         }
@@ -124,32 +127,32 @@ impl Codex {
         Ok(())
     }
 
-    /// Move list down (increase ordering, swap with next)
+    /// Move codex down (increase ordering, swap with next)
     pub async fn move_down(&mut self, pool: &SqlitePool) -> Result<()> {
-        // Find the list with the next higher ordering value
-        let next_list: Option<(i64, i64)> = sqlx::query_as(
-            "SELECT id, ordering FROM todo_lists WHERE ordering > ?1 ORDER BY ordering ASC LIMIT 1",
+        // Find the codex with the next higher ordering value
+        let next_codex: Option<(i64, i64)> = sqlx::query_as(
+            "SELECT id, ordering FROM codices WHERE ordering > ?1 ORDER BY ordering ASC LIMIT 1",
         )
         .bind(self.ordering)
         .fetch_optional(pool)
         .await
-        .with_context(|| "Failed to find next list")?;
+        .with_context(|| "Failed to find next codex")?;
 
-        if let Some((next_id, next_ordering)) = next_list {
+        if let Some((next_id, next_ordering)) = next_codex {
             // Swap orderings
-            sqlx::query("UPDATE todo_lists SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE codices SET ordering = ?1 WHERE id = ?2")
                 .bind(self.ordering)
                 .bind(next_id)
                 .execute(pool)
                 .await
-                .with_context(|| "Failed to update next list ordering")?;
+                .with_context(|| "Failed to update next codex ordering")?;
 
-            sqlx::query("UPDATE todo_lists SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE codices SET ordering = ?1 WHERE id = ?2")
                 .bind(next_ordering)
                 .bind(self.id)
                 .execute(pool)
                 .await
-                .with_context(|| "Failed to update current list ordering")?;
+                .with_context(|| "Failed to update current codex ordering")?;
 
             self.ordering = next_ordering;
         }
@@ -158,87 +161,89 @@ impl Codex {
     }
 }
 
+// ============================================================================
+// Folio Operations
+// ============================================================================
+
 impl Folio {
-    /// Create a new todo item
-    pub async fn create(pool: &SqlitePool, new_item: NewTodoItem) -> Result<Folio> {
+    /// Create a new folio (recording)
+    pub async fn create(pool: &SqlitePool, new_folio: NewFolio) -> Result<Folio> {
         let now = Utc::now();
 
-        // Get the next ordering value for this list (max + 1)
+        // Get the next ordering value for this codex (max + 1)
         let next_ordering: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(MAX(ordering), 0) + 1 FROM todo_items WHERE list_id = ?1",
+            "SELECT COALESCE(MAX(ordering), 0) + 1 FROM folia WHERE codex_id = ?1",
         )
-        .bind(new_item.list_id)
+        .bind(new_folio.codex_id)
         .fetch_one(pool)
         .await
-        .with_context(|| "Failed to get next ordering value")?;
+        .with_context(|| "Failed to get next ordering value for folio")?;
 
         let row = sqlx::query_as::<_, Folio>(
             r#"
-            INSERT INTO todo_items (list_id, name, is_done, priority, due_date, ordering, created_at, updated_at)
-            VALUES (?1, ?2, FALSE, ?3, ?4, ?5, ?6, ?7)
-            RETURNING id, list_id, name, is_done, priority, due_date, ordering, created_at, updated_at
+            INSERT INTO folia (codex_id, name, ordering, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5)
+            RETURNING id, codex_id, name, ordering, created_at, updated_at
             "#,
         )
-        .bind(new_item.list_id)
-        .bind(&new_item.name)
-        .bind(&new_item.priority)
-        .bind(new_item.due_date)
+        .bind(new_folio.codex_id)
+        .bind(&new_folio.name)
         .bind(next_ordering)
         .bind(now)
         .bind(now)
         .fetch_one(pool)
         .await
-        .with_context(|| "Failed to create todo item")?;
+        .with_context(|| "Failed to create folio")?;
 
         Ok(row)
     }
 
-    /// Get all items for a specific list
-    pub async fn get_by_list_id(pool: &SqlitePool, list_id: i64) -> Result<Vec<Folio>> {
-        let items = sqlx::query_as::<_, Folio>(
+    /// Get all folia for a specific codex
+    pub async fn get_by_codex_id(pool: &SqlitePool, codex_id: i64) -> Result<Vec<Folio>> {
+        let folia = sqlx::query_as::<_, Folio>(
             r#"
-            SELECT id, list_id, name, is_done, priority, due_date, ordering, created_at, updated_at
-            FROM todo_items 
-            WHERE list_id = ?1 
+            SELECT id, codex_id, name, ordering, created_at, updated_at
+            FROM folia 
+            WHERE codex_id = ?1 
             ORDER BY ordering
             "#,
         )
-        .bind(list_id)
+        .bind(codex_id)
         .fetch_all(pool)
         .await
-        .with_context(|| "Failed to fetch todo items")?;
+        .with_context(|| "Failed to fetch folia")?;
 
-        Ok(items)
+        Ok(folia)
     }
 
-    /// Get item with a specific id
+    /// Get folio by specific id
     pub async fn get_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Folio>> {
-        let item = sqlx::query_as::<_, Folio>(
+        let folio = sqlx::query_as::<_, Folio>(
             r#"
-            SELECT id, list_id, name, is_done, priority, due_date, ordering, created_at, updated_at
-            FROM todo_items 
+            SELECT id, codex_id, name, ordering, created_at, updated_at
+            FROM folia 
             WHERE id = ?1 
             "#,
         )
         .bind(id)
         .fetch_optional(pool)
         .await
-        .with_context(|| "Failed to fetch todo item")?;
+        .with_context(|| "Failed to fetch folio")?;
 
-        Ok(item)
+        Ok(folio)
     }
 
-    /// Update to-do item name
+    /// Update folio name
     pub async fn update_name(&mut self, pool: &SqlitePool, new_name: String) -> Result<()> {
         let now = Utc::now();
 
-        sqlx::query("UPDATE todo_items SET name = ?1, updated_at = ?2 WHERE id = ?3")
+        sqlx::query("UPDATE folia SET name = ?1, updated_at = ?2 WHERE id = ?3")
             .bind(&new_name)
             .bind(now)
             .bind(self.id)
             .execute(pool)
             .await
-            .with_context(|| "Failed to update todo item name")?;
+            .with_context(|| "Failed to update folio name")?;
 
         self.name = new_name;
         self.updated_at = now;
@@ -246,106 +251,44 @@ impl Folio {
         Ok(())
     }
 
-    /// Toggle item completion status (from false to true or from true to false)
-    pub async fn toggle_done(&mut self, pool: &SqlitePool) -> Result<()> {
-        let now = Utc::now();
-        let new_status = !self.is_done;
-
-        sqlx::query("UPDATE todo_items SET is_done = ?1, updated_at = ?2 WHERE id = ?3")
-            .bind(new_status)
-            .bind(now)
-            .bind(self.id)
-            .execute(pool)
-            .await
-            .with_context(|| "Failed to update todo item status")?;
-
-        self.is_done = new_status;
-        self.updated_at = now;
-
-        Ok(())
-    }
-
-    /// Update item priority
-    pub async fn update_priority(
-        &mut self,
-        pool: &SqlitePool,
-        new_priority: Priority,
-    ) -> Result<()> {
-        let now = Utc::now();
-
-        sqlx::query("UPDATE todo_items SET priority = ?1, updated_at = ?2 WHERE id = ?3")
-            .bind(&new_priority)
-            .bind(now)
-            .bind(self.id)
-            .execute(pool)
-            .await
-            .with_context(|| "Failed to update todo item priority")?;
-
-        self.priority = Some(new_priority);
-        self.updated_at = now;
-
-        Ok(())
-    }
-
-    /// Update item due date
-    pub async fn update_due_date(
-        &mut self,
-        pool: &SqlitePool,
-        new_due_date: DateTime<Utc>,
-    ) -> Result<()> {
-        let now = Utc::now();
-
-        sqlx::query("UPDATE todo_items SET due_date = ?1, updated_at = ?2 WHERE id = ?3")
-            .bind(new_due_date)
-            .bind(now)
-            .bind(self.id)
-            .execute(pool)
-            .await
-            .with_context(|| "Failed to update todo item priority")?;
-
-        self.due_date = Some(new_due_date);
-        self.updated_at = now;
-        Ok(())
-    }
-
-    /// Delete todo item
+    /// Delete folio (cascades to fragmenta)
     pub async fn delete(self, pool: &SqlitePool) -> Result<()> {
-        sqlx::query("DELETE FROM todo_items WHERE id = ?1")
+        sqlx::query("DELETE FROM folia WHERE id = ?1")
             .bind(self.id)
             .execute(pool)
             .await
-            .with_context(|| "Failed to delete todo item")?;
+            .with_context(|| "Failed to delete folio")?;
 
         Ok(())
     }
 
-    /// Move item up (decrease ordering, swap with previous in same list)
+    /// Move folio up (decrease ordering, swap with previous in same codex)
     pub async fn move_up(&mut self, pool: &SqlitePool) -> Result<()> {
-        // Find the item with the next lower ordering value in the same list
-        let prev_item: Option<(i64, i64)> = sqlx::query_as(
-            "SELECT id, ordering FROM todo_items WHERE list_id = ?1 AND ordering < ?2 ORDER BY ordering DESC LIMIT 1"
+        // Find the folio with the next lower ordering value in the same codex
+        let prev_folio: Option<(i64, i64)> = sqlx::query_as(
+            "SELECT id, ordering FROM folia WHERE codex_id = ?1 AND ordering < ?2 ORDER BY ordering DESC LIMIT 1"
         )
-        .bind(self.list_id)
+        .bind(self.codex_id)
         .bind(self.ordering)
         .fetch_optional(pool)
         .await
-        .with_context(|| "Failed to find previous item")?;
+        .with_context(|| "Failed to find previous folio")?;
 
-        if let Some((prev_id, prev_ordering)) = prev_item {
+        if let Some((prev_id, prev_ordering)) = prev_folio {
             // Swap orderings
-            sqlx::query("UPDATE todo_items SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE folia SET ordering = ?1 WHERE id = ?2")
                 .bind(self.ordering)
                 .bind(prev_id)
                 .execute(pool)
                 .await
-                .with_context(|| "Failed to update previous item ordering")?;
+                .with_context(|| "Failed to update previous folio ordering")?;
 
-            sqlx::query("UPDATE todo_items SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE folia SET ordering = ?1 WHERE id = ?2")
                 .bind(prev_ordering)
                 .bind(self.id)
                 .execute(pool)
                 .await
-                .with_context(|| "Failed to update current item ordering")?;
+                .with_context(|| "Failed to update current folio ordering")?;
 
             self.ordering = prev_ordering;
         }
@@ -353,33 +296,33 @@ impl Folio {
         Ok(())
     }
 
-    /// Move item down (increase ordering, swap with next in same list)
+    /// Move folio down (increase ordering, swap with next in same codex)
     pub async fn move_down(&mut self, pool: &SqlitePool) -> Result<()> {
-        // Find the item with the next higher ordering value in the same list
-        let next_item: Option<(i64, i64)> = sqlx::query_as(
-            "SELECT id, ordering FROM todo_items WHERE list_id = ?1 AND ordering > ?2 ORDER BY ordering ASC LIMIT 1"
+        // Find the folio with the next higher ordering value in the same codex
+        let next_folio: Option<(i64, i64)> = sqlx::query_as(
+            "SELECT id, ordering FROM folia WHERE codex_id = ?1 AND ordering > ?2 ORDER BY ordering ASC LIMIT 1"
         )
-        .bind(self.list_id)
+        .bind(self.codex_id)
         .bind(self.ordering)
         .fetch_optional(pool)
         .await
-        .with_context(|| "Failed to find next item")?;
+        .with_context(|| "Failed to find next folio")?;
 
-        if let Some((next_id, next_ordering)) = next_item {
+        if let Some((next_id, next_ordering)) = next_folio {
             // Swap orderings
-            sqlx::query("UPDATE todo_items SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE folia SET ordering = ?1 WHERE id = ?2")
                 .bind(self.ordering)
                 .bind(next_id)
                 .execute(pool)
                 .await
-                .with_context(|| "Failed to update next item ordering")?;
+                .with_context(|| "Failed to update next folio ordering")?;
 
-            sqlx::query("UPDATE todo_items SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE folia SET ordering = ?1 WHERE id = ?2")
                 .bind(next_ordering)
                 .bind(self.id)
                 .execute(pool)
                 .await
-                .with_context(|| "Failed to update current item ordering")?;
+                .with_context(|| "Failed to update current folio ordering")?;
 
             self.ordering = next_ordering;
         }
@@ -388,54 +331,225 @@ impl Folio {
     }
 }
 
-impl UIList {
-    /// Get all lists in db already attached to their items
-    pub async fn get_all(pool: &SqlitePool) -> Result<Vec<UIList>> {
-        // Fetch all lists
-        let lists = Codex::get_all(pool)
+// ============================================================================
+// Fragmentum Operations
+// ============================================================================
+
+impl Fragmentum {
+    /// Create a new fragmentum (text/audio chunk)
+    pub async fn create(pool: &SqlitePool, new_fragmentum: NewFragmentum) -> Result<Fragmentum> {
+        let now = Utc::now();
+
+        let row = sqlx::query_as::<_, Fragmentum>(
+            r#"
+            INSERT INTO fragmenta (folio_id, content, audio_path, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5)
+            RETURNING id, folio_id, content, audio_path, created_at, updated_at
+            "#,
+        )
+        .bind(new_fragmentum.folio_id)
+        .bind(&new_fragmentum.content)
+        .bind("") // Default empty audio_path, can be updated later
+        .bind(now)
+        .bind(now)
+        .fetch_one(pool)
+        .await
+        .with_context(|| "Failed to create fragmentum")?;
+
+        Ok(row)
+    }
+
+    /// Get all fragmenta for a specific folio
+    pub async fn get_by_folio_id(pool: &SqlitePool, folio_id: i64) -> Result<Vec<Fragmentum>> {
+        let fragmenta = sqlx::query_as::<_, Fragmentum>(
+            r#"
+            SELECT id, folio_id, content, audio_path, created_at, updated_at
+            FROM fragmenta 
+            WHERE folio_id = ?1 
+            ORDER BY id
+            "#,
+        )
+        .bind(folio_id)
+        .fetch_all(pool)
+        .await
+        .with_context(|| "Failed to fetch fragmenta")?;
+
+        Ok(fragmenta)
+    }
+
+    /// Get fragmentum by specific id
+    pub async fn get_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Fragmentum>> {
+        let fragmentum = sqlx::query_as::<_, Fragmentum>(
+            r#"
+            SELECT id, folio_id, content, audio_path, created_at, updated_at
+            FROM fragmenta 
+            WHERE id = ?1 
+            "#,
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .with_context(|| "Failed to fetch fragmentum")?;
+
+        Ok(fragmentum)
+    }
+
+    /// Update fragmentum content (transcription)
+    pub async fn update_content(&mut self, pool: &SqlitePool, new_content: String) -> Result<()> {
+        let now = Utc::now();
+
+        sqlx::query("UPDATE fragmenta SET content = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(&new_content)
+            .bind(now)
+            .bind(self.id)
+            .execute(pool)
             .await
-            .with_context(|| "Failed to fetch lists from db")?;
+            .with_context(|| "Failed to update fragmentum content")?;
 
-        let mut ui_lists = Vec::new();
+        self.content = new_content;
+        self.updated_at = now;
 
-        // For each list, fetch its items and create a UIList
-        for list in lists {
-            let items = Folio::get_by_list_id(pool, list.id)
+        Ok(())
+    }
+
+    /// Update fragmentum audio path
+    pub async fn update_audio_path(
+        &mut self,
+        pool: &SqlitePool,
+        new_audio_path: String,
+    ) -> Result<()> {
+        let now = Utc::now();
+
+        sqlx::query("UPDATE fragmenta SET audio_path = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(&new_audio_path)
+            .bind(now)
+            .bind(self.id)
+            .execute(pool)
+            .await
+            .with_context(|| "Failed to update fragmentum audio path")?;
+
+        self.audio_path = new_audio_path;
+        self.updated_at = now;
+
+        Ok(())
+    }
+
+    /// Delete fragmentum
+    pub async fn delete(self, pool: &SqlitePool) -> Result<()> {
+        sqlx::query("DELETE FROM fragmenta WHERE id = ?1")
+            .bind(self.id)
+            .execute(pool)
+            .await
+            .with_context(|| "Failed to delete fragmentum")?;
+
+        Ok(())
+    }
+}
+
+// ============================================================================
+// UI Helper Operations
+// ============================================================================
+
+impl UICodex {
+    /// Get all codices with their nested folia and fragmenta
+    pub async fn get_all(pool: &SqlitePool) -> Result<Vec<UICodex>> {
+        // Fetch all codices
+        let codices = Codex::get_all(pool)
+            .await
+            .with_context(|| "Failed to fetch codices from db")?;
+
+        let mut ui_codices = Vec::new();
+
+        // For each codex, fetch its folia and create a UICodex
+        for codex in codices {
+            let folia = Folio::get_by_codex_id(pool, codex.id)
                 .await
-                .with_context(|| format!("Failed to fetch items for list {}", list.id))?
-                .iter()
-                .map(|i| UIItem {
-                    item: i.clone(),
+                .with_context(|| format!("Failed to fetch folia for codex {}", codex.id))?;
+
+            let mut ui_folia = Vec::new();
+
+            // For each folio, fetch its fragmenta
+            for folio in folia {
+                let fragmenta = Fragmentum::get_by_folio_id(pool, folio.id)
+                    .await
+                    .with_context(|| format!("Failed to fetch fragmenta for folio {}", folio.id))?
+                    .into_iter()
+                    .map(|f| UIFragmentum {
+                        fragmentum: f,
+                        state: ListState::default(),
+                    })
+                    .collect();
+
+                ui_folia.push(UIFolio {
+                    folio,
+                    fragmentum_state: ListState::default(),
+                    fragmenta,
+                });
+            }
+
+            ui_codices.push(UICodex {
+                codex,
+                folio_state: ListState::default(),
+                folia: ui_folia,
+            });
+        }
+
+        Ok(ui_codices)
+    }
+
+    /// Update folia when something changes (new folio, deleted folio)
+    /// Keeps the same state instead of reinitializing it
+    pub async fn update_folia(&mut self, pool: &SqlitePool) -> Result<()> {
+        // Re-fetch the folia but don't change the codex state
+        let folia = Folio::get_by_codex_id(pool, self.codex.id)
+            .await
+            .with_context(|| "Failed to fetch folia for codex")?;
+
+        let mut ui_folia = Vec::new();
+
+        // For each folio, fetch its fragmenta
+        for folio in folia {
+            let fragmenta = Fragmentum::get_by_folio_id(pool, folio.id)
+                .await
+                .with_context(|| format!("Failed to fetch fragmenta for folio {}", folio.id))?
+                .into_iter()
+                .map(|f| UIFragmentum {
+                    fragmentum: f,
                     state: ListState::default(),
                 })
                 .collect();
 
-            ui_lists.push(UIList {
-                list,
-                item_state: ListState::default(),
-                items,
+            ui_folia.push(UIFolio {
+                folio,
+                fragmentum_state: ListState::default(),
+                fragmenta,
             });
         }
 
-        Ok(ui_lists)
-    }
+        // Update the folia
+        self.folia = ui_folia;
 
-    /// Update items when something changes (new item, deleted item).
-    /// Keeps the same list state instead of reinitializing it
-    pub async fn update_items(&mut self, pool: &SqlitePool) -> Result<()> {
-        // Re-fetch the items but don't change the list state
-        let items = Folio::get_by_list_id(pool, self.list.id)
+        Ok(())
+    }
+}
+
+impl UIFolio {
+    /// Update fragmenta when something changes (new fragmentum, deleted fragmentum, edited content)
+    /// Keeps the same state instead of reinitializing it
+    pub async fn update_fragmenta(&mut self, pool: &SqlitePool) -> Result<()> {
+        // Re-fetch the fragmenta but don't change the folio state
+        let fragmenta = Fragmentum::get_by_folio_id(pool, self.folio.id)
             .await
-            .with_context(|| "Failed to fetch items for list")?
-            .iter()
-            .map(|i| UIItem {
-                item: i.clone(),
-                state: self.item_state.clone(),
+            .with_context(|| "Failed to fetch fragmenta for folio")?
+            .into_iter()
+            .map(|f| UIFragmentum {
+                fragmentum: f,
+                state: ListState::default(),
             })
             .collect();
 
-        // Update the items
-        self.items = items;
+        // Update the fragmenta
+        self.fragmenta = fragmenta;
 
         Ok(())
     }

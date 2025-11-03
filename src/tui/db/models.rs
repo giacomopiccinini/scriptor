@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use ratatui::widgets::ListState;
-use sqlx::{FromRow, Type};
+use sqlx::FromRow;
 
 #[derive(Debug, FromRow, Clone)]
 pub struct Codex {
@@ -26,13 +26,14 @@ pub struct Fragmentum {
     pub id: i64,
     pub folio_id: i64,
     pub content: String,
+    pub audio_path: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
 // Structs for creating new records (without id and timestamps)
 #[derive(Debug)]
-pub struct NewCodex{
+pub struct NewCodex {
     pub name: String,
 }
 
@@ -45,7 +46,7 @@ pub struct NewFolio {
 #[derive(Debug)]
 pub struct NewFragmentum {
     pub folio_id: i64,
-    pub name: String,
+    pub content: String,
 }
 
 // Convenient repackaging of DB items to cache reads from DB

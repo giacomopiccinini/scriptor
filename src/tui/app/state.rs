@@ -1,7 +1,7 @@
 use crate::tui::app::events::EventHandler;
 use crate::tui::db::config::{Config, DBConfig};
 use crate::tui::db::connections::init_db;
-use crate::tui::db::models::{TodoList, UIList};
+use crate::tui::db::models::{Codex, UICodex};
 use crate::tui::ui::components::{
     AddDBPopUp, AddItemPopUp, AddListPopUp, ChangeDBPopUp, DBSelector, InputState, ItemsComponent,
     ListsComponent, Logo, ModifyItemPopUp, ModifyListPopUp,
