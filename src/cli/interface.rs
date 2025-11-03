@@ -2,6 +2,7 @@ use crate::stt::model::STTModel;
 use crate::stt::onnx::ExecutionProvider;
 use crate::stt::onnx::InferenceConfig;
 use crate::stt::parakeet::{ParakeetConfig, ParakeetModel};
+use crate::tui::entrypoint::run_tui;
 use anyhow::Result;
 use clap::Parser;
 use std::path::Path;
@@ -105,9 +106,9 @@ pub fn run_cli() -> Result<()> {
             args.n_intra_threads.unwrap(),
             args.par_x.unwrap(),
         )?;
-    } else {
-        println!("I will use the TUI");
-    }
 
-    Ok(())
+        Ok(())
+    } else {
+        run_tui().map_err(|e| anyhow::anyhow!("{}", e))
+    }
 }

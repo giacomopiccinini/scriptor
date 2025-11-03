@@ -8,7 +8,15 @@ description = "Scriba - Speech-to-Text CLI and TUI"
 readme = "README.md"
 homepage = "https://github.com/giacomopiccinini/scriba"
 repository = "https://github.com/giacomopiccinini/scriba"
-keywords = ["parakeet", "stt", "speech-to-text", "audio", "onnx", "nvidia"]
+keywords = ["parakeet", "stt", "speech-to-text", "audio", "onnx"]
+
+[[bin]]
+name = "scriba"
+path = "src/main.rs"
+
+[lib]
+name = "scriba"
+path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0.100"
