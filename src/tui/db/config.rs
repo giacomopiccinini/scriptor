@@ -12,6 +12,7 @@ const DEFAULT_DEVICE: &str = "cuda";
 const DEFAULT_GRAPH_OPTIMIZATION_LEVEL: usize = 3;
 const DEFAULT_N_INTRA_THREADS: usize = 4;
 const DEFAULT_PARALLEL_EXECUTION: bool = true;
+const DEFAULT_FRAGMENTUM_LENGTH: usize = 7; // Each fragmentum lasts for 7 seconds
 
 const DEFAULT_BACKGROUND_COLOR: &str = "#F3E5AB";
 const DEFAULT_FOREGROUND_COLOR: &str = "#1A1A1A";
@@ -34,6 +35,7 @@ pub struct DefaultConfig {
     pub graph_optimization_level: usize,
     pub n_intra_threads: usize,
     pub parallel_execution: bool,
+    pub fragmentum_length: usize,
 }
 
 /// Theme configuration
@@ -60,6 +62,7 @@ impl Default for DefaultConfig {
             graph_optimization_level: DEFAULT_GRAPH_OPTIMIZATION_LEVEL,
             n_intra_threads: DEFAULT_N_INTRA_THREADS,
             parallel_execution: DEFAULT_PARALLEL_EXECUTION,
+            fragmentum_length: DEFAULT_FRAGMENTUM_LENGTH
         }
     }
 }

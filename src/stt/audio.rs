@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
-use hound::WavReader;
 use rubato::{FftFixedIn, Resampler};
 use std::path::Path;
+use hound::{SampleFormat, WavSpec, WavReader, WavWriter};
 
 /// Read audio file from file path and convert to mono by averaging left and right channel
 pub fn read_audio_file_mono(audio_file_path: &Path) -> Result<(Vec<f32>, u32)> {
@@ -75,4 +75,44 @@ pub fn resample(samples: Vec<f32>, original_sr: u32, target_sr: u32) -> Result<V
 
     // Take ownership of the first channel, avoiding cloning
     Ok(resampled.swap_remove(0))
+}
+
+/// Write audio to file
+pub fn write_mono_wav(samples: Vec<f32>, sr: u32, bits_per_sample: usize, output_path: &Path) -> Result<()> {
+
+    // Create a new WAV specification for the audio
+    let audio_spec = WavSpec {
+        channels: 1 as u16,
+        sample_rate: sr,
+        bits_per_sample: bits_per_sample as u16,
+        sample_format: SampleFormat::Int,
+    };
+
+    // Init writer
+    let mut writer = WavWriter::create(output_path, audio_spec)
+        .with_context(|| format!("Couldn't write to {:?}", output_path))?;
+
+    // Calculate the max value based on bits_per_sample for proper scaling
+    let max_value = 2_f64.powi((audio_spec.bits_per_sample - 1) as i32);
+
+    // Write samples interleaved
+    for i in 0..samples.len() {
+        // Scale back to the appropriate integer range
+        let scaled_sample = (samples[i] as f64 * max_value).round();
+
+        // Write sample based on bits_per_sample
+        match audio_spec.bits_per_sample {
+            8 => writer.write_sample(scaled_sample as i8)?,
+            16 => writer.write_sample(scaled_sample as i16)?,
+            24 | 32 => writer.write_sample(scaled_sample as i32)?,
+            _ => {
+                return Err(anyhow::Error::msg(format!(
+                    "Unsupported bits per sample: {}",
+                    audio_spec.bits_per_sample
+                )))
+            }
+        }
+    }
+
+    Ok(())
 }
