@@ -1,14 +1,14 @@
+use crate::tui::db::config::ThemeConfig;
 use crate::tui::db::models::UIFolio;
 use anyhow::Result;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{
     Block, BorderType, Borders, HighlightSpacing, List, ListItem, Padding, StatefulWidget, Widget,
 };
 use sqlx::SqlitePool;
-use std::str::FromStr;
 
 pub struct FragmentaComponent;
 
@@ -60,19 +60,17 @@ impl FragmentaComponent {
     }
 
     /// Render the list of fragmenta for the selected folio
-    pub fn render(selected_folio: Option<&mut UIFolio>, area: Rect, buf: &mut Buffer) {
+    pub fn render(
+        selected_folio: Option<&mut UIFolio>,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &ThemeConfig,
+    ) {
         // Command hints for fragmenta
         let fragmentum_command_hints = Line::from(vec![
             Span::raw(" "),
-            Span::styled(" ↑↓ ", Style::default()),
-            Span::styled(
-                "[c]",
-                Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-            ),
-            Span::styled(
-                "opy ",
-                Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-            ),
+            Span::styled("[c]", Style::default().fg(theme.highlight)),
+            Span::styled("opy ", Style::default().fg(theme.foreground)),
             Span::raw(" "),
         ])
         .left_aligned();
@@ -80,14 +78,8 @@ impl FragmentaComponent {
         // Add "quit" hint, in the bottom right corner
         let quit_hint = Line::from(vec![
             Span::raw(" "),
-            Span::styled(
-                "[q]",
-                Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-            ),
-            Span::styled(
-                "uit ",
-                Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-            ),
+            Span::styled("[q]", Style::default().fg(theme.highlight)),
+            Span::styled("uit ", Style::default().fg(theme.foreground)),
             Span::raw(" "),
         ])
         .right_aligned();
@@ -122,9 +114,7 @@ impl FragmentaComponent {
                 .highlight_symbol(" ▸ ")
                 .highlight_style(
                     // Swap foreground and background for selected item
-                    Style::default()
-                        .bg(Color::from_str("#FCF1D5").unwrap())
-                        .fg(Color::from_str("#002626").unwrap()),
+                    Style::default().bg(theme.foreground).fg(theme.background),
                 )
                 .highlight_spacing(HighlightSpacing::Always);
 

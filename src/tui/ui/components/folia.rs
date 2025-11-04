@@ -1,14 +1,14 @@
+use crate::tui::db::config::ThemeConfig;
 use crate::tui::db::models::{Folio, NewFolio, UICodex};
 use anyhow::Result;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{
     Block, BorderType, Borders, HighlightSpacing, List, ListItem, Padding, StatefulWidget, Widget,
 };
 use sqlx::SqlitePool;
-use std::str::FromStr;
 
 pub struct FoliaComponent;
 
@@ -121,35 +121,21 @@ impl FoliaComponent {
     }
 
     /// Render the list of folia for the selected codex
-    pub fn render(selected_codex: Option<&mut UICodex>, area: Rect, buf: &mut Buffer) {
+    pub fn render(
+        selected_codex: Option<&mut UICodex>,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &ThemeConfig,
+    ) {
         // Command hints for folia
         let folio_command_hints = Line::from(vec![
             Span::raw(" "),
-            Span::styled(" ↑↓ ", Style::default()),
-            Span::styled(
-                "[a]",
-                Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-            ),
-            Span::styled(
-                "dd",
-                Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-            ),
-            Span::styled(
-                " [d]",
-                Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-            ),
-            Span::styled(
-                "el",
-                Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-            ),
-            Span::styled(
-                " [m]",
-                Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-            ),
-            Span::styled(
-                "odify ",
-                Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-            ),
+            Span::styled("[a]", Style::default().fg(theme.highlight)),
+            Span::styled("dd", Style::default().fg(theme.foreground)),
+            Span::styled(" [d]", Style::default().fg(theme.highlight)),
+            Span::styled("el", Style::default().fg(theme.foreground)),
+            Span::styled(" [m]", Style::default().fg(theme.highlight)),
+            Span::styled("odify ", Style::default().fg(theme.foreground)),
             Span::raw(" "),
         ])
         .left_aligned();
@@ -175,9 +161,7 @@ impl FoliaComponent {
                 .highlight_symbol(" ▸ ")
                 .highlight_style(
                     // Swap foreground and background for selected item
-                    Style::default()
-                        .bg(Color::from_str("#FCF1D5").unwrap())
-                        .fg(Color::from_str("#002626").unwrap()),
+                    Style::default().bg(theme.foreground).fg(theme.background),
                 )
                 .highlight_spacing(HighlightSpacing::Always);
 

@@ -1,8 +1,8 @@
+use crate::tui::db::config::ThemeConfig;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::widgets::{Block, Widget};
-use std::str::FromStr;
 
 pub struct AppLayout;
 
@@ -70,11 +70,9 @@ impl AppLayout {
     }
 
     /// Render a background that fills the entire area
-    pub fn render_background(area: Rect, buf: &mut Buffer) {
-        let background_color = Color::from_str("#002626").unwrap();
-        let foreground_color = Color::from_str("#FCF1D5").unwrap();
+    pub fn render_background(area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
         let background =
-            Block::default().style(Style::default().bg(background_color).fg(foreground_color));
+            Block::default().style(Style::default().bg(theme.background).fg(theme.foreground));
         background.render(area, buf);
     }
 }

@@ -1,13 +1,12 @@
-use crate::tui::db::config::Config;
+use crate::tui::db::config::{Config, ThemeConfig};
 use crate::tui::ui::cursor::CursorState;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{
     Block, BorderType, Borders, Clear, List, ListItem, Padding, Paragraph, Widget, Wrap,
 };
-use std::str::FromStr;
 
 pub struct AddCodexPopUp;
 pub struct ModifyCodexPopUp;
@@ -17,14 +16,12 @@ fn render_codex_popup_kernel<T: CursorState>(
     area: Rect,
     buf: &mut Buffer,
     popup_title: &str,
+    theme: &ThemeConfig,
 ) {
     // Command hints for add/modify codex popup
     let add_or_modify_codex_command_hints = Line::from(vec![
         Span::raw(" "),
-        Span::styled(
-            "[Esc]",
-            Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-        ),
+        Span::styled("[Esc]", Style::default().fg(theme.highlight)),
         Span::raw(" "),
     ]);
 
@@ -49,22 +46,22 @@ fn render_codex_popup_kernel<T: CursorState>(
     // Clear the background of the popup area first
     Clear.render(popup_area, buf);
     Block::default()
-        .style(Style::default().bg(Color::from_str("#002626").unwrap()))
+        .style(Style::default().bg(theme.background))
         .render(popup_area, buf);
 
     // Define the popup block with styling
     let popup_block = Block::new()
         .padding(Padding::new(2, 2, 1, 1))
         .title(format!("  {}  ", popup_title))
-        .title_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
+        .title_style(Style::new().fg(theme.foreground))
         .title_bottom(add_or_modify_codex_command_hints)
         .borders(Borders::ALL)
-        .border_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
+        .border_style(Style::new().fg(theme.foreground))
         .border_type(BorderType::Rounded)
         .padding(Padding::horizontal(1));
 
     // Define the text to render
-    let text_spans = state.create_cursor_text_spans();
+    let text_spans = state.create_cursor_text_spans(theme);
     let text_line = Line::from(text_spans);
 
     // Render the input field
@@ -76,15 +73,15 @@ fn render_codex_popup_kernel<T: CursorState>(
 
 impl AddCodexPopUp {
     /// Render popup for entering a new codex name
-    pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer) {
-        render_codex_popup_kernel(state, area, buf, "Add Codex");
+    pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
+        render_codex_popup_kernel(state, area, buf, "Add Codex", theme);
     }
 }
 
 impl ModifyCodexPopUp {
     /// Render popup for modifying a codex name
-    pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer) {
-        render_codex_popup_kernel(state, area, buf, "Modify Codex");
+    pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
+        render_codex_popup_kernel(state, area, buf, "Modify Codex", theme);
     }
 }
 
@@ -97,14 +94,12 @@ pub fn render_folio_popup_kernel<T: CursorState>(
     area: Rect,
     buf: &mut Buffer,
     popup_title: &str,
+    theme: &ThemeConfig,
 ) {
     // Command hints for add/modify folio popup
     let add_folio_command_hints = Line::from(vec![
         Span::raw(" "),
-        Span::styled(
-            "[Esc]",
-            Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-        ),
+        Span::styled("[Esc]", Style::default().fg(theme.highlight)),
         Span::raw(" "),
     ]);
 
@@ -129,22 +124,22 @@ pub fn render_folio_popup_kernel<T: CursorState>(
     // Clear the background of the popup area first
     Clear.render(popup_area, buf);
     Block::default()
-        .style(Style::default().bg(Color::from_str("#002626").unwrap()))
+        .style(Style::default().bg(theme.background))
         .render(popup_area, buf);
 
     // Define the popup block with styling
     let popup_block = Block::new()
         .padding(Padding::new(2, 2, 1, 1))
         .title(format!("  {}  ", popup_title))
-        .title_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
+        .title_style(Style::new().fg(theme.foreground))
         .title_bottom(add_folio_command_hints)
         .borders(Borders::ALL)
-        .border_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
+        .border_style(Style::new().fg(theme.foreground))
         .border_type(BorderType::Rounded)
         .padding(Padding::horizontal(1));
 
     // Define the text to render
-    let text_spans = state.create_cursor_text_spans();
+    let text_spans = state.create_cursor_text_spans(theme);
     let text_line = Line::from(text_spans);
 
     // Render the input field
@@ -156,15 +151,15 @@ pub fn render_folio_popup_kernel<T: CursorState>(
 
 impl AddFolioPopUp {
     /// Render popup for entering a new folio
-    pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer) {
-        render_folio_popup_kernel(state, area, buf, "Add Folio");
+    pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
+        render_folio_popup_kernel(state, area, buf, "Add Folio", theme);
     }
 }
 
 impl ModifyFolioPopUp {
     /// Render popup for modifying folio name
-    pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer) {
-        render_folio_popup_kernel(state, area, buf, "Modify Folio");
+    pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
+        render_folio_popup_kernel(state, area, buf, "Modify Folio", theme);
     }
 }
 
@@ -172,50 +167,36 @@ pub struct ChangeArchivumPopUp;
 
 impl ChangeArchivumPopUp {
     /// Render popup for selecting archivum
-    pub fn render(config: &Config, selected_index: usize, area: Rect, buf: &mut Buffer) {
+    pub fn render(
+        config: &Config,
+        selected_index: usize,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &ThemeConfig,
+    ) {
         // Command hints for change archivum popup
         let change_archivum_command_hints = Line::from(vec![
             Span::raw(" "),
-            Span::styled(" ↑↓ ", Style::default()),
-            Span::styled(
-                "[A]",
-                Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-            ),
-            Span::styled(
-                "dd",
-                Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-            ),
-            Span::styled(
-                " [S]",
-                Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-            ),
-            Span::styled(
-                "et Default",
-                Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-            ),
-            Span::styled(
-                " [Esc]",
-                Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-            ),
+            Span::styled("[A]", Style::default().fg(theme.highlight)),
+            Span::styled("dd", Style::default().fg(theme.foreground)),
+            Span::styled(" [S]", Style::default().fg(theme.highlight)),
+            Span::styled("et Default", Style::default().fg(theme.foreground)),
+            Span::styled(" [Esc]", Style::default().fg(theme.highlight)),
             Span::raw(" "),
         ]);
 
         Block::default()
-            .style(
-                Style::default()
-                    .bg(Color::from_str("#002626").unwrap())
-                    .fg(Color::from_str("#FCF1D5").unwrap()),
-            )
+            .style(Style::default().bg(theme.background).fg(theme.foreground))
             .render(area, buf);
 
         // Define the popup block with styling
         let popup_block = Block::new()
             .padding(Padding::new(2, 2, 1, 1))
             .title(" Select Archivum ")
-            .title_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
+            .title_style(Style::new().fg(theme.foreground))
             .title_bottom(change_archivum_command_hints)
             .borders(Borders::ALL)
-            .border_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
+            .border_style(Style::new().fg(theme.foreground))
             .border_type(BorderType::Rounded);
 
         // Create list items from archiva (databases)
@@ -235,9 +216,7 @@ impl ChangeArchivumPopUp {
             .highlight_symbol(" ▸ ") // Selection indicator
             .highlight_style(
                 // Swap foreground and background for selected item
-                Style::default()
-                    .bg(Color::from_str("#FCF1D5").unwrap())
-                    .fg(Color::from_str("#002626").unwrap()),
+                Style::default().bg(theme.foreground).fg(theme.background),
             )
             .highlight_spacing(ratatui::widgets::HighlightSpacing::Always);
 
@@ -249,40 +228,33 @@ pub struct AddArchivumPopUp;
 
 impl AddArchivumPopUp {
     /// Render popup for entering a new archivum name
-    pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer) {
+    pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
         // Command hints for add archivum popup
         let add_archivum_command_hints = Line::from(vec![
             Span::raw(" "),
-            Span::styled(
-                "[Esc]",
-                Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-            ),
+            Span::styled("[Esc]", Style::default().fg(theme.highlight)),
             Span::raw(" "),
         ]);
 
         // Clear the entire area background first
         Clear.render(area, buf);
         Block::default()
-            .style(
-                Style::default()
-                    .bg(Color::from_str("#002626").unwrap())
-                    .fg(Color::from_str("#FCF1D5").unwrap()),
-            )
+            .style(Style::default().bg(theme.background).fg(theme.foreground))
             .render(area, buf);
 
         // Define the popup block with styling - use full width
         let popup_block = Block::new()
             .padding(Padding::new(2, 2, 1, 1))
             .title(" Add Archivum ")
-            .title_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
+            .title_style(Style::new().fg(theme.foreground))
             .title_bottom(add_archivum_command_hints)
             .borders(Borders::ALL)
-            .border_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
+            .border_style(Style::new().fg(theme.foreground))
             .border_type(BorderType::Rounded)
             .padding(Padding::horizontal(1));
 
         // Define the text to render
-        let text_spans = state.create_cursor_text_spans();
+        let text_spans = state.create_cursor_text_spans(theme);
         let text_line = Line::from(text_spans);
 
         // Render the input field using the full area

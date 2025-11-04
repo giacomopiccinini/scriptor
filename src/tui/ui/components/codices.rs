@@ -1,15 +1,15 @@
+use crate::tui::db::config::ThemeConfig;
 use crate::tui::db::models::{Codex, NewCodex, UICodex};
 use anyhow::Result;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{
     Block, BorderType, Borders, HighlightSpacing, List, ListItem, ListState, Padding,
     StatefulWidget,
 };
 use sqlx::SqlitePool;
-use std::str::FromStr;
 
 /// Component for managing and displaying codices (projects)
 pub struct CodicesComponent {
@@ -178,35 +178,16 @@ impl CodicesComponent {
     }
 
     /// Render the list of codices
-    pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
+    pub fn render(&mut self, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
         // Command hints for codices
         let codex_command_hints = Line::from(vec![
             Span::raw(" "),
-            Span::styled(" ↑↓ ", Style::default()),
-            Span::styled(
-                "[A]",
-                Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-            ),
-            Span::styled(
-                "dd",
-                Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-            ),
-            Span::styled(
-                " [D]",
-                Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-            ),
-            Span::styled(
-                "el",
-                Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-            ),
-            Span::styled(
-                " [M]",
-                Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-            ),
-            Span::styled(
-                "odify ",
-                Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-            ),
+            Span::styled("[A]", Style::default().fg(theme.highlight)),
+            Span::styled("dd", Style::default().fg(theme.foreground)),
+            Span::styled(" [D]", Style::default().fg(theme.highlight)),
+            Span::styled("el", Style::default().fg(theme.foreground)),
+            Span::styled(" [M]", Style::default().fg(theme.highlight)),
+            Span::styled("odify ", Style::default().fg(theme.foreground)),
             Span::raw(" "),
         ])
         .left_aligned();
@@ -231,9 +212,7 @@ impl CodicesComponent {
             .highlight_symbol(" ▸ ") // Selection indicator
             .highlight_style(
                 // Swap foreground and background for selected item
-                Style::default()
-                    .bg(Color::from_str("#FCF1D5").unwrap())
-                    .fg(Color::from_str("#002626").unwrap()),
+                Style::default().bg(theme.foreground).fg(theme.background),
             )
             .highlight_spacing(HighlightSpacing::Always);
 

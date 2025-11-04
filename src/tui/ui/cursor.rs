@@ -1,6 +1,6 @@
-use ratatui::style::{Color, Style};
+use crate::tui::db::config::ThemeConfig;
+use ratatui::style::Style;
 use ratatui::text::Span;
-use std::str::FromStr;
 
 /// Trait for managing cursor-based text input
 pub trait CursorState {
@@ -83,7 +83,7 @@ pub trait CursorState {
     }
 
     /// Create text spans for rendering with cursor visualization
-    fn create_cursor_text_spans(&self) -> Vec<Span<'static>> {
+    fn create_cursor_text_spans(&self, theme: &ThemeConfig) -> Vec<Span<'static>> {
         let text = self.get_text();
         let cursor_pos = self.get_cursor_pos();
         let chars: Vec<char> = text.chars().collect();
@@ -110,29 +110,19 @@ pub trait CursorState {
         };
 
         vec![
-            Span::styled(
-                text_before,
-                Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-            ),
+            Span::styled(text_before, Style::default().fg(theme.foreground)),
             if cursor_char == "█" {
                 Span::styled(
                     cursor_char,
-                    Style::default()
-                        .fg(Color::from_str("#FCF1D5").unwrap())
-                        .bg(Color::from_str("#002626").unwrap()),
+                    Style::default().fg(theme.highlight).bg(theme.background),
                 )
             } else {
                 Span::styled(
                     cursor_char,
-                    Style::default()
-                        .fg(Color::from_str("#002626").unwrap())
-                        .bg(Color::from_str("#FCF1D5").unwrap()),
+                    Style::default().fg(theme.background).bg(theme.foreground),
                 )
             },
-            Span::styled(
-                text_after,
-                Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-            ),
+            Span::styled(text_after, Style::default().fg(theme.foreground)),
         ]
     }
 }

@@ -350,8 +350,11 @@ impl App {
 
 impl Widget for &mut App {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        // Get theme reference
+        let theme = &self.config.default.theme;
+
         // Render background
-        AppLayout::render_background(area, buf);
+        AppLayout::render_background(area, buf, theme);
 
         // Calculate layout areas
         let (
@@ -371,15 +374,20 @@ impl Widget for &mut App {
             self.current_screen,
             CurrentScreen::ChangeArchivum | CurrentScreen::AddArchivum
         ) {
-            ArchivumSelector::render(closed_selector_area, buf, &self.config.default.db.name);
+            ArchivumSelector::render(
+                closed_selector_area,
+                buf,
+                &self.config.default.db.name,
+                theme,
+            );
         }
 
         // Render the main areas
-        self.codices_component.render(codices_area, buf);
+        self.codices_component.render(codices_area, buf, theme);
 
         // Render folia with the selected codex
         let selected_codex = self.codices_component.get_selected_codex_mut();
-        FoliaComponent::render(selected_codex, folia_area, buf);
+        FoliaComponent::render(selected_codex, folia_area, buf, theme);
 
         // Render fragmenta with the selected folio
         let selected_folio = if let Some(codex) = self.codices_component.get_selected_codex_mut() {
@@ -391,26 +399,31 @@ impl Widget for &mut App {
         } else {
             None
         };
-        FragmentaComponent::render(selected_folio, fragmenta_area, buf);
+        FragmentaComponent::render(selected_folio, fragmenta_area, buf, theme);
 
         // Render popup screens if active
         match self.current_screen {
-            CurrentScreen::AddCodex => AddCodexPopUp::render(&self.input_state, codices_area, buf),
-            CurrentScreen::ModifyCodex => {
-                ModifyCodexPopUp::render(&self.input_state, codices_area, buf)
+            CurrentScreen::AddCodex => {
+                AddCodexPopUp::render(&self.input_state, codices_area, buf, theme)
             }
-            CurrentScreen::AddFolio => AddFolioPopUp::render(&self.input_state, folia_area, buf),
+            CurrentScreen::ModifyCodex => {
+                ModifyCodexPopUp::render(&self.input_state, codices_area, buf, theme)
+            }
+            CurrentScreen::AddFolio => {
+                AddFolioPopUp::render(&self.input_state, folia_area, buf, theme)
+            }
             CurrentScreen::ModifyFolio => {
-                ModifyFolioPopUp::render(&self.input_state, folia_area, buf)
+                ModifyFolioPopUp::render(&self.input_state, folia_area, buf, theme)
             }
             CurrentScreen::ChangeArchivum => ChangeArchivumPopUp::render(
                 &self.config,
                 self.selected_archivum_index,
                 archivum_selector_area,
                 buf,
+                theme,
             ),
             CurrentScreen::AddArchivum => {
-                AddArchivumPopUp::render(&self.input_state, archivum_selector_area, buf)
+                AddArchivumPopUp::render(&self.input_state, archivum_selector_area, buf, theme)
             }
             _ => {}
         }

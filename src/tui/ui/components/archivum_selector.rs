@@ -1,24 +1,18 @@
 pub struct ArchivumSelector;
+use crate::tui::db::config::ThemeConfig;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Padding, Paragraph, Widget};
-use std::str::FromStr;
 
 impl ArchivumSelector {
-    pub fn render(area: Rect, buf: &mut Buffer, current_archivum_name: &str) {
+    pub fn render(area: Rect, buf: &mut Buffer, current_archivum_name: &str, theme: &ThemeConfig) {
         // Command hints for archivum
         let archivum_command_hints = Line::from(vec![
             Span::raw(" "),
-            Span::styled(
-                "[Tab]",
-                Style::default().fg(Color::from_str("#FFA69E").unwrap()),
-            ),
-            Span::styled(
-                " Change",
-                Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-            ),
+            Span::styled("[Tab]", Style::default().fg(theme.highlight)),
+            Span::styled(" Change", Style::default().fg(theme.foreground)),
             Span::raw(" "),
         ])
         .left_aligned();
