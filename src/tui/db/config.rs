@@ -22,28 +22,15 @@ const DEFAULT_HIGHLIGHT_COLOR: &str = "#8B0000";
 #[derive(Deserialize, Serialize)]
 pub struct Config {
     pub default: DefaultConfig,
-    pub theme: Theme,
     pub dbs: Vec<DBConfig>,
 }
 
-/// Theme configuration
+/// Default configurations for db, theme and speech-to-text options
 #[derive(Deserialize, Serialize, Clone)]
 pub struct DefaultConfig {
     pub db: DBConfig,
-    pub model: String,
-    pub device: String,
-    pub graph_optimization_level: usize,
-    pub n_intra_threads: usize,
-    pub parallel_execution: bool,
-    pub fragmentum_length: usize,
-}
-
-/// Theme configuration
-#[derive(Deserialize, Serialize, Clone)]
-pub struct Theme {
-    pub background: String,
-    pub foreground: String,
-    pub highlight: String,
+    pub theme: ThemeConfig,
+    pub stt: STTConfig,
 }
 
 /// Database configuration
@@ -53,28 +40,23 @@ pub struct DBConfig {
     pub connection_str: String,
 }
 
-impl Default for DefaultConfig {
-    fn default() -> Self {
-        Self {
-            db: DBConfig::default(),
-            model: DEFAULT_MODEL.to_string(),
-            device: DEFAULT_DEVICE.to_string(),
-            graph_optimization_level: DEFAULT_GRAPH_OPTIMIZATION_LEVEL,
-            n_intra_threads: DEFAULT_N_INTRA_THREADS,
-            parallel_execution: DEFAULT_PARALLEL_EXECUTION,
-            fragmentum_length: DEFAULT_FRAGMENTUM_LENGTH
-        }
-    }
+/// Theme configuration
+#[derive(Deserialize, Serialize, Clone)]
+pub struct ThemeConfig {
+    pub background: String,
+    pub foreground: String,
+    pub highlight: String,
 }
 
-impl Default for Theme {
-    fn default() -> Self {
-        Self {
-            background: DEFAULT_BACKGROUND_COLOR.to_string(),
-            foreground: DEFAULT_FOREGROUND_COLOR.to_string(),
-            highlight: DEFAULT_HIGHLIGHT_COLOR.to_string(),
-        }
-    }
+/// Speech-to-text configuration
+#[derive(Deserialize, Serialize, Clone)]
+pub struct STTConfig {
+    pub model: String,
+    pub device: String,
+    pub graph_optimization_level: usize,
+    pub n_intra_threads: usize,
+    pub parallel_execution: bool,
+    pub fragmentum_length: usize,
 }
 
 impl Default for DBConfig {
@@ -98,12 +80,44 @@ impl Default for DBConfig {
     }
 }
 
+impl Default for ThemeConfig {
+    fn default() -> Self {
+        Self {
+            background: DEFAULT_BACKGROUND_COLOR.to_string(),
+            foreground: DEFAULT_FOREGROUND_COLOR.to_string(),
+            highlight: DEFAULT_HIGHLIGHT_COLOR.to_string(),
+        }
+    }
+}
+
+impl Default for STTConfig {
+    fn default() -> Self {
+        Self {
+            model: DEFAULT_MODEL.to_string(),
+            device: DEFAULT_DEVICE.to_string(),
+            graph_optimization_level: DEFAULT_GRAPH_OPTIMIZATION_LEVEL,
+            n_intra_threads: DEFAULT_N_INTRA_THREADS,
+            parallel_execution: DEFAULT_PARALLEL_EXECUTION,
+            fragmentum_length: DEFAULT_FRAGMENTUM_LENGTH,
+        }
+    }
+}
+
+impl Default for DefaultConfig {
+    fn default() -> Self {
+        Self {
+            db: DBConfig::default(),
+            theme: ThemeConfig::default(),
+            stt: STTConfig::default(),
+        }
+    }
+}
+
 impl Default for Config {
     /// By default, the name is the default name with default config
     fn default() -> Self {
         Self {
             default: DefaultConfig::default(),
-            theme: Theme::default(),
             dbs: vec![DBConfig::default()],
         }
     }
