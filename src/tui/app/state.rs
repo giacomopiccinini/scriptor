@@ -3,8 +3,8 @@ use crate::tui::db::config::{Config, DBConfig};
 use crate::tui::db::connections::init_db;
 use crate::tui::db::models::{Codex, UICodex};
 use crate::tui::ui::components::{
-    AddDBPopUp, AddItemPopUp, AddListPopUp, ChangeDBPopUp, DBSelector, InputState, ItemsComponent,
-    ListsComponent, Logo, ModifyItemPopUp, ModifyListPopUp,
+    AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ArchivumSelector, ChangeArchivumPopUp,
+    CodicesComponent, FoliaComponent, InputState, Logo, ModifyCodexPopUp, ModifyFolioPopUp,
 };
 use crate::tui::ui::cursor::CursorState;
 use crate::tui::ui::layout::AppLayout;
@@ -19,38 +19,52 @@ use sqlx::SqlitePool;
 /// Enum representing the different screens in the application
 #[derive(Debug, Clone, PartialEq)]
 pub enum CurrentScreen {
-    /// Main screen showing lists and items
+    /// Main screen showing codices and folia
     Main,
-    /// Pop-up screen for adding a new list
-    AddList,
-    /// Pop-up screen for modifying an existing list
-    ModifyList,
-    /// Pop-up screen for adding a new item
-    AddItem,
-    /// Pop-up screen for adding a new item
-    ModifyItem,
-    /// Pop-up for changing database
-    ChangeDB,
-    /// Pop-up for adding a new database
-    AddDB,
+    /// Pop-up screen for adding a new
+    AddCodex,
+    /// Pop-up screen for modifying an existing codex
+    ModifyCodex,
+    /// Pop-up screen for adding a new folio (from path)
+    AddFolio,
+    /// Pop-up screen for modifying an existing folio
+    ModifyFolio,
+    /// Pop-up screen for recording a folio
+    RecordFolio,
+    /// Pop-up for changing archivum
+    ChangeArchivum,
+    /// Pop-up for adding a new archivum
+    AddArchivum,
+}
+
+/// Current region to signal where the cursor is
+#[derive(Debug, Clone, PartialEq)]
+pub enum CurrentRegion {
+    Codex,
+    Folio,
+    Fragmentum,
 }
 
 /// Main application state
 pub struct App {
-    /// Configuration of available databases
+    /// App configuration (db, stt inference parameters, theme)
     pub config: Config,
-    /// Config of currently selected database
-    pub current_db_config: DBConfig,
-    /// Current active screen (Main, AddList, ModifyList, or AddItem)
+    /// Current active screen
     pub current_screen: CurrentScreen,
-    /// Database connection pool
+    /// Current active region
+    pub current_region: CurrentRegion,
+    /// Database (archivum) connection pool
     pub pool: SqlitePool,
-    /// Lists component for managing todo lists
-    pub lists_component: ListsComponent,
+    ///  Component for managing codices
+    pub codices_component: CodicesComponent,
     /// State of user-provided input
     pub input_state: InputState,
-    /// Selected database index for DB selector
-    pub selected_db_index: usize,
+    /// Flag to signal if user is recordinng
+    pub is_recording: bool,
+    /// Flag to signal if inference is running
+    pub is_transcribing: bool,
+    /// Selected archivum index for Archivum selector
+    pub selected_archivum_index: usize,
     /// Flag to indicate if the application should exit
     pub exit: bool,
 }
@@ -58,38 +72,38 @@ pub struct App {
 impl App {
     /// Create new app instance
     ///
-    /// Initializes the database connection, loads existing lists from the database,
+    /// Initializes the archivum connection, loads existing codices from the archivum,
     /// and sets up the initial UI state.
     pub async fn new() -> Self {
         // Read the config (creates default if missing)
         let config = Config::read().expect("Failed to read config file");
 
-        // Extract the default db and its connection string
-        let default_db_config = config
-            .get_default()
-            .expect("Couldn't fetch default database");
-        let pool = init_db(&default_db_config.connection_str)
+        // Connect to default archivum (db)
+        let pool = init_db(&config.default.db.connection_str)
             .await
-            .expect("Failed to connect to database");
+            .expect("Failed to connect to archivum");
 
         // Start from main screen
         let current_screen = CurrentScreen::Main;
 
-        // Create lists component and load data
-        let mut lists_component = ListsComponent::new();
-        lists_component
-            .load_lists(&pool)
+        // Create codices component and load data
+        let mut codices_component = CodicesComponent::new();
+        codices_component
+            .load_codices(&pool)
             .await
-            .expect("Failed to read lists");
+            .expect("Failed to read codices");
 
+        // Return initial state of the app
         Self {
-            config,
-            current_db_config: default_db_config,
-            current_screen,
-            pool,
-            lists_component,
+            config: config,
+            current_screen: current_screen,
+            current_region: CurrentRegion::Codex,
+            pool: pool,
+            codices_component: codices_component,
             input_state: InputState::new(),
-            selected_db_index: 0,
+            is_recording: false,
+            is_transcribing: false,
+            selected_archivum_index: 0,
             exit: false,
         }
     }
@@ -111,10 +125,10 @@ impl App {
         Ok(())
     }
 
-    /// Create a new database with the given name
-    pub async fn create_new_database(
+    /// Create a new archivum with the given name
+    pub async fn create_new_archivum(
         &mut self,
-        db_name: String,
+        archivum_name: String,
         set_as_default: bool,
     ) -> Result<()> {
         // Use data directory to standardize storage
@@ -126,30 +140,30 @@ impl App {
         std::fs::create_dir_all(&data_dir)
             .map_err(|e| color_eyre::eyre::eyre!("Failed to create data directory: {}", e))?;
 
-        // Create path to new db file
-        let db_file = format!("{}.db", db_name);
-        let path = data_dir.join(db_file);
+        // Create path to new archivum file
+        let archivum_file = format!("{}.db", archivum_name);
+        let path = data_dir.join(archivum_file);
 
         // Create connection string (only SQLite is admissible)
         let connection_str = format!("sqlite:{}", path.display());
 
-        // Create new database config
-        let new_db_config = DBConfig {
-            name: db_name.clone(),
+        // Create new archivum config
+        let new_archivum_config = DBConfig {
+            name: archivum_name.clone(),
             connection_str: connection_str.clone(),
         };
 
-        // Initialize the new database (this creates the file and runs migrations)
+        // Initialize the new archivum (this creates the file and runs migrations)
         init_db(&connection_str)
             .await
-            .map_err(|e| color_eyre::eyre::eyre!("Failed to initialize new database: {}", e))?;
+            .map_err(|e| color_eyre::eyre::eyre!("Failed to initialize new archivum: {}", e))?;
 
         // Add to config
-        self.config.dbs.push(new_db_config);
+        self.config.dbs.push(new_archivum_config);
 
         // Set as default if requested
         if set_as_default {
-            self.config.default = db_name.clone();
+            self.config.default.db.name = archivum_name.clone();
         }
 
         // Write updated config to file
@@ -162,8 +176,8 @@ impl App {
             .write(&config_path)
             .map_err(|e| color_eyre::eyre::eyre!("Failed to save config: {}", e))?;
 
-        // Update selected index to point to the new database
-        self.selected_db_index = self.config.dbs.len() - 1;
+        // Update selected index to point to the new archivum
+        self.selected_archivum_index = self.config.dbs.len() - 1;
 
         Ok(())
     }
@@ -172,138 +186,140 @@ impl App {
     async fn handle_key_event(&mut self, key: KeyEvent) {
         match self.current_screen {
             CurrentScreen::Main => EventHandler::handle_main_screen_key(self, key).await,
-            CurrentScreen::AddList | CurrentScreen::ModifyList => {
-                EventHandler::handle_add_or_modify_list_screen_key(self, key).await
+            CurrentScreen::AddCodex | CurrentScreen::ModifyCodex => {
+                EventHandler::handle_add_or_modify_codex_screen_key(self, key).await
             }
-            CurrentScreen::AddItem => {
-                EventHandler::handle_add_or_modify_item_screen_key(self, key).await
+            CurrentScreen::AddFolio | CurrentScreen::ModifyFolio => {
+                EventHandler::handle_add_or_modify_folio_screen_key(self, key).await
             }
-            CurrentScreen::ModifyItem => {
-                EventHandler::handle_add_or_modify_item_screen_key(self, key).await
+            CurrentScreen::RecordFolio => todo!(), //TODO
+            CurrentScreen::ChangeArchivum => {
+                EventHandler::handle_change_archivum_screen_key(self, key).await
             }
-            CurrentScreen::ChangeDB => EventHandler::handle_change_db_screen_key(self, key).await,
-            CurrentScreen::AddDB => EventHandler::handle_add_db_screen_key(self, key).await,
+            CurrentScreen::AddArchivum => {
+                EventHandler::handle_add_archivum_screen_key(self, key).await
+            }
         }
     }
 
-    /// Enter the "Add List" screen by opening the corresponding pop-up
-    pub fn enter_add_list_screen(&mut self) {
+    /// Enter the "Add Codex" screen by opening the corresponding pop-up
+    pub fn enter_add_codex_screen(&mut self) {
         self.input_state = InputState::default();
-        self.current_screen = CurrentScreen::AddList;
+        self.current_screen = CurrentScreen::AddCodex;
     }
 
-    /// Enter the "Modify List" screen by opening the corresponding pop-up
-    pub fn enter_modify_list_screen(&mut self, selected_list: &TodoList) {
+    /// Enter the "Modify Codex" screen by opening the corresponding pop-up
+    pub fn enter_modify_codex_screen(&mut self, selected_codex: &Codex) {
         self.input_state = InputState {
-            current_input: selected_list.name.clone(),
+            current_input: selected_codex.name.clone(),
             cursor_pos: 0,
             is_modifying: true,
         };
-        self.current_screen = CurrentScreen::ModifyList;
+        self.current_screen = CurrentScreen::ModifyCodex;
     }
 
-    /// Enter the "Add Item" screen by opening the corresponding pop-up
-    pub fn enter_add_item_screen(&mut self) {
-        if self.lists_component.selected().is_some() {
+    /// Enter the "Add Folio" screen by opening the corresponding pop-up
+    pub fn enter_add_folio_screen(&mut self) {
+        if self.codices_component.selected().is_some() {
             self.input_state = InputState::default();
-            self.current_screen = CurrentScreen::AddItem;
+            self.current_screen = CurrentScreen::AddFolio;
         }
     }
 
-    /// Enter the "Modify Item" screen by opening the corresponding pop-up
-    pub fn enter_modify_item_screen(&mut self, ui_list: &UIList) {
-        if self.lists_component.selected().is_some()
-            && let Some(j) = ui_list.item_state.selected()
+    /// Enter the "Modify Folio" screen by opening the corresponding pop-up
+    pub fn enter_modify_modify_screen(&mut self, ui_codex: &UICodex) {
+        if self.codices_component.selected().is_some()
+            && let Some(j) = ui_codex.folio_state.selected()
         {
-            let selected_item = ui_list.items[j].item.clone();
+            let selected_folio = ui_codex.folia[j].folio.clone();
 
             self.input_state = InputState {
-                current_input: selected_item.name.clone(),
+                current_input: selected_folio.name.clone(),
                 cursor_pos: 0,
                 is_modifying: true,
             };
-            self.current_screen = CurrentScreen::ModifyItem;
+            self.current_screen = CurrentScreen::ModifyFolio;
         }
     }
 
-    /// Exit the Add List screen without saving
-    pub fn exit_add_or_modify_list_without_saving(&mut self) {
+    /// Exit the Add Codex screen without saving
+    pub fn exit_add_or_modify_codex_without_saving(&mut self) {
         self.current_screen = CurrentScreen::Main;
         self.input_state.clear();
     }
 
-    /// Exit the Add Item screen without saving
+    /// Exit the Add Folio screen without saving
     pub fn exit_add_item_without_saving(&mut self) {
         self.current_screen = CurrentScreen::Main;
         self.input_state.clear();
     }
 
-    /// Enter the "Change DB" screen by opening the corresponding pop-up
-    pub fn enter_change_db_screen(&mut self) {
-        // Find the index of the current database in the config
-        self.selected_db_index = self
+    /// Enter the "Change Archivum" screen by opening the corresponding pop-up
+    pub fn enter_change_archivum_screen(&mut self) {
+        // Find the index of the current archivum in the config
+        self.selected_archivum_index = self
             .config
             .dbs
             .iter()
-            .position(|db| db.name == self.current_db_config.name)
+            .position(|archivum| archivum.name == self.config.default.db.name)
             .unwrap_or(0);
-        self.current_screen = CurrentScreen::ChangeDB;
+        self.current_screen = CurrentScreen::ChangeArchivum;
     }
 
-    /// Exit the Change DB screen without saving
-    pub fn exit_change_db_without_saving(&mut self) {
+    /// Exit the Change Archivum screen without saving
+    pub fn exit_change_archivum_without_saving(&mut self) {
         self.current_screen = CurrentScreen::Main;
     }
 
-    /// Enter the "Add DB" screen by opening the corresponding pop-up
-    pub fn enter_add_db_screen(&mut self) {
-        self.current_screen = CurrentScreen::AddDB;
+    /// Enter the "Add Archivum" screen by opening the corresponding pop-up
+    pub fn enter_add_archivum_screen(&mut self) {
+        self.current_screen = CurrentScreen::AddArchivum;
     }
 
-    /// Exit the Add DB screen without saving
-    pub fn exit_add_db_without_saving(&mut self) {
-        self.current_screen = CurrentScreen::ChangeDB;
+    /// Exit the Add Archivum screen without saving
+    pub fn exit_add_archivum_without_saving(&mut self) {
+        self.current_screen = CurrentScreen::ChangeArchivum;
         self.input_state.clear();
     }
 
-    /// Move selection up in DB list
-    pub fn select_previous_db(&mut self) {
+    /// Move selection up in Archivum codex
+    pub fn select_previous_archivum(&mut self) {
         if self.config.dbs.is_empty() {
             return;
         }
-        self.selected_db_index = if self.selected_db_index == 0 {
+        self.selected_archivum_index = if self.selected_archivum_index == 0 {
             self.config.dbs.len() - 1
         } else {
-            self.selected_db_index - 1
+            self.selected_archivum_index - 1
         };
     }
 
-    /// Move selection down in DB list
-    pub fn select_next_db(&mut self) {
+    /// Move selection down in Archivum codex
+    pub fn select_next_archivum(&mut self) {
         if self.config.dbs.is_empty() {
             return;
         }
-        self.selected_db_index = (self.selected_db_index + 1) % self.config.dbs.len();
+        self.selected_archivum_index = (self.selected_archivum_index + 1) % self.config.dbs.len();
     }
 
-    /// Switch to the selected database
-    pub async fn switch_to_selected_db(&mut self) -> Result<()> {
-        if let Some(selected_db) = self.config.dbs.get(self.selected_db_index) {
-            // Initialize connection to the new database
-            let new_pool = init_db(&selected_db.connection_str)
+    /// Switch to the selected archivum
+    pub async fn switch_to_selected_archivum(&mut self) -> Result<()> {
+        if let Some(selected_archivum) = self.config.dbs.get(self.selected_archivum_index) {
+            // Initialize connection to the new archivum
+            let new_pool = init_db(&selected_archivum.connection_str)
                 .await
-                .map_err(|e| color_eyre::eyre::eyre!("Failed to connect to database: {}", e))?;
+                .map_err(|e| color_eyre::eyre::eyre!("Failed to connect to archivum: {}", e))?;
 
             // Update app state
-            self.current_db_config = selected_db.clone();
+            self.config.default.db = selected_archivum.clone();
             self.pool = new_pool;
 
-            // Reload all lists from the new database
-            self.lists_component = ListsComponent::new();
-            self.lists_component
-                .load_lists(&self.pool)
+            // Reload all codices from the new archivum
+            self.codices_component = CodicesComponent::new();
+            self.codices_component
+                .load_codices(&self.pool)
                 .await
-                .map_err(|e| color_eyre::eyre::eyre!("Failed to load lists: {}", e))?;
+                .map_err(|e| color_eyre::eyre::eyre!("Failed to load codices: {}", e))?;
 
             // Return to main screen
             self.current_screen = CurrentScreen::Main;
@@ -311,11 +327,11 @@ impl App {
         Ok(())
     }
 
-    /// Set the selected database as default
-    pub async fn set_selected_db_as_default(&mut self) -> Result<()> {
-        if let Some(selected_db) = self.config.dbs.get(self.selected_db_index) {
+    /// Set the selected archivum as default
+    pub async fn set_selected_archivum_as_default(&mut self) -> Result<()> {
+        if let Some(selected_archivum) = self.config.dbs.get(self.selected_archivum_index) {
             // Update the default in config
-            self.config.default = selected_db.name.clone();
+            self.config.default.db.name = selected_archivum.name.clone();
 
             // Write updated config to file
             let config_dir = dirs::config_dir()
@@ -337,41 +353,46 @@ impl Widget for &mut App {
         AppLayout::render_background(area, buf);
 
         // Calculate layout areas
-        let (lists_area, items_area, logo_area, db_selector_area, closed_selector_area) =
+        let (codices_area, folia_area, logo_area, archivum_selector_area, closed_selector_area) =
             AppLayout::calculate_main_layout(area);
 
         // Render logo
         Logo::render(logo_area, buf);
 
-        // Render db selector only when not in database-related popups
+        // Render archivum selector only when not in archivum-related popups
         if !matches!(
             self.current_screen,
-            CurrentScreen::ChangeDB | CurrentScreen::AddDB
+            CurrentScreen::ChangeArchivum | CurrentScreen::AddArchivum
         ) {
-            DBSelector::render(closed_selector_area, buf, &self.current_db_config.name);
+            ArchivumSelector::render(closed_selector_area, buf, &self.config.default.db.name);
         }
 
         // Render the main areas
-        self.lists_component.render(lists_area, buf);
+        self.codices_component.render(codices_area, buf);
 
-        // Render items with the selected list
-        let selected_list = self.lists_component.get_selected_list_mut();
-        ItemsComponent::render(selected_list, items_area, buf);
+        // Render folia with the selected codex
+        let selected_list = self.codices_component.get_selected_list_mut();
+        FoliaComponent::render(selected_list, folia_area, buf);
 
         // Render popup screens if active
         match self.current_screen {
-            CurrentScreen::AddList => AddListPopUp::render(&self.input_state, lists_area, buf),
-            CurrentScreen::ModifyList => {
-                ModifyListPopUp::render(&self.input_state, lists_area, buf)
+            CurrentScreen::AddCodex => AddCodexPopUp::render(&self.input_state, codices_area, buf),
+            CurrentScreen::ModifyCodex => {
+                ModifyCodexPopUp::render(&self.input_state, codices_area, buf)
             }
-            CurrentScreen::AddItem => AddItemPopUp::render(&self.input_state, items_area, buf),
-            CurrentScreen::ModifyItem => {
-                ModifyItemPopUp::render(&self.input_state, items_area, buf)
+            CurrentScreen::AddFolio => AddFolioPopUp::render(&self.input_state, folia_area, buf),
+            CurrentScreen::ModifyFolio => {
+                ModifyFolioPopUp::render(&self.input_state, folia_area, buf)
             }
-            CurrentScreen::ChangeDB => {
-                ChangeDBPopUp::render(&self.config, self.selected_db_index, db_selector_area, buf)
+            CurrentScreen::ChangeArchivum => ChangeArchivumPopUp::render(
+                &self.config,
+                self.selected_archivum_index,
+                archivum_selector_area,
+                buf,
+            ),
+            CurrentScreen::AddArchivum => {
+                AddArchivumPopUp::render(&self.input_state, archivum_selector_area, buf)
             }
-            CurrentScreen::AddDB => AddDBPopUp::render(&self.input_state, db_selector_area, buf),
             _ => {}
         }
     }
