@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
+use hound::{SampleFormat, WavReader, WavSpec, WavWriter};
 use rubato::{FftFixedIn, Resampler};
 use std::path::Path;
-use hound::{SampleFormat, WavSpec, WavReader, WavWriter};
 
 /// Read audio file from file path and convert to mono by averaging left and right channel
 pub fn read_audio_file_mono(audio_file_path: &Path) -> Result<(Vec<f32>, u32)> {
@@ -78,8 +78,12 @@ pub fn resample(samples: Vec<f32>, original_sr: u32, target_sr: u32) -> Result<V
 }
 
 /// Write audio to file
-pub fn write_mono_wav(samples: Vec<f32>, sr: u32, bits_per_sample: usize, output_path: &Path) -> Result<()> {
-
+pub fn write_mono_wav(
+    samples: Vec<f32>,
+    sr: u32,
+    bits_per_sample: usize,
+    output_path: &Path,
+) -> Result<()> {
     // Create a new WAV specification for the audio
     let audio_spec = WavSpec {
         channels: 1 as u16,
@@ -109,7 +113,7 @@ pub fn write_mono_wav(samples: Vec<f32>, sr: u32, bits_per_sample: usize, output
                 return Err(anyhow::Error::msg(format!(
                     "Unsupported bits per sample: {}",
                     audio_spec.bits_per_sample
-                )))
+                )));
             }
         }
     }

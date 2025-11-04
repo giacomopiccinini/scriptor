@@ -227,7 +227,7 @@ impl App {
     }
 
     /// Enter the "Modify Folio" screen by opening the corresponding pop-up
-    pub fn enter_modify_modify_screen(&mut self, ui_codex: &UICodex) {
+    pub fn enter_modify_folio_screen(&mut self, ui_codex: &UICodex) {
         if self.codices_component.selected().is_some()
             && let Some(j) = ui_codex.folio_state.selected()
         {
