@@ -4,7 +4,8 @@ use crate::tui::db::connections::init_db;
 use crate::tui::db::models::{Codex, UICodex};
 use crate::tui::ui::components::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ArchivumSelector, ChangeArchivumPopUp,
-    CodicesComponent, FoliaComponent, InputState, Logo, ModifyCodexPopUp, ModifyFolioPopUp,
+    CodicesComponent, FoliaComponent, FragmentaComponent, InputState, Logo, ModifyCodexPopUp,
+    ModifyFolioPopUp,
 };
 use crate::tui::ui::cursor::CursorState;
 use crate::tui::ui::layout::AppLayout;
@@ -353,8 +354,14 @@ impl Widget for &mut App {
         AppLayout::render_background(area, buf);
 
         // Calculate layout areas
-        let (codices_area, folia_area, logo_area, archivum_selector_area, closed_selector_area) =
-            AppLayout::calculate_main_layout(area);
+        let (
+            codices_area,
+            folia_area,
+            fragmenta_area,
+            logo_area,
+            archivum_selector_area,
+            closed_selector_area,
+        ) = AppLayout::calculate_main_layout(area);
 
         // Render logo
         Logo::render(logo_area, buf);
@@ -371,8 +378,20 @@ impl Widget for &mut App {
         self.codices_component.render(codices_area, buf);
 
         // Render folia with the selected codex
-        let selected_list = self.codices_component.get_selected_list_mut();
-        FoliaComponent::render(selected_list, folia_area, buf);
+        let selected_codex = self.codices_component.get_selected_codex_mut();
+        FoliaComponent::render(selected_codex, folia_area, buf);
+
+        // Render fragmenta with the selected folio
+        let selected_folio = if let Some(codex) = self.codices_component.get_selected_codex_mut() {
+            if let Some(folio_idx) = codex.folio_state.selected() {
+                codex.folia.get_mut(folio_idx)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        FragmentaComponent::render(selected_folio, fragmenta_area, buf);
 
         // Render popup screens if active
         match self.current_screen {

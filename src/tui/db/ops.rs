@@ -18,14 +18,14 @@ impl Codex {
 
         // Get the next ordering value (max + 1)
         let next_ordering: i64 =
-            sqlx::query_scalar("SELECT COALESCE(MAX(ordering), 0) + 1 FROM codices")
+            sqlx::query_scalar("SELECT COALESCE(MAX(ordering), 0) + 1 FROM codex")
                 .fetch_one(pool)
                 .await
                 .with_context(|| "Failed to get next ordering value for codex")?;
 
         let row = sqlx::query_as::<_, Codex>(
             r#"
-            INSERT INTO codices (name, ordering, created_at, updated_at)
+            INSERT INTO codex (name, ordering, created_at, updated_at)
             VALUES (?1, ?2, ?3, ?4)
             RETURNING id, name, ordering, created_at, updated_at
             "#,
@@ -44,7 +44,7 @@ impl Codex {
     /// Get all codices ordered by ordering
     pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Codex>> {
         let codices = sqlx::query_as::<_, Codex>(
-            "SELECT id, name, ordering, created_at, updated_at FROM codices ORDER BY ordering",
+            "SELECT id, name, ordering, created_at, updated_at FROM codex ORDER BY ordering",
         )
         .fetch_all(pool)
         .await
@@ -56,7 +56,7 @@ impl Codex {
     /// Get a specific codex by ID
     pub async fn get_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Codex>> {
         let codex = sqlx::query_as::<_, Codex>(
-            "SELECT id, name, ordering, created_at, updated_at FROM codices WHERE id = ?1",
+            "SELECT id, name, ordering, created_at, updated_at FROM codex WHERE id = ?1",
         )
         .bind(id)
         .fetch_optional(pool)
@@ -70,7 +70,7 @@ impl Codex {
     pub async fn update_name(&mut self, pool: &SqlitePool, new_name: String) -> Result<()> {
         let now = Utc::now();
 
-        sqlx::query("UPDATE codices SET name = ?1, updated_at = ?2 WHERE id = ?3")
+        sqlx::query("UPDATE codex SET name = ?1, updated_at = ?2 WHERE id = ?3")
             .bind(&new_name)
             .bind(now)
             .bind(self.id)
@@ -85,7 +85,7 @@ impl Codex {
 
     /// Delete codex (cascades to folia and fragmenta)
     pub async fn delete(self, pool: &SqlitePool) -> Result<()> {
-        sqlx::query("DELETE FROM codices WHERE id = ?1")
+        sqlx::query("DELETE FROM codex WHERE id = ?1")
             .bind(self.id)
             .execute(pool)
             .await
@@ -98,7 +98,7 @@ impl Codex {
     pub async fn move_up(&mut self, pool: &SqlitePool) -> Result<()> {
         // Find the codex with the next lower ordering value
         let prev_codex: Option<(i64, i64)> = sqlx::query_as(
-            "SELECT id, ordering FROM codices WHERE ordering < ?1 ORDER BY ordering DESC LIMIT 1",
+            "SELECT id, ordering FROM codex WHERE ordering < ?1 ORDER BY ordering DESC LIMIT 1",
         )
         .bind(self.ordering)
         .fetch_optional(pool)
@@ -107,14 +107,14 @@ impl Codex {
 
         if let Some((prev_id, prev_ordering)) = prev_codex {
             // Swap orderings
-            sqlx::query("UPDATE codices SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE codex SET ordering = ?1 WHERE id = ?2")
                 .bind(self.ordering)
                 .bind(prev_id)
                 .execute(pool)
                 .await
                 .with_context(|| "Failed to update previous codex ordering")?;
 
-            sqlx::query("UPDATE codices SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE codex SET ordering = ?1 WHERE id = ?2")
                 .bind(prev_ordering)
                 .bind(self.id)
                 .execute(pool)
@@ -131,7 +131,7 @@ impl Codex {
     pub async fn move_down(&mut self, pool: &SqlitePool) -> Result<()> {
         // Find the codex with the next higher ordering value
         let next_codex: Option<(i64, i64)> = sqlx::query_as(
-            "SELECT id, ordering FROM codices WHERE ordering > ?1 ORDER BY ordering ASC LIMIT 1",
+            "SELECT id, ordering FROM codex WHERE ordering > ?1 ORDER BY ordering ASC LIMIT 1",
         )
         .bind(self.ordering)
         .fetch_optional(pool)
@@ -140,14 +140,14 @@ impl Codex {
 
         if let Some((next_id, next_ordering)) = next_codex {
             // Swap orderings
-            sqlx::query("UPDATE codices SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE codex SET ordering = ?1 WHERE id = ?2")
                 .bind(self.ordering)
                 .bind(next_id)
                 .execute(pool)
                 .await
                 .with_context(|| "Failed to update next codex ordering")?;
 
-            sqlx::query("UPDATE codices SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE codex SET ordering = ?1 WHERE id = ?2")
                 .bind(next_ordering)
                 .bind(self.id)
                 .execute(pool)
@@ -172,7 +172,7 @@ impl Folio {
 
         // Get the next ordering value for this codex (max + 1)
         let next_ordering: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(MAX(ordering), 0) + 1 FROM folia WHERE codex_id = ?1",
+            "SELECT COALESCE(MAX(ordering), 0) + 1 FROM folio WHERE codex_id = ?1",
         )
         .bind(new_folio.codex_id)
         .fetch_one(pool)
@@ -181,7 +181,7 @@ impl Folio {
 
         let row = sqlx::query_as::<_, Folio>(
             r#"
-            INSERT INTO folia (codex_id, name, ordering, created_at, updated_at)
+            INSERT INTO folio (codex_id, name, ordering, created_at, updated_at)
             VALUES (?1, ?2, ?3, ?4, ?5)
             RETURNING id, codex_id, name, ordering, created_at, updated_at
             "#,
@@ -203,7 +203,7 @@ impl Folio {
         let folia = sqlx::query_as::<_, Folio>(
             r#"
             SELECT id, codex_id, name, ordering, created_at, updated_at
-            FROM folia 
+            FROM folio 
             WHERE codex_id = ?1 
             ORDER BY ordering
             "#,
@@ -221,7 +221,7 @@ impl Folio {
         let folio = sqlx::query_as::<_, Folio>(
             r#"
             SELECT id, codex_id, name, ordering, created_at, updated_at
-            FROM folia 
+            FROM folio 
             WHERE id = ?1 
             "#,
         )
@@ -237,7 +237,7 @@ impl Folio {
     pub async fn update_name(&mut self, pool: &SqlitePool, new_name: String) -> Result<()> {
         let now = Utc::now();
 
-        sqlx::query("UPDATE folia SET name = ?1, updated_at = ?2 WHERE id = ?3")
+        sqlx::query("UPDATE folio SET name = ?1, updated_at = ?2 WHERE id = ?3")
             .bind(&new_name)
             .bind(now)
             .bind(self.id)
@@ -253,7 +253,7 @@ impl Folio {
 
     /// Delete folio (cascades to fragmenta)
     pub async fn delete(self, pool: &SqlitePool) -> Result<()> {
-        sqlx::query("DELETE FROM folia WHERE id = ?1")
+        sqlx::query("DELETE FROM folio WHERE id = ?1")
             .bind(self.id)
             .execute(pool)
             .await
@@ -266,7 +266,7 @@ impl Folio {
     pub async fn move_up(&mut self, pool: &SqlitePool) -> Result<()> {
         // Find the folio with the next lower ordering value in the same codex
         let prev_folio: Option<(i64, i64)> = sqlx::query_as(
-            "SELECT id, ordering FROM folia WHERE codex_id = ?1 AND ordering < ?2 ORDER BY ordering DESC LIMIT 1"
+            "SELECT id, ordering FROM folio WHERE codex_id = ?1 AND ordering < ?2 ORDER BY ordering DESC LIMIT 1"
         )
         .bind(self.codex_id)
         .bind(self.ordering)
@@ -276,14 +276,14 @@ impl Folio {
 
         if let Some((prev_id, prev_ordering)) = prev_folio {
             // Swap orderings
-            sqlx::query("UPDATE folia SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE folio SET ordering = ?1 WHERE id = ?2")
                 .bind(self.ordering)
                 .bind(prev_id)
                 .execute(pool)
                 .await
                 .with_context(|| "Failed to update previous folio ordering")?;
 
-            sqlx::query("UPDATE folia SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE folio SET ordering = ?1 WHERE id = ?2")
                 .bind(prev_ordering)
                 .bind(self.id)
                 .execute(pool)
@@ -300,7 +300,7 @@ impl Folio {
     pub async fn move_down(&mut self, pool: &SqlitePool) -> Result<()> {
         // Find the folio with the next higher ordering value in the same codex
         let next_folio: Option<(i64, i64)> = sqlx::query_as(
-            "SELECT id, ordering FROM folia WHERE codex_id = ?1 AND ordering > ?2 ORDER BY ordering ASC LIMIT 1"
+            "SELECT id, ordering FROM folio WHERE codex_id = ?1 AND ordering > ?2 ORDER BY ordering ASC LIMIT 1"
         )
         .bind(self.codex_id)
         .bind(self.ordering)
@@ -310,14 +310,14 @@ impl Folio {
 
         if let Some((next_id, next_ordering)) = next_folio {
             // Swap orderings
-            sqlx::query("UPDATE folia SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE folio SET ordering = ?1 WHERE id = ?2")
                 .bind(self.ordering)
                 .bind(next_id)
                 .execute(pool)
                 .await
                 .with_context(|| "Failed to update next folio ordering")?;
 
-            sqlx::query("UPDATE folia SET ordering = ?1 WHERE id = ?2")
+            sqlx::query("UPDATE folio SET ordering = ?1 WHERE id = ?2")
                 .bind(next_ordering)
                 .bind(self.id)
                 .execute(pool)
@@ -342,7 +342,7 @@ impl Fragmentum {
 
         let row = sqlx::query_as::<_, Fragmentum>(
             r#"
-            INSERT INTO fragmenta (folio_id, content, audio_path, created_at, updated_at)
+            INSERT INTO fragmentum (folio_id, content, audio_path, created_at, updated_at)
             VALUES (?1, ?2, ?3, ?4, ?5)
             RETURNING id, folio_id, content, audio_path, created_at, updated_at
             "#,
@@ -364,7 +364,7 @@ impl Fragmentum {
         let fragmenta = sqlx::query_as::<_, Fragmentum>(
             r#"
             SELECT id, folio_id, content, audio_path, created_at, updated_at
-            FROM fragmenta 
+            FROM fragmentum 
             WHERE folio_id = ?1 
             ORDER BY id
             "#,
@@ -382,7 +382,7 @@ impl Fragmentum {
         let fragmentum = sqlx::query_as::<_, Fragmentum>(
             r#"
             SELECT id, folio_id, content, audio_path, created_at, updated_at
-            FROM fragmenta 
+            FROM fragmentum 
             WHERE id = ?1 
             "#,
         )
@@ -398,7 +398,7 @@ impl Fragmentum {
     pub async fn update_content(&mut self, pool: &SqlitePool, new_content: String) -> Result<()> {
         let now = Utc::now();
 
-        sqlx::query("UPDATE fragmenta SET content = ?1, updated_at = ?2 WHERE id = ?3")
+        sqlx::query("UPDATE fragmentum SET content = ?1, updated_at = ?2 WHERE id = ?3")
             .bind(&new_content)
             .bind(now)
             .bind(self.id)
@@ -420,7 +420,7 @@ impl Fragmentum {
     ) -> Result<()> {
         let now = Utc::now();
 
-        sqlx::query("UPDATE fragmenta SET audio_path = ?1, updated_at = ?2 WHERE id = ?3")
+        sqlx::query("UPDATE fragmentum SET audio_path = ?1, updated_at = ?2 WHERE id = ?3")
             .bind(&new_audio_path)
             .bind(now)
             .bind(self.id)
@@ -436,7 +436,7 @@ impl Fragmentum {
 
     /// Delete fragmentum
     pub async fn delete(self, pool: &SqlitePool) -> Result<()> {
-        sqlx::query("DELETE FROM fragmenta WHERE id = ?1")
+        sqlx::query("DELETE FROM fragmentum WHERE id = ?1")
             .bind(self.id)
             .execute(pool)
             .await

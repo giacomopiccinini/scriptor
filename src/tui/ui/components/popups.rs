@@ -9,17 +9,17 @@ use ratatui::widgets::{
 };
 use std::str::FromStr;
 
-pub struct AddListPopUp;
-pub struct ModifyListPopUp;
+pub struct AddCodexPopUp;
+pub struct ModifyCodexPopUp;
 
-fn render_list_popup_kernel<T: CursorState>(
+fn render_codex_popup_kernel<T: CursorState>(
     state: &T,
     area: Rect,
     buf: &mut Buffer,
     popup_title: &str,
 ) {
-    // Command hints for add list popup
-    let add_or_modify_list_command_hints = Line::from(vec![
+    // Command hints for add/modify codex popup
+    let add_or_modify_codex_command_hints = Line::from(vec![
         Span::raw(" "),
         Span::styled(
             "[Esc]",
@@ -57,7 +57,7 @@ fn render_list_popup_kernel<T: CursorState>(
         .padding(Padding::new(2, 2, 1, 1))
         .title(format!("  {}  ", popup_title))
         .title_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
-        .title_bottom(add_or_modify_list_command_hints)
+        .title_bottom(add_or_modify_codex_command_hints)
         .borders(Borders::ALL)
         .border_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
         .border_type(BorderType::Rounded)
@@ -74,41 +74,37 @@ fn render_list_popup_kernel<T: CursorState>(
         .render(popup_area, buf);
 }
 
-impl AddListPopUp {
-    /// Render popup for entering a new list name
+impl AddCodexPopUp {
+    /// Render popup for entering a new codex name
     pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer) {
-        render_list_popup_kernel(state, area, buf, "Add List");
+        render_codex_popup_kernel(state, area, buf, "Add Codex");
     }
 }
 
-impl ModifyListPopUp {
-    /// Render popup for entering a new list name
+impl ModifyCodexPopUp {
+    /// Render popup for modifying a codex name
     pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer) {
-        render_list_popup_kernel(state, area, buf, "Modify List");
+        render_codex_popup_kernel(state, area, buf, "Modify Codex");
     }
 }
 
-pub struct AddItemPopUp;
-pub struct ModifyItemPopUp;
+pub struct AddFolioPopUp;
+pub struct ModifyFolioPopUp;
 
-/// Render popup for entering a new item name
-pub fn render_item_popup_kernel<T: CursorState>(
+/// Render popup for entering a new folio name
+pub fn render_folio_popup_kernel<T: CursorState>(
     state: &T,
     area: Rect,
     buf: &mut Buffer,
     popup_title: &str,
 ) {
-    // Command hints for add item popup
-    let add_item_command_hints = Line::from(vec![
+    // Command hints for add/modify folio popup
+    let add_folio_command_hints = Line::from(vec![
         Span::raw(" "),
         Span::styled(
             "[Esc]",
             Style::default().fg(Color::from_str("#FFA69E").unwrap()),
         ),
-        // Span::styled(
-        //     "sc",
-        //     Style::default().fg(Color::from_str("#FCF1D5").unwrap()),
-        // ),
         Span::raw(" "),
     ]);
 
@@ -141,7 +137,7 @@ pub fn render_item_popup_kernel<T: CursorState>(
         .padding(Padding::new(2, 2, 1, 1))
         .title(format!("  {}  ", popup_title))
         .title_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
-        .title_bottom(add_item_command_hints)
+        .title_bottom(add_folio_command_hints)
         .borders(Borders::ALL)
         .border_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
         .border_type(BorderType::Rounded)
@@ -158,27 +154,27 @@ pub fn render_item_popup_kernel<T: CursorState>(
         .render(popup_area, buf);
 }
 
-impl AddItemPopUp {
-    /// Render popup for entering a new item
+impl AddFolioPopUp {
+    /// Render popup for entering a new folio
     pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer) {
-        render_item_popup_kernel(state, area, buf, "Add Item");
+        render_folio_popup_kernel(state, area, buf, "Add Folio");
     }
 }
 
-impl ModifyItemPopUp {
-    /// Render popup for modifying item name
+impl ModifyFolioPopUp {
+    /// Render popup for modifying folio name
     pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer) {
-        render_item_popup_kernel(state, area, buf, "Modify Item");
+        render_folio_popup_kernel(state, area, buf, "Modify Folio");
     }
 }
 
-pub struct ChangeDBPopUp;
+pub struct ChangeArchivumPopUp;
 
-impl ChangeDBPopUp {
-    /// Render popup for selecting database
+impl ChangeArchivumPopUp {
+    /// Render popup for selecting archivum
     pub fn render(config: &Config, selected_index: usize, area: Rect, buf: &mut Buffer) {
-        // Command hints for change db popup
-        let change_db_command_hints = Line::from(vec![
+        // Command hints for change archivum popup
+        let change_archivum_command_hints = Line::from(vec![
             Span::raw(" "),
             Span::styled(" ↑↓ ", Style::default()),
             Span::styled(
@@ -215,25 +211,25 @@ impl ChangeDBPopUp {
         // Define the popup block with styling
         let popup_block = Block::new()
             .padding(Padding::new(2, 2, 1, 1))
-            .title(" Select Database ")
+            .title(" Select Archivum ")
             .title_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
-            .title_bottom(change_db_command_hints)
+            .title_bottom(change_archivum_command_hints)
             .borders(Borders::ALL)
             .border_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
             .border_type(BorderType::Rounded);
 
-        // Create list items from databases
+        // Create list items from archiva (databases)
         let items: Vec<ListItem> = config
             .dbs
             .iter()
-            .map(|db| ListItem::from(db.name.clone()))
+            .map(|archivum| ListItem::from(archivum.name.clone()))
             .collect();
 
         // Create a mutable list state for rendering
         let mut temp_list_state = ratatui::widgets::ListState::default();
         temp_list_state.select(Some(selected_index));
 
-        // Render the database list
+        // Render the archivum list
         let list = List::new(items)
             .block(popup_block)
             .highlight_symbol(" ▸ ") // Selection indicator
@@ -249,13 +245,13 @@ impl ChangeDBPopUp {
     }
 }
 
-pub struct AddDBPopUp;
+pub struct AddArchivumPopUp;
 
-impl AddDBPopUp {
-    /// Render popup for entering a new database name
+impl AddArchivumPopUp {
+    /// Render popup for entering a new archivum name
     pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer) {
-        // Command hints for add db popup
-        let add_db_command_hints = Line::from(vec![
+        // Command hints for add archivum popup
+        let add_archivum_command_hints = Line::from(vec![
             Span::raw(" "),
             Span::styled(
                 "[Esc]",
@@ -277,9 +273,9 @@ impl AddDBPopUp {
         // Define the popup block with styling - use full width
         let popup_block = Block::new()
             .padding(Padding::new(2, 2, 1, 1))
-            .title(" Add Database ")
+            .title(" Add Archivum ")
             .title_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
-            .title_bottom(add_db_command_hints)
+            .title_bottom(add_archivum_command_hints)
             .borders(Borders::ALL)
             .border_style(Style::new().fg(Color::from_str("#FCF1D5").unwrap()))
             .border_type(BorderType::Rounded)

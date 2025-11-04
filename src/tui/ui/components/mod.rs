@@ -1,15 +1,18 @@
-pub mod db_selector;
+pub mod archivum_selector;
+pub mod codices;
+pub mod folia;
+pub mod fragmenta;
 pub mod input_states;
-pub mod items;
-pub mod lists;
 pub mod logo;
 pub mod popups;
 
-pub use db_selector::DBSelector;
+pub use archivum_selector::ArchivumSelector;
+pub use codices::CodicesComponent;
+pub use folia::FoliaComponent;
+pub use fragmenta::FragmentaComponent;
 pub use input_states::InputState;
-pub use items::ItemsComponent;
-pub use lists::ListsComponent;
 pub use logo::Logo;
 pub use popups::{
-    AddDBPopUp, AddItemPopUp, AddListPopUp, ChangeDBPopUp, ModifyItemPopUp, ModifyListPopUp,
+    AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, ModifyCodexPopUp,
+    ModifyFolioPopUp,
 };

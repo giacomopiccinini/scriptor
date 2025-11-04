@@ -1,5 +1,5 @@
 use crate::tui::app::state::{App, CurrentRegion, CurrentScreen};
-use crate::tui::ui::components::{CodicesComponent, FoliaComponent};
+use crate::tui::ui::components::{CodicesComponent, FoliaComponent, FragmentaComponent};
 use crate::tui::ui::cursor::CursorState;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -20,7 +20,17 @@ impl EventHandler {
                         FoliaComponent::select_previous_folio(selected_codex);
                     }
                 }
-                CurrentRegion::Fragmentum => todo!(),
+                CurrentRegion::Fragmentum => {
+                    if let Some(selected_codex) = app.codices_component.get_selected_codex_mut() {
+                        if let Some(selected_folio_idx) = selected_codex.folio_state.selected() {
+                            if let Some(selected_folio) =
+                                selected_codex.folia.get_mut(selected_folio_idx)
+                            {
+                                FragmentaComponent::select_previous_fragmentum(selected_folio);
+                            }
+                        }
+                    }
+                }
             },
 
             // Navigate down in codices, folia or fragmenta
@@ -31,7 +41,17 @@ impl EventHandler {
                         FoliaComponent::select_next_folio(selected_codex);
                     }
                 }
-                CurrentRegion::Fragmentum => todo!(),
+                CurrentRegion::Fragmentum => {
+                    if let Some(selected_codex) = app.codices_component.get_selected_codex_mut() {
+                        if let Some(selected_folio_idx) = selected_codex.folio_state.selected() {
+                            if let Some(selected_folio) =
+                                selected_codex.folia.get_mut(selected_folio_idx)
+                            {
+                                FragmentaComponent::select_next_fragmentum(selected_folio);
+                            }
+                        }
+                    }
+                }
             },
 
             // Add new codex
@@ -127,9 +147,10 @@ impl EventHandler {
                 CurrentRegion::Fragmentum => {}
             },
 
+            // Navigate left between regions
             (KeyCode::Left, KeyModifiers::NONE) => {
                 match app.current_region {
-                    CurrentRegion::Codex => {} // Nothing here
+                    CurrentRegion::Codex => {} // Nothing here, already at leftmost
                     CurrentRegion::Folio => {
                         if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
                         {
@@ -137,14 +158,74 @@ impl EventHandler {
                         }
                         app.current_region = CurrentRegion::Codex;
                     }
-                    CurrentRegion::Fragmentum => todo!(),
+                    CurrentRegion::Fragmentum => {
+                        // Move back to Folio region
+                        if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
+                        {
+                            if let Some(selected_folio_idx) = selected_codex.folio_state.selected()
+                            {
+                                if let Some(selected_folio) =
+                                    selected_codex.folia.get_mut(selected_folio_idx)
+                                {
+                                    // Remove fragmentum selection
+                                    selected_folio.fragmentum_state.select(None);
+                                }
+                            }
+                        }
+                        app.current_region = CurrentRegion::Folio;
+                    }
                 }
             }
 
+            // Navigate right between regions
             (KeyCode::Right, KeyModifiers::NONE) => {
-                if let Some(selected_codex) = app.codices_component.get_selected_codex_mut() {
-                    FoliaComponent::select_first_item(selected_codex);
+                match app.current_region {
+                    CurrentRegion::Codex => {
+                        // Move to Folio region if a codex is selected
+                        if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
+                        {
+                            FoliaComponent::select_first_item(selected_codex);
+                            app.current_region = CurrentRegion::Folio;
+                        }
+                    }
+                    CurrentRegion::Folio => {
+                        // Move to Fragmentum region if a folio is selected
+                        if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
+                        {
+                            if let Some(selected_folio_idx) = selected_codex.folio_state.selected()
+                            {
+                                if let Some(selected_folio) =
+                                    selected_codex.folia.get_mut(selected_folio_idx)
+                                {
+                                    // Select first fragmentum if available
+                                    if !selected_folio.fragmenta.is_empty() {
+                                        selected_folio.fragmentum_state.select_first();
+                                        app.current_region = CurrentRegion::Fragmentum;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    CurrentRegion::Fragmentum => {} // Nothing here, already at rightmost
                 }
+            }
+
+            // Start recording (placeholder)
+            (KeyCode::Char('r'), KeyModifiers::NONE) => {
+                // TODO: Implement recording functionality
+                eprintln!("Recording not yet implemented");
+            }
+
+            // Copy single fragmentum (placeholder)
+            (KeyCode::Char('c'), KeyModifiers::NONE) => {
+                // TODO: Implement copy fragmentum to clipboard
+                eprintln!("Copy fragmentum not yet implemented");
+            }
+
+            // Copy all fragmenta from selected folio (placeholder)
+            (KeyCode::Char('C'), KeyModifiers::SHIFT) => {
+                // TODO: Implement copy all fragmenta to clipboard
+                eprintln!("Copy all fragmenta not yet implemented");
             }
             _ => {}
         }
@@ -194,10 +275,10 @@ impl EventHandler {
         }
     }
 
-    /// Handle key press from user in add item screen
+    /// Handle key press from user in add folio screen
     pub async fn handle_add_or_modify_folio_screen_key(app: &mut App, key: KeyEvent) {
         match key.code {
-            KeyCode::Esc => app.exit_add_folio_without_saving(),
+            KeyCode::Esc => app.exit_add_item_without_saving(),
             KeyCode::Backspace => app.input_state.remove_char_before_cursor(),
             KeyCode::Delete => app.input_state.delete_char_after_cursor(),
             KeyCode::Left => app.input_state.move_cursor_left(),
@@ -231,29 +312,29 @@ impl EventHandler {
         }
     }
 
-    /// Handle change of db
+    /// Handle change of archivum
     pub async fn handle_change_archivum_screen_key(app: &mut App, key: KeyEvent) {
         match key.code {
             KeyCode::Esc => app.exit_change_archivum_without_saving(),
-            KeyCode::Up => app.select_previous_db(),
-            KeyCode::Down => app.select_next_db(),
+            KeyCode::Up => app.select_previous_archivum(),
+            KeyCode::Down => app.select_next_archivum(),
             KeyCode::Enter => {
-                if let Err(e) = app.switch_to_selected_db().await {
-                    eprintln!("Failed to switch database: {}", e);
+                if let Err(e) = app.switch_to_selected_archivum().await {
+                    eprintln!("Failed to switch archivum: {}", e);
                 }
             }
             KeyCode::Char('A') => app.enter_add_archivum_screen(),
             KeyCode::Char('S') => {
-                // Set selected database as default
+                // Set selected archivum as default
                 if let Err(e) = app.set_selected_archivum_as_default().await {
-                    eprintln!("Failed to set database as default: {}", e);
+                    eprintln!("Failed to set archivum as default: {}", e);
                 }
             }
             _ => {}
         }
     }
 
-    /// Handle key press from user in add database screen
+    /// Handle key press from user in add archivum screen
     pub async fn handle_add_archivum_screen_key(app: &mut App, key: KeyEvent) {
         match key.code {
             KeyCode::Esc => app.exit_add_archivum_without_saving(),
@@ -263,12 +344,12 @@ impl EventHandler {
             KeyCode::Left => app.input_state.move_cursor_left(),
             KeyCode::Right => app.input_state.move_cursor_right(),
             KeyCode::Enter => {
-                let db_name = app.input_state.get_text().to_string();
-                if !db_name.trim().is_empty() {
-                    if let Err(e) = app.create_new_database(db_name, false).await {
-                        eprintln!("Failed to create database: {}", e);
+                let archivum_name = app.input_state.get_text().to_string();
+                if !archivum_name.trim().is_empty() {
+                    if let Err(e) = app.create_new_archivum(archivum_name, false).await {
+                        eprintln!("Failed to create archivum: {}", e);
                     } else {
-                        app.current_screen = CurrentScreen::ChangeDB;
+                        app.current_screen = CurrentScreen::ChangeArchivum;
                         app.input_state.clear();
                     }
                 }
