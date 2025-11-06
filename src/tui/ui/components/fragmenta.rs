@@ -86,11 +86,10 @@ impl FragmentaComponent {
 
         let block = Block::default()
             .padding(Padding::new(2, 2, 1, 1))
-            .title_top(Line::raw("  F R A G M E N T U M  ").left_aligned())
             .title_bottom(fragmentum_command_hints)
             .title_bottom(quit_hint)
             .title_alignment(Alignment::Center)
-            .borders(Borders::ALL)
+            .borders(Borders::LEFT | Borders::BOTTOM | Borders::RIGHT)
             .border_type(BorderType::Rounded);
 
         if let Some(ui_folio) = selected_folio {

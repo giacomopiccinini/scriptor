@@ -3,9 +3,8 @@ use crate::tui::db::config::{Config, DBConfig};
 use crate::tui::db::connections::init_db;
 use crate::tui::db::models::{Codex, UICodex};
 use crate::tui::ui::components::{
-    AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ArchivumSelector, ChangeArchivumPopUp,
-    CodicesComponent, FoliaComponent, FragmentaComponent, InputState, Logo, ModifyCodexPopUp,
-    ModifyFolioPopUp,
+    AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, CodicesComponent,
+    FragmentaComponent, InputState, Logo, ModifyCodexPopUp, ModifyFolioPopUp,
 };
 use crate::tui::ui::cursor::CursorState;
 use crate::tui::ui::layout::AppLayout;
@@ -358,36 +357,26 @@ impl Widget for &mut App {
 
         // Calculate layout areas
         let (
+            codices_header_area,
             codices_area,
-            folia_area,
+            bookmark_area,
+            fragmenta_header_area,
             fragmenta_area,
             logo_area,
-            archivum_selector_area,
-            closed_selector_area,
         ) = AppLayout::calculate_main_layout(area);
 
         // Render logo
         Logo::render(logo_area, buf);
 
-        // Render archivum selector only when not in archivum-related popups
-        if !matches!(
-            self.current_screen,
-            CurrentScreen::ChangeArchivum | CurrentScreen::AddArchivum
-        ) {
-            ArchivumSelector::render(
-                closed_selector_area,
-                buf,
-                &self.config.default.db.name,
-                theme,
-            );
-        }
+        // Render column headers
+        AppLayout::render_header(codices_header_area, buf, "C O D I C E S", theme);
+        AppLayout::render_header(fragmenta_header_area, buf, "F R A G M E N T A", theme);
+
+        // Render bookmark area (archivum selector in the middle)
+        AppLayout::render_bookmark(bookmark_area, buf, "   A R C H I V U M", theme);
 
         // Render the main areas
         self.codices_component.render(codices_area, buf, theme);
-
-        // Render folia with the selected codex
-        let selected_codex = self.codices_component.get_selected_codex_mut();
-        FoliaComponent::render(selected_codex, folia_area, buf, theme);
 
         // Render fragmenta with the selected folio
         let selected_folio = if let Some(codex) = self.codices_component.get_selected_codex_mut() {
@@ -410,20 +399,20 @@ impl Widget for &mut App {
                 ModifyCodexPopUp::render(&self.input_state, codices_area, buf, theme)
             }
             CurrentScreen::AddFolio => {
-                AddFolioPopUp::render(&self.input_state, folia_area, buf, theme)
+                AddFolioPopUp::render(&self.input_state, bookmark_area, buf, theme)
             }
             CurrentScreen::ModifyFolio => {
-                ModifyFolioPopUp::render(&self.input_state, folia_area, buf, theme)
+                ModifyFolioPopUp::render(&self.input_state, bookmark_area, buf, theme)
             }
             CurrentScreen::ChangeArchivum => ChangeArchivumPopUp::render(
                 &self.config,
                 self.selected_archivum_index,
-                archivum_selector_area,
+                bookmark_area,
                 buf,
                 theme,
             ),
             CurrentScreen::AddArchivum => {
-                AddArchivumPopUp::render(&self.input_state, archivum_selector_area, buf, theme)
+                AddArchivumPopUp::render(&self.input_state, bookmark_area, buf, theme)
             }
             _ => {}
         }

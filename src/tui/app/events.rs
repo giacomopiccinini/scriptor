@@ -12,13 +12,17 @@ impl EventHandler {
             // Quit application
             (KeyCode::Char('q'), KeyModifiers::NONE) => app.exit = true,
 
-            // Navigate up in codices, folia or fragmenta
+            // Navigate up in codices tree or fragmenta
             (KeyCode::Up, KeyModifiers::NONE) => match app.current_region {
-                CurrentRegion::Codex => app.codices_component.select_previous(),
-                CurrentRegion::Folio => {
-                    if let Some(selected_codex) = app.codices_component.get_selected_codex_mut() {
-                        FoliaComponent::select_previous_folio(selected_codex);
+                CurrentRegion::Codex => {
+                    // Try smart navigation first (auto-expand previous codex at boundary)
+                    if !app.codices_component.handle_smart_navigation_up() {
+                        // Regular navigation
+                        app.codices_component.select_previous();
                     }
+                }
+                CurrentRegion::Folio => {
+                    // Middle column (bookmark) - no navigation
                 }
                 CurrentRegion::Fragmentum => {
                     if let Some(selected_codex) = app.codices_component.get_selected_codex_mut() {
@@ -33,13 +37,16 @@ impl EventHandler {
                 }
             },
 
-            // Navigate down in codices, folia or fragmenta
+            // Navigate down in codices tree or fragmenta
             (KeyCode::Down, KeyModifiers::NONE) => match app.current_region {
-                CurrentRegion::Codex => app.codices_component.select_next(),
+                CurrentRegion::Codex => {
+                    // Regular navigation
+                    app.codices_component.select_next();
+                    // Try smart navigation (auto-expand next codex at boundary)
+                    app.codices_component.handle_smart_navigation_down();
+                }
                 CurrentRegion::Folio => {
-                    if let Some(selected_codex) = app.codices_component.get_selected_codex_mut() {
-                        FoliaComponent::select_next_folio(selected_codex);
-                    }
+                    // Middle column (bookmark) - no navigation
                 }
                 CurrentRegion::Fragmentum => {
                     if let Some(selected_codex) = app.codices_component.get_selected_codex_mut() {
@@ -53,6 +60,13 @@ impl EventHandler {
                     }
                 }
             },
+
+            // Expand/collapse codex with Enter key
+            (KeyCode::Enter, KeyModifiers::NONE) => {
+                if app.current_region == CurrentRegion::Codex {
+                    app.codices_component.toggle_selected_codex_expansion();
+                }
+            }
 
             // Add new codex
             (KeyCode::Char('A'), KeyModifiers::SHIFT) => app.enter_add_codex_screen(),
@@ -147,66 +161,29 @@ impl EventHandler {
                 CurrentRegion::Fragmentum => {}
             },
 
-            // Navigate left between regions
+            // Navigate left between regions (Codex <- Folio <- Fragmentum)
             (KeyCode::Left, KeyModifiers::NONE) => {
                 match app.current_region {
-                    CurrentRegion::Codex => {} // Nothing here, already at leftmost
+                    CurrentRegion::Codex => {} // Already at leftmost
                     CurrentRegion::Folio => {
-                        if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
-                        {
-                            FoliaComponent::remove_folio_selection(selected_codex);
-                        }
                         app.current_region = CurrentRegion::Codex;
                     }
                     CurrentRegion::Fragmentum => {
-                        // Move back to Folio region
-                        if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
-                        {
-                            if let Some(selected_folio_idx) = selected_codex.folio_state.selected()
-                            {
-                                if let Some(selected_folio) =
-                                    selected_codex.folia.get_mut(selected_folio_idx)
-                                {
-                                    // Remove fragmentum selection
-                                    selected_folio.fragmentum_state.select(None);
-                                }
-                            }
-                        }
                         app.current_region = CurrentRegion::Folio;
                     }
                 }
             }
 
-            // Navigate right between regions
+            // Navigate right between regions (Codex -> Folio -> Fragmentum)
             (KeyCode::Right, KeyModifiers::NONE) => {
                 match app.current_region {
                     CurrentRegion::Codex => {
-                        // Move to Folio region if a codex is selected
-                        if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
-                        {
-                            FoliaComponent::select_first_item(selected_codex);
-                            app.current_region = CurrentRegion::Folio;
-                        }
+                        app.current_region = CurrentRegion::Folio;
                     }
                     CurrentRegion::Folio => {
-                        // Move to Fragmentum region if a folio is selected
-                        if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
-                        {
-                            if let Some(selected_folio_idx) = selected_codex.folio_state.selected()
-                            {
-                                if let Some(selected_folio) =
-                                    selected_codex.folia.get_mut(selected_folio_idx)
-                                {
-                                    // Select first fragmentum if available
-                                    if !selected_folio.fragmenta.is_empty() {
-                                        selected_folio.fragmentum_state.select_first();
-                                        app.current_region = CurrentRegion::Fragmentum;
-                                    }
-                                }
-                            }
-                        }
+                        app.current_region = CurrentRegion::Fragmentum;
                     }
-                    CurrentRegion::Fragmentum => {} // Nothing here, already at rightmost
+                    CurrentRegion::Fragmentum => {} // Already at rightmost
                 }
             }
 

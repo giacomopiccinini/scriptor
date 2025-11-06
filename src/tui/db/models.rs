@@ -55,6 +55,7 @@ pub struct UICodex {
     pub codex: Codex,
     pub folio_state: ListState,
     pub folia: Vec<UIFolio>,
+    pub is_expanded: bool, // Track if folia are visible
 }
 
 #[derive(Debug, Clone)]

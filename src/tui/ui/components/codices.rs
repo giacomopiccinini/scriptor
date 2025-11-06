@@ -2,7 +2,7 @@ use crate::tui::db::config::ThemeConfig;
 use crate::tui::db::models::{Codex, NewCodex, UICodex};
 use anyhow::Result;
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Alignment, Rect};
+use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{
@@ -68,6 +68,116 @@ impl CodicesComponent {
         } else {
             None
         }
+    }
+
+    /// Get codex index and optional folio index from visual list index
+    /// Returns (codex_idx, Some(folio_idx)) if on a folio, or (codex_idx, None) if on a codex
+    fn get_codex_and_folio_at_visual_index(&self, visual_idx: usize) -> (usize, Option<usize>) {
+        let mut current_visual_idx = 0;
+
+        for (codex_idx, codex) in self.codices.iter().enumerate() {
+            if current_visual_idx == visual_idx {
+                // We're on the codex line
+                return (codex_idx, None);
+            }
+            current_visual_idx += 1;
+
+            if codex.is_expanded {
+                for folio_idx in 0..codex.folia.len() {
+                    if current_visual_idx == visual_idx {
+                        // We're on a folio line
+                        return (codex_idx, Some(folio_idx));
+                    }
+                    current_visual_idx += 1;
+                }
+            }
+        }
+
+        // Default: return last codex
+        (self.codices.len().saturating_sub(1), None)
+    }
+
+    /// Toggle expand/collapse for the currently selected codex
+    pub fn toggle_selected_codex_expansion(&mut self) {
+        if let Some(selected_idx) = self.codex_state.selected() {
+            // Find which codex we're on
+            let (codex_idx, _) = self.get_codex_and_folio_at_visual_index(selected_idx);
+
+            if let Some(codex) = self.codices.get_mut(codex_idx) {
+                codex.is_expanded = !codex.is_expanded;
+
+                // If collapsing, ensure selection stays on the codex line
+                if !codex.is_expanded {
+                    let visual_idx = self.get_visual_index_for_codex(codex_idx);
+                    self.codex_state.select(Some(visual_idx));
+                }
+            }
+        }
+    }
+
+    /// Get visual index for a given codex index
+    fn get_visual_index_for_codex(&self, codex_idx: usize) -> usize {
+        let mut visual_idx = 0;
+
+        for (idx, codex) in self.codices.iter().enumerate() {
+            if idx == codex_idx {
+                return visual_idx;
+            }
+            visual_idx += 1;
+            if codex.is_expanded {
+                visual_idx += codex.folia.len();
+            }
+        }
+
+        visual_idx
+    }
+
+    /// Smart navigation: handle boundary overflow (auto-expand next/previous codex)
+    pub fn handle_smart_navigation_down(&mut self) -> bool {
+        if let Some(selected_idx) = self.codex_state.selected() {
+            let (codex_idx, folio_idx_opt) = self.get_codex_and_folio_at_visual_index(selected_idx);
+
+            // If we're on a folio and it's the last one in an expanded codex
+            if let Some(folio_idx) = folio_idx_opt {
+                if let Some(codex) = self.codices.get(codex_idx) {
+                    if codex.is_expanded && folio_idx == codex.folia.len() - 1 {
+                        // Try to open next codex
+                        if codex_idx + 1 < self.codices.len() {
+                            if let Some(next_codex) = self.codices.get_mut(codex_idx + 1) {
+                                next_codex.is_expanded = true;
+                                // Move to the next codex line
+                                self.select_next();
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Smart navigation: handle boundary overflow upward (auto-expand previous codex)
+    pub fn handle_smart_navigation_up(&mut self) -> bool {
+        if let Some(selected_idx) = self.codex_state.selected() {
+            let (codex_idx, folio_idx_opt) = self.get_codex_and_folio_at_visual_index(selected_idx);
+
+            // If we're on a folio and it's the first one in an expanded codex
+            if let Some(folio_idx) = folio_idx_opt {
+                if folio_idx == 0 {
+                    // Try to open previous codex
+                    if codex_idx > 0 {
+                        if let Some(prev_codex) = self.codices.get_mut(codex_idx - 1) {
+                            prev_codex.is_expanded = true;
+                            // Move to the previous codex line
+                            self.select_previous();
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Refresh codices from archivum (used after reordering)
@@ -177,39 +287,49 @@ impl CodicesComponent {
         Ok(())
     }
 
-    /// Render the list of codices
+    /// Render the hierarchical tree of codices with collapsible folia
     pub fn render(&mut self, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
         // Command hints for codices
         let codex_command_hints = Line::from(vec![
             Span::raw(" "),
             Span::styled("[A]", Style::default().fg(theme.highlight)),
-            Span::styled("dd", Style::default().fg(theme.foreground)),
-            Span::styled(" [D]", Style::default().fg(theme.highlight)),
-            Span::styled("el", Style::default().fg(theme.foreground)),
-            Span::styled(" [M]", Style::default().fg(theme.highlight)),
-            Span::styled("odify ", Style::default().fg(theme.foreground)),
+            Span::styled("dd ", Style::default().fg(theme.foreground)),
+            Span::styled("[D]", Style::default().fg(theme.highlight)),
+            Span::styled("el ", Style::default().fg(theme.foreground)),
+            Span::styled("[Enter]", Style::default().fg(theme.highlight)),
+            Span::styled("expand ", Style::default().fg(theme.foreground)),
             Span::raw(" "),
         ])
         .left_aligned();
 
         let block = Block::default()
             .padding(Padding::new(2, 2, 1, 1))
-            .title_top(Line::raw("  C O D E X  ").left_aligned())
             .title_bottom(codex_command_hints)
-            .title_alignment(Alignment::Center)
-            .borders(Borders::TOP | Borders::LEFT | Borders::BOTTOM)
+            .borders(Borders::LEFT | Borders::BOTTOM | Borders::RIGHT)
             .border_type(BorderType::Rounded);
 
-        // Convert codices to display items
-        let items: Vec<ListItem> = self
-            .codices
-            .iter()
-            .map(|ui_codex| ListItem::from(ui_codex.codex.name.clone()))
-            .collect();
+        // Build hierarchical tree view
+        let mut items: Vec<ListItem> = Vec::new();
+
+        for ui_codex in &self.codices {
+            // Show codex with medieval expand/collapse indicator
+            let indicator = if ui_codex.is_expanded { "❖" } else { "◆" };
+            items.push(ListItem::from(format!(
+                "{} {}",
+                indicator, ui_codex.codex.name
+            )));
+
+            // Show folia if expanded (no symbol, just indent)
+            if ui_codex.is_expanded {
+                for ui_folio in &ui_codex.folia {
+                    items.push(ListItem::from(format!("    {}", ui_folio.folio.name)));
+                }
+            }
+        }
 
         let list: List = List::new(items)
             .block(block)
-            .highlight_symbol(" ▸ ") // Selection indicator
+            .highlight_symbol("  ") // No symbol, just space for padding
             .highlight_style(
                 // Swap foreground and background for selected item
                 Style::default().bg(theme.foreground).fg(theme.background),

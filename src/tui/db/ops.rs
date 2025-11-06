@@ -491,6 +491,7 @@ impl UICodex {
                 codex,
                 folio_state: ListState::default(),
                 folia: ui_folia,
+                is_expanded: false, // Start collapsed by default
             });
         }
 
