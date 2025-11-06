@@ -145,7 +145,7 @@ impl FoliaComponent {
             .title_top(Line::raw("  F O L I O  ").left_aligned())
             .title_bottom(folio_command_hints)
             .title_alignment(Alignment::Center)
-            .borders(Borders::TOP | Borders::BOTTOM)
+            .borders(Borders::TOP | Borders::BOTTOM | Borders::LEFT)
             .border_type(BorderType::Rounded);
 
         if let Some(ui_codex) = selected_codex {

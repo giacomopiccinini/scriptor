@@ -17,7 +17,7 @@ const DEFAULT_PARALLEL_EXECUTION: bool = true;
 const DEFAULT_FRAGMENTUM_LENGTH: usize = 7; // Each fragmentum lasts for 7 seconds
 
 const DEFAULT_BACKGROUND_COLOR: &str = "#F3E5AB";
-const DEFAULT_FOREGROUND_COLOR: &str = "#1A1A1A";
+const DEFAULT_FOREGROUND_COLOR: &str = "#2B1810";
 const DEFAULT_HIGHLIGHT_COLOR: &str = "#8B0000";
 
 /// Config file definition
