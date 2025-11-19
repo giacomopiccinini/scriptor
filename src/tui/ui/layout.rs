@@ -14,38 +14,8 @@ pub struct AppLayout;
 
 impl AppLayout {
     /// Calculate responsive layout areas
-    /// Returns: (codices_header_area, codices_area, bookmark_area, fragmenta_header_area, fragmenta_area, logo_area)
-    pub fn calculate_main_layout(area: Rect) -> (Rect, Rect, Rect, Rect, Rect, Rect) {
-        // Add overall padding around the entire TUI
-        // Adjust these values to control how much space you want from terminal borders
-        let padded_area = area.inner(Margin {
-            horizontal: 2, // 2 columns of padding on left and right
-            vertical: 1,   // 1 row of padding on top and bottom
-        });
-
-        // Calculate responsive header height based on terminal size
-        let header_height = if padded_area.height < 15 {
-            // Very small terminal - minimal header
-            Constraint::Length(3)
-        } else if padded_area.height < 25 {
-            // Small terminal - reduced header
-            Constraint::Length(8)
-        } else {
-            // Normal terminal - full header
-            Constraint::Percentage(20)
-        };
-
-        let main_layout = Layout::vertical([
-            header_height,
-            Constraint::Min(10), // Ensure minimum content area
-        ]);
-
-        // Extract the areas from the main layout using the padded area
-        let [header_area, content_area] = main_layout.areas(padded_area);
-
-        // Use entire header area for logo
-        let logo_area = header_area;
-
+    /// Returns: (codices_header_area, codices_area, bookmark_area, fragmenta_header_area, fragmenta_area)
+    pub fn calculate_main_layout(area: Rect) -> (Rect, Rect, Rect, Rect, Rect) {
         // Subdivide the content area into three columns: codex, folio, fragmentum
         let content_layout = Layout::horizontal([
             Constraint::Percentage(48), // Codex column
@@ -58,7 +28,7 @@ impl AppLayout {
             codices_and_header_area,
             bookmark_area,
             fragmenta_and_header_area,
-        ] = content_layout.areas(content_area);
+        ] = content_layout.areas(area);
 
         // Page layout for both codex and fragment
         let page_layout =
@@ -72,7 +42,6 @@ impl AppLayout {
             bookmark_area,
             fragmenta_header_area,
             fragmenta_area,
-            logo_area,
         )
     }
 
@@ -85,10 +54,7 @@ impl AppLayout {
 
     /// Render a simple centered header title
     pub fn render_header(area: Rect, buf: &mut Buffer, title: &str, theme: &ThemeConfig) {
-        let block = Block::default()
-            .padding(Padding::new(0, 0, 1, 0))
-            .borders(Borders::LEFT | Borders::TOP | Borders::RIGHT)
-            .border_type(BorderType::Rounded);
+        let block = Block::default().padding(Padding::new(0, 0, 2, 0));
 
         let header_text = Line::from(vec![Span::styled(
             title,

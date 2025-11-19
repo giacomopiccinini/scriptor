@@ -3,7 +3,6 @@ pub mod codices;
 pub mod folia;
 pub mod fragmenta;
 pub mod input_states;
-pub mod logo;
 pub mod popups;
 
 pub use archivum_selector::ArchivumSelector;
@@ -11,7 +10,6 @@ pub use codices::CodicesComponent;
 pub use folia::FoliaComponent;
 pub use fragmenta::FragmentaComponent;
 pub use input_states::InputState;
-pub use logo::Logo;
 pub use popups::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, ModifyCodexPopUp,
     ModifyFolioPopUp,

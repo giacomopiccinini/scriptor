@@ -68,29 +68,17 @@ impl FragmentaComponent {
     ) {
         // Command hints for fragmenta
         let fragmentum_command_hints = Line::from(vec![
-            Span::raw(" "),
             Span::styled("[c]", Style::default().fg(theme.highlight)),
             Span::styled("opy ", Style::default().fg(theme.foreground)),
-            Span::raw(" "),
+            Span::raw("   "),
+            Span::styled("[C]", Style::default().fg(theme.highlight)),
+            Span::styled("opy all ", Style::default().fg(theme.foreground)),
         ])
-        .left_aligned();
-
-        // Add "quit" hint, in the bottom right corner
-        let quit_hint = Line::from(vec![
-            Span::raw(" "),
-            Span::styled("[q]", Style::default().fg(theme.highlight)),
-            Span::styled("uit ", Style::default().fg(theme.foreground)),
-            Span::raw(" "),
-        ])
-        .right_aligned();
+        .centered();
 
         let block = Block::default()
-            .padding(Padding::new(2, 2, 1, 1))
             .title_bottom(fragmentum_command_hints)
-            .title_bottom(quit_hint)
-            .title_alignment(Alignment::Center)
-            .borders(Borders::LEFT | Borders::BOTTOM | Borders::RIGHT)
-            .border_type(BorderType::Rounded);
+            .title_alignment(Alignment::Center);
 
         if let Some(ui_folio) = selected_folio {
             // Extract the fragmenta and display the first few characters of content

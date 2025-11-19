@@ -4,7 +4,7 @@ use crate::tui::db::connections::init_db;
 use crate::tui::db::models::{Codex, UICodex};
 use crate::tui::ui::components::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, CodicesComponent,
-    FragmentaComponent, InputState, Logo, ModifyCodexPopUp, ModifyFolioPopUp,
+    FragmentaComponent, InputState, ModifyCodexPopUp, ModifyFolioPopUp,
 };
 use crate::tui::ui::cursor::CursorState;
 use crate::tui::ui::layout::AppLayout;
@@ -362,11 +362,7 @@ impl Widget for &mut App {
             bookmark_area,
             fragmenta_header_area,
             fragmenta_area,
-            logo_area,
         ) = AppLayout::calculate_main_layout(area);
-
-        // Render logo
-        Logo::render(logo_area, buf);
 
         // Render column headers
         AppLayout::render_header(codices_header_area, buf, "C O D I C E S", theme);

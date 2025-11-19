@@ -3,6 +3,7 @@ use crate::tui::db::models::{Codex, NewCodex, UICodex};
 use anyhow::Result;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Modifier;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{
@@ -291,43 +292,43 @@ impl CodicesComponent {
     pub fn render(&mut self, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
         // Command hints for codices
         let codex_command_hints = Line::from(vec![
-            Span::raw(" "),
             Span::styled("[A]", Style::default().fg(theme.highlight)),
-            Span::styled("dd ", Style::default().fg(theme.foreground)),
+            Span::styled("dd", Style::default().fg(theme.foreground)),
+            Span::raw("   "),
             Span::styled("[D]", Style::default().fg(theme.highlight)),
-            Span::styled("el ", Style::default().fg(theme.foreground)),
-            Span::styled("[Enter]", Style::default().fg(theme.highlight)),
-            Span::styled("expand ", Style::default().fg(theme.foreground)),
-            Span::raw(" "),
+            Span::styled("elete", Style::default().fg(theme.foreground)),
+            Span::raw("   "),
+            Span::styled("[E]", Style::default().fg(theme.highlight)),
+            Span::styled("xpand", Style::default().fg(theme.foreground)),
+            Span::raw("   "),
+            Span::styled("[M]", Style::default().fg(theme.highlight)),
+            Span::styled("odify", Style::default().fg(theme.foreground)),
         ])
-        .left_aligned();
+        .centered();
 
-        let block = Block::default()
-            .padding(Padding::new(2, 2, 1, 1))
-            .title_bottom(codex_command_hints)
-            .borders(Borders::LEFT | Borders::BOTTOM | Borders::RIGHT)
-            .border_type(BorderType::Rounded);
+        let block = Block::default().title_bottom(codex_command_hints);
 
-        // Build hierarchical tree view
-        let mut items: Vec<ListItem> = Vec::new();
+        // Build hierarchical tree view.
+        // We initiate a list that is composed of both codices and folia, in a nested way
+        let mut codices_and_folia: Vec<ListItem> = Vec::new();
 
         for ui_codex in &self.codices {
             // Show codex with medieval expand/collapse indicator
             let indicator = if ui_codex.is_expanded { "❖" } else { "◆" };
-            items.push(ListItem::from(format!(
-                "{} {}",
-                indicator, ui_codex.codex.name
-            )));
+            codices_and_folia.push(
+                ListItem::from(format!("{} {}", indicator, ui_codex.codex.name))
+                    .style(Style::default().add_modifier(Modifier::BOLD)),
+            );
 
             // Show folia if expanded (no symbol, just indent)
             if ui_codex.is_expanded {
                 for ui_folio in &ui_codex.folia {
-                    items.push(ListItem::from(format!("    {}", ui_folio.folio.name)));
+                    codices_and_folia.push(ListItem::from(format!("    {}", ui_folio.folio.name)));
                 }
             }
         }
 
-        let list: List = List::new(items)
+        let list: List = List::new(codices_and_folia)
             .block(block)
             .highlight_symbol("  ") // No symbol, just space for padding
             .highlight_style(

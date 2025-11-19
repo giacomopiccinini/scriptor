@@ -120,55 +120,55 @@ impl FoliaComponent {
         Ok(())
     }
 
-    /// Render the list of folia for the selected codex
-    pub fn render(
-        selected_codex: Option<&mut UICodex>,
-        area: Rect,
-        buf: &mut Buffer,
-        theme: &ThemeConfig,
-    ) {
-        // Command hints for folia
-        let folio_command_hints = Line::from(vec![
-            Span::raw(" "),
-            Span::styled("[a]", Style::default().fg(theme.highlight)),
-            Span::styled("dd", Style::default().fg(theme.foreground)),
-            Span::styled(" [d]", Style::default().fg(theme.highlight)),
-            Span::styled("el", Style::default().fg(theme.foreground)),
-            Span::styled(" [m]", Style::default().fg(theme.highlight)),
-            Span::styled("odify ", Style::default().fg(theme.foreground)),
-            Span::raw(" "),
-        ])
-        .left_aligned();
+    // /// Render the list of folia for the selected codex
+    // pub fn render(
+    //     selected_codex: Option<&mut UICodex>,
+    //     area: Rect,
+    //     buf: &mut Buffer,
+    //     theme: &ThemeConfig,
+    // ) {
+    //     // Command hints for folia
+    //     let folio_command_hints = Line::from(vec![
+    //         Span::raw(" "),
+    //         Span::styled("[a]", Style::default().fg(theme.highlight)),
+    //         Span::styled("dd", Style::default().fg(theme.foreground)),
+    //         Span::styled(" [d]", Style::default().fg(theme.highlight)),
+    //         Span::styled("el", Style::default().fg(theme.foreground)),
+    //         Span::styled(" [m]", Style::default().fg(theme.highlight)),
+    //         Span::styled("odify ", Style::default().fg(theme.foreground)),
+    //         Span::raw(" "),
+    //     ])
+    //     .left_aligned();
 
-        let block = Block::default()
-            .padding(Padding::new(2, 2, 1, 1))
-            .title_top(Line::raw("  F O L I O  ").left_aligned())
-            .title_bottom(folio_command_hints)
-            .title_alignment(Alignment::Center)
-            .borders(Borders::TOP | Borders::BOTTOM | Borders::LEFT)
-            .border_type(BorderType::Rounded);
+    //     let block = Block::default()
+    //         .padding(Padding::new(2, 2, 1, 1))
+    //         .title_top(Line::raw("  F O L I O  ").left_aligned())
+    //         .title_bottom(folio_command_hints)
+    //         .title_alignment(Alignment::Center)
+    //         .borders(Borders::TOP | Borders::BOTTOM | Borders::LEFT)
+    //         .border_type(BorderType::Rounded);
 
-        if let Some(ui_codex) = selected_codex {
-            // Extract the folia
-            let items: Vec<ListItem> = ui_codex
-                .folia
-                .iter()
-                .map(|ui_folio| ListItem::from(ui_folio.folio.name.clone()))
-                .collect();
+    //     if let Some(ui_codex) = selected_codex {
+    //         // Extract the folia
+    //         let items: Vec<ListItem> = ui_codex
+    //             .folia
+    //             .iter()
+    //             .map(|ui_folio| ListItem::from(ui_folio.folio.name.clone()))
+    //             .collect();
 
-            let list: List = List::new(items)
-                .block(block)
-                .highlight_symbol(" ▸ ")
-                .highlight_style(
-                    // Swap foreground and background for selected item
-                    Style::default().bg(theme.foreground).fg(theme.background),
-                )
-                .highlight_spacing(HighlightSpacing::Always);
+    //         let list: List = List::new(items)
+    //             .block(block)
+    //             .highlight_symbol(" ▸ ")
+    //             .highlight_style(
+    //                 // Swap foreground and background for selected item
+    //                 Style::default().bg(theme.foreground).fg(theme.background),
+    //             )
+    //             .highlight_spacing(HighlightSpacing::Always);
 
-            StatefulWidget::render(list, area, buf, &mut ui_codex.folio_state);
-        } else {
-            // No codex selected - render empty block
-            block.render(area, buf);
-        }
-    }
+    //         StatefulWidget::render(list, area, buf, &mut ui_codex.folio_state);
+    //     } else {
+    //         // No codex selected - render empty block
+    //         block.render(area, buf);
+    //     }
+    // }
 }
