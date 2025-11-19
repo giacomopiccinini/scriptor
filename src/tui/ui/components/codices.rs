@@ -3,11 +3,15 @@ use crate::tui::db::models::{Codex, NewCodex, UICodex};
 use anyhow::Result;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::Modifier;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, HighlightSpacing, List, ListItem, ListState, StatefulWidget};
 use sqlx::SqlitePool;
+
+// Blank spaces to use to pad the list to declutter view
+const LIST_HIGHLIGHT_SYMBOL: &str = "  ";
+const OPEN_CODEX_SYMBOL: &str = "❖";
+const CLOSED_CODEX_SYMBOL: &str = "◆";
 
 /// Component for managing and displaying codices (projects)
 pub struct CodicesComponent {
@@ -309,13 +313,37 @@ impl CodicesComponent {
         // We initiate a list that is composed of both codices and folia, in a nested way
         let mut codices_and_folia: Vec<ListItem> = Vec::new();
 
-        for ui_codex in &self.codices {
+        // Commands
+        let codex_commands = "[M]odify  [D]elete  ".to_string();
+
+        for (codex_idx, ui_codex) in self.codices.iter().enumerate() {
             // Show codex with medieval expand/collapse indicator
-            let indicator = if ui_codex.is_expanded { "❖" } else { "◆" };
-            codices_and_folia.push(
-                ListItem::from(format!("{} {}", indicator, ui_codex.codex.name))
-                    .style(Style::default().add_modifier(Modifier::BOLD)),
-            );
+            let indicator = if ui_codex.is_expanded {
+                OPEN_CODEX_SYMBOL
+            } else {
+                CLOSED_CODEX_SYMBOL
+            };
+
+            // Default text, irrespective of whether the codex is selected or not
+            let mut codex_text = format!("{} {}", indicator, ui_codex.codex.name);
+
+            // If Codex is selected, add relevant commands *inline*
+            if self.selected() == Some(codex_idx) {
+                // Compute number of blanks spaces to leave after the codex name
+                let n_blanks = area.width // Width of the allocated space, i.e. the max
+                - codex_text.chars().count()as u16 // Characters occupied by the codex name
+                - codex_commands.chars().count()as u16 // Characters occupied the commands
+                - LIST_HIGHLIGHT_SYMBOL.chars().count()as u16; // Characters occupied by the highlight of the list
+
+                // Add commands to selected codex
+                codex_text = format!(
+                    "{}{}{}",
+                    codex_text,
+                    " ".repeat(n_blanks as usize),
+                    codex_commands
+                );
+            }
+            codices_and_folia.push(ListItem::from(codex_text));
 
             // Show folia if expanded (no symbol, just indent)
             if ui_codex.is_expanded {
@@ -327,7 +355,7 @@ impl CodicesComponent {
 
         let list: List = List::new(codices_and_folia)
             .block(block)
-            .highlight_symbol("  ") // No symbol, just space for padding
+            .highlight_symbol(LIST_HIGHLIGHT_SYMBOL) // No symbol, just space for padding
             .highlight_style(
                 // Swap foreground and background for selected item
                 Style::default().bg(theme.foreground).fg(theme.background),
