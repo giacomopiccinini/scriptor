@@ -313,8 +313,9 @@ impl CodicesComponent {
         // We initiate a list that is composed of both codices and folia, in a nested way
         let mut codices_and_folia: Vec<ListItem> = Vec::new();
 
-        // Commands
-        let codex_commands = "[M]odify  [D]elete  ".to_string();
+        // Inline command hints
+        let codex_commands_inline = "[M]odify  [D]elete  ".to_string();
+        let folio_commands_inline = "[a]dd  [m]odify  [d]elete  ".to_string();
 
         for (codex_idx, ui_codex) in self.codices.iter().enumerate() {
             // Show codex with medieval expand/collapse indicator
@@ -332,7 +333,7 @@ impl CodicesComponent {
                 // Compute number of blanks spaces to leave after the codex name
                 let n_blanks = area.width // Width of the allocated space, i.e. the max
                 - codex_text.chars().count()as u16 // Characters occupied by the codex name
-                - codex_commands.chars().count()as u16 // Characters occupied the commands
+                - codex_commands_inline.chars().count()as u16 // Characters occupied the commands
                 - LIST_HIGHLIGHT_SYMBOL.chars().count()as u16; // Characters occupied by the highlight of the list
 
                 // Add commands to selected codex
@@ -340,15 +341,37 @@ impl CodicesComponent {
                     "{}{}{}",
                     codex_text,
                     " ".repeat(n_blanks as usize),
-                    codex_commands
+                    codex_commands_inline
                 );
             }
             codices_and_folia.push(ListItem::from(codex_text));
 
             // Show folia if expanded (no symbol, just indent)
             if ui_codex.is_expanded {
-                for ui_folio in &ui_codex.folia {
-                    codices_and_folia.push(ListItem::from(format!("    {}", ui_folio.folio.name)));
+                // Index of selected folio
+                let selected_folio_idx = ui_codex.folio_state.selected();
+
+                for (folio_idx, ui_folio) in ui_codex.folia.iter().enumerate() {
+                    // Default text, irrespective of whether the folio is selected or not
+                    let mut folio_text = format!("    {}", ui_folio.folio.name);
+
+                    if Some(folio_idx) == selected_folio_idx {
+                        // Compute number of blanks spaces to leave after the folio name
+                        let n_blanks = area.width // Width of the allocated space, i.e. the max
+                        - folio_text.chars().count()as u16 // Characters occupied by the folio name
+                        - folio_commands_inline.chars().count()as u16 // Characters occupied the commands
+                        - LIST_HIGHLIGHT_SYMBOL.chars().count()as u16; // Characters occupied by the highlight of the list
+
+                        // Add commands to selected codex
+                        folio_text = format!(
+                            "{}{}{}",
+                            folio_text,
+                            " ".repeat(n_blanks as usize),
+                            folio_commands_inline
+                        );
+                    }
+
+                    codices_and_folia.push(ListItem::from(folio_text));
                 }
             }
         }
