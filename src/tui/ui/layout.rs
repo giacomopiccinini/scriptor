@@ -1,14 +1,11 @@
 use crate::tui::db::config::ThemeConfig;
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Layout, Margin, Rect};
-use ratatui::style::Modifier;
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::{Block, Widget};
-use ratatui::widgets::{
-    BorderType, Borders, HighlightSpacing, List, ListItem, ListState, Padding, StatefulWidget,
-};
+use ratatui::widgets::{Padding, StatefulWidget};
 
 pub struct AppLayout;
 

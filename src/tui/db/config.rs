@@ -28,7 +28,7 @@ pub struct Config {
 }
 
 /// Default configurations for db, theme and speech-to-text options
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Default)]
 pub struct DefaultConfig {
     pub db: DBConfig,
     pub theme: ThemeConfig,
@@ -164,16 +164,6 @@ impl Default for STTConfig {
             n_intra_threads: DEFAULT_N_INTRA_THREADS,
             parallel_execution: DEFAULT_PARALLEL_EXECUTION,
             fragmentum_length: DEFAULT_FRAGMENTUM_LENGTH,
-        }
-    }
-}
-
-impl Default for DefaultConfig {
-    fn default() -> Self {
-        Self {
-            db: DBConfig::default(),
-            theme: ThemeConfig::default(),
-            stt: STTConfig::default(),
         }
     }
 }

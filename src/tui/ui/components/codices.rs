@@ -6,10 +6,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Modifier;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{
-    Block, BorderType, Borders, HighlightSpacing, List, ListItem, ListState, Padding,
-    StatefulWidget,
-};
+use ratatui::widgets::{Block, HighlightSpacing, List, ListItem, ListState, StatefulWidget};
 use sqlx::SqlitePool;
 
 /// Component for managing and displaying codices (projects)
@@ -139,19 +136,19 @@ impl CodicesComponent {
             let (codex_idx, folio_idx_opt) = self.get_codex_and_folio_at_visual_index(selected_idx);
 
             // If we're on a folio and it's the last one in an expanded codex
-            if let Some(folio_idx) = folio_idx_opt {
-                if let Some(codex) = self.codices.get(codex_idx) {
-                    if codex.is_expanded && folio_idx == codex.folia.len() - 1 {
-                        // Try to open next codex
-                        if codex_idx + 1 < self.codices.len() {
-                            if let Some(next_codex) = self.codices.get_mut(codex_idx + 1) {
-                                next_codex.is_expanded = true;
-                                // Move to the next codex line
-                                self.select_next();
-                                return true;
-                            }
-                        }
-                    }
+            if let Some(folio_idx) = folio_idx_opt
+                && let Some(codex) = self.codices.get(codex_idx)
+                && codex.is_expanded
+                && folio_idx == codex.folia.len() - 1
+            {
+                // Try to open next codex
+                if codex_idx + 1 < self.codices.len()
+                    && let Some(next_codex) = self.codices.get_mut(codex_idx + 1)
+                {
+                    next_codex.is_expanded = true;
+                    // Move to the next codex line
+                    self.select_next();
+                    return true;
                 }
             }
         }
@@ -164,17 +161,17 @@ impl CodicesComponent {
             let (codex_idx, folio_idx_opt) = self.get_codex_and_folio_at_visual_index(selected_idx);
 
             // If we're on a folio and it's the first one in an expanded codex
-            if let Some(folio_idx) = folio_idx_opt {
-                if folio_idx == 0 {
-                    // Try to open previous codex
-                    if codex_idx > 0 {
-                        if let Some(prev_codex) = self.codices.get_mut(codex_idx - 1) {
-                            prev_codex.is_expanded = true;
-                            // Move to the previous codex line
-                            self.select_previous();
-                            return true;
-                        }
-                    }
+            if let Some(folio_idx) = folio_idx_opt
+                && folio_idx == 0
+            {
+                // Try to open previous codex
+                if codex_idx > 0
+                    && let Some(prev_codex) = self.codices.get_mut(codex_idx - 1)
+                {
+                    prev_codex.is_expanded = true;
+                    // Move to the previous codex line
+                    self.select_previous();
+                    return true;
                 }
             }
         }

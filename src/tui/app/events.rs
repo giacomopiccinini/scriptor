@@ -25,14 +25,12 @@ impl EventHandler {
                     // Middle column (bookmark) - no navigation
                 }
                 CurrentRegion::Fragmentum => {
-                    if let Some(selected_codex) = app.codices_component.get_selected_codex_mut() {
-                        if let Some(selected_folio_idx) = selected_codex.folio_state.selected() {
-                            if let Some(selected_folio) =
-                                selected_codex.folia.get_mut(selected_folio_idx)
-                            {
-                                FragmentaComponent::select_previous_fragmentum(selected_folio);
-                            }
-                        }
+                    if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
+                        && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
+                        && let Some(selected_folio) =
+                            selected_codex.folia.get_mut(selected_folio_idx)
+                    {
+                        FragmentaComponent::select_previous_fragmentum(selected_folio);
                     }
                 }
             },
@@ -49,14 +47,12 @@ impl EventHandler {
                     // Middle column (bookmark) - no navigation
                 }
                 CurrentRegion::Fragmentum => {
-                    if let Some(selected_codex) = app.codices_component.get_selected_codex_mut() {
-                        if let Some(selected_folio_idx) = selected_codex.folio_state.selected() {
-                            if let Some(selected_folio) =
-                                selected_codex.folia.get_mut(selected_folio_idx)
-                            {
-                                FragmentaComponent::select_next_fragmentum(selected_folio);
-                            }
-                        }
+                    if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
+                        && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
+                        && let Some(selected_folio) =
+                            selected_codex.folia.get_mut(selected_folio_idx)
+                    {
+                        FragmentaComponent::select_next_fragmentum(selected_folio);
                     }
                 }
             },

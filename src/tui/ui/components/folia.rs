@@ -1,13 +1,5 @@
-use crate::tui::db::config::ThemeConfig;
 use crate::tui::db::models::{Folio, NewFolio, UICodex};
 use anyhow::Result;
-use ratatui::buffer::Buffer;
-use ratatui::layout::{Alignment, Rect};
-use ratatui::style::Style;
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{
-    Block, BorderType, Borders, HighlightSpacing, List, ListItem, Padding, StatefulWidget, Widget,
-};
 use sqlx::SqlitePool;
 
 pub struct FoliaComponent;

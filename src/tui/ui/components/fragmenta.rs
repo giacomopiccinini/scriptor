@@ -5,9 +5,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{
-    Block, BorderType, Borders, HighlightSpacing, List, ListItem, Padding, StatefulWidget, Widget,
-};
+use ratatui::widgets::{Block, HighlightSpacing, List, ListItem, StatefulWidget, Widget};
 use sqlx::SqlitePool;
 
 pub struct FragmentaComponent;

@@ -95,11 +95,11 @@ impl App {
 
         // Return initial state of the app
         Self {
-            config: config,
-            current_screen: current_screen,
+            config,
+            current_screen,
             current_region: CurrentRegion::Codex,
-            pool: pool,
-            codices_component: codices_component,
+            pool,
+            codices_component,
             input_state: InputState::new(),
             is_recording: false,
             is_transcribing: false,

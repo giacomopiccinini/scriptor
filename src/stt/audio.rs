@@ -86,7 +86,7 @@ pub fn write_mono_wav(
 ) -> Result<()> {
     // Create a new WAV specification for the audio
     let audio_spec = WavSpec {
-        channels: 1 as u16,
+        channels: 1_u16,
         sample_rate: sr,
         bits_per_sample: bits_per_sample as u16,
         sample_format: SampleFormat::Int,
