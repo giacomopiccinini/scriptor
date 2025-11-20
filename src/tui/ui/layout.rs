@@ -3,9 +3,9 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
+use ratatui::widgets::Padding;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::{Block, Widget};
-use ratatui::widgets::Padding;
 
 pub struct AppLayout;
 

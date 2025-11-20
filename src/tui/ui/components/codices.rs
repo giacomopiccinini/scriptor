@@ -358,18 +358,27 @@ impl CodicesComponent {
             // If Codex is selected, add relevant commands *inline*
             if codex_idx == selected_codex_idx && selected_folio_idx.is_none() {
                 // Compute number of blanks spaces to leave after the codex name
-                let n_blanks = area.width // Width of the allocated space, i.e. the max
-                - codex_text.chars().count()as u16 // Characters occupied by the codex name
-                - codex_commands_inline.chars().count()as u16 // Characters occupied the commands
-                - LIST_HIGHLIGHT_SYMBOL.chars().count()as u16; // Characters occupied by the highlight of the list
+                let n_blanks = area.width as i16// Width of the allocated space, i.e. the max
+                - codex_text.chars().count()as i16 // Characters occupied by the codex name
+                - codex_commands_inline.chars().count()as i16 // Characters occupied the commands
+                - LIST_HIGHLIGHT_SYMBOL.chars().count()as i16; // Characters occupied by the highlight of the list
 
-                // Add commands to selected codex
-                codex_text = format!(
-                    "{}{}{}",
-                    codex_text,
-                    " ".repeat(n_blanks as usize),
-                    codex_commands_inline
-                );
+                if n_blanks <= 0 {
+                    // Not enough space - truncate the codex name
+                    // 3 chars for ...
+                    // 2 chars for blank spaces to improve readibility
+                    let n_chars_to_keep = codex_text.chars().count() as i16 + n_blanks - 3 - 2;
+                    codex_text = codex_text.chars().take(n_chars_to_keep as usize).collect();
+                    codex_text = format!("{}...  {}", codex_text, codex_commands_inline);
+                } else {
+                    // Add commands to selected codex
+                    codex_text = format!(
+                        "{}{}{}",
+                        codex_text,
+                        " ".repeat(n_blanks as usize),
+                        codex_commands_inline
+                    );
+                }
             }
             codices_and_folia.push(ListItem::from(codex_text));
 
