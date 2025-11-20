@@ -5,7 +5,7 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::{Block, Widget};
-use ratatui::widgets::{Padding, StatefulWidget};
+use ratatui::widgets::Padding;
 
 pub struct AppLayout;
 
