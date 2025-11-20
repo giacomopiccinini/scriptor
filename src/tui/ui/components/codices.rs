@@ -134,54 +134,6 @@ impl CodicesComponent {
         visual_idx
     }
 
-    /// Smart navigation: handle boundary overflow (auto-expand next/previous codex)
-    pub fn handle_smart_navigation_down(&mut self) -> bool {
-        if let Some(selected_idx) = self.codex_state.selected() {
-            let (codex_idx, folio_idx_opt) = self.get_codex_and_folio_at_visual_index(selected_idx);
-
-            // If we're on a folio and it's the last one in an expanded codex
-            if let Some(folio_idx) = folio_idx_opt
-                && let Some(codex) = self.codices.get(codex_idx)
-                && codex.is_expanded
-                && folio_idx == codex.folia.len() - 1
-            {
-                // Try to open next codex
-                if codex_idx + 1 < self.codices.len()
-                    && let Some(next_codex) = self.codices.get_mut(codex_idx + 1)
-                {
-                    next_codex.is_expanded = true;
-                    // Move to the next codex line
-                    self.select_next();
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
-    /// Smart navigation: handle boundary overflow upward (auto-expand previous codex)
-    pub fn handle_smart_navigation_up(&mut self) -> bool {
-        if let Some(selected_idx) = self.codex_state.selected() {
-            let (codex_idx, folio_idx_opt) = self.get_codex_and_folio_at_visual_index(selected_idx);
-
-            // If we're on a folio and it's the first one in an expanded codex
-            if let Some(folio_idx) = folio_idx_opt
-                && folio_idx == 0
-            {
-                // Try to open previous codex
-                if codex_idx > 0
-                    && let Some(prev_codex) = self.codices.get_mut(codex_idx - 1)
-                {
-                    prev_codex.is_expanded = true;
-                    // Move to the previous codex line
-                    self.select_previous();
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
     /// Refresh codices from archivum (used after reordering)
     pub async fn refresh_codices(&mut self, pool: &SqlitePool) -> Result<()> {
         let selected_index = self.codex_state.selected();

@@ -14,16 +14,7 @@ impl EventHandler {
 
             // Navigate up in codices tree or fragmenta
             (KeyCode::Up, KeyModifiers::NONE) => match app.current_region {
-                CurrentRegion::Codex => {
-                    // Try smart navigation first (auto-expand previous codex at boundary)
-                    if !app.codices_component.handle_smart_navigation_up() {
-                        // Regular navigation
-                        app.codices_component.select_previous();
-                    }
-                }
-                CurrentRegion::Folio => {
-                    // Middle column (bookmark) - no navigation
-                }
+                CurrentRegion::CodexAndFolio => app.codices_component.select_previous(),
                 CurrentRegion::Fragmentum => {
                     if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
                         && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
@@ -37,14 +28,9 @@ impl EventHandler {
 
             // Navigate down in codices tree or fragmenta
             (KeyCode::Down, KeyModifiers::NONE) => match app.current_region {
-                CurrentRegion::Codex => {
-                    // Regular navigation
+                CurrentRegion::CodexAndFolio => {
+                    // Navigate to next
                     app.codices_component.select_next();
-                    // Try smart navigation (auto-expand next codex at boundary)
-                    app.codices_component.handle_smart_navigation_down();
-                }
-                CurrentRegion::Folio => {
-                    // Middle column (bookmark) - no navigation
                 }
                 CurrentRegion::Fragmentum => {
                     if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
@@ -59,7 +45,7 @@ impl EventHandler {
 
             // Expand/collapse codex with Enter key
             (KeyCode::Enter, KeyModifiers::NONE) => {
-                if app.current_region == CurrentRegion::Codex {
+                if app.current_region == CurrentRegion::CodexAndFolio {
                     app.codices_component.toggle_selected_codex_expansion();
                 }
             }
@@ -112,7 +98,7 @@ impl EventHandler {
 
             // Move codex/folio down, reordering the list
             (KeyCode::Down, KeyModifiers::CONTROL) => match app.current_region {
-                CurrentRegion::Codex => {
+                CurrentRegion::CodexAndFolio => {
                     if let Err(e) = CodicesComponent::move_selected_codex_down(
                         &mut app.codices_component,
                         &app.pool,
@@ -122,21 +108,12 @@ impl EventHandler {
                         eprintln!("Failed to move codex down: {}", e);
                     }
                 }
-                CurrentRegion::Folio => {
-                    if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
-                        && let Err(e) =
-                            FoliaComponent::move_selected_folio_down(selected_codex, &app.pool)
-                                .await
-                    {
-                        eprintln!("Failed to move folio up: {}", e);
-                    }
-                }
                 CurrentRegion::Fragmentum => {}
             },
 
             // Move codex/folio up, reordering the list
             (KeyCode::Up, KeyModifiers::CONTROL) => match app.current_region {
-                CurrentRegion::Codex => {
+                CurrentRegion::CodexAndFolio => {
                     if let Err(e) = CodicesComponent::move_selected_codex_up(
                         &mut app.codices_component,
                         &app.pool,
@@ -146,42 +123,26 @@ impl EventHandler {
                         eprintln!("Failed to move codex up: {}", e);
                     }
                 }
-                CurrentRegion::Folio => {
-                    if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
-                        && let Err(e) =
-                            FoliaComponent::move_selected_folio_up(selected_codex, &app.pool).await
-                    {
-                        eprintln!("Failed to move folio up: {}", e);
-                    }
-                }
                 CurrentRegion::Fragmentum => {}
             },
 
             // Navigate left between regions (Codex <- Folio <- Fragmentum)
             (KeyCode::Left, KeyModifiers::NONE) => {
                 match app.current_region {
-                    CurrentRegion::Codex => {} // Already at leftmost
-                    CurrentRegion::Folio => {
-                        app.current_region = CurrentRegion::Codex;
-                    }
+                    CurrentRegion::CodexAndFolio => {} // Already at leftmost
                     CurrentRegion::Fragmentum => {
-                        app.current_region = CurrentRegion::Folio;
+                        app.current_region = CurrentRegion::CodexAndFolio;
                     }
                 }
             }
 
-            // Navigate right between regions (Codex -> Folio -> Fragmentum)
-            (KeyCode::Right, KeyModifiers::NONE) => {
-                match app.current_region {
-                    CurrentRegion::Codex => {
-                        app.current_region = CurrentRegion::Folio;
-                    }
-                    CurrentRegion::Folio => {
-                        app.current_region = CurrentRegion::Fragmentum;
-                    }
-                    CurrentRegion::Fragmentum => {} // Already at rightmost
+            // Navigate right between regions (Codex -> Fragmentum)
+            (KeyCode::Right, KeyModifiers::NONE) => match app.current_region {
+                CurrentRegion::CodexAndFolio => {
+                    app.current_region = CurrentRegion::Fragmentum;
                 }
-            }
+                CurrentRegion::Fragmentum => {}
+            },
 
             // Start recording (placeholder)
             (KeyCode::Char('r'), KeyModifiers::NONE) => {

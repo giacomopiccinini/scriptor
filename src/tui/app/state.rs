@@ -40,8 +40,7 @@ pub enum CurrentScreen {
 /// Current region to signal where the cursor is
 #[derive(Debug, Clone, PartialEq)]
 pub enum CurrentRegion {
-    Codex,
-    Folio,
+    CodexAndFolio,
     Fragmentum,
 }
 
@@ -97,7 +96,7 @@ impl App {
         Self {
             config,
             current_screen,
-            current_region: CurrentRegion::Codex,
+            current_region: CurrentRegion::CodexAndFolio,
             pool,
             codices_component,
             input_state: InputState::new(),
