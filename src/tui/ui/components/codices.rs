@@ -391,18 +391,29 @@ impl CodicesComponent {
                     // Check if this folio is selected
                     if codex_idx == selected_codex_idx && selected_folio_idx == Some(folio_idx) {
                         // Compute number of blanks spaces to leave after the folio name
-                        let n_blanks = area.width // Width of the allocated space, i.e. the max
-                        - folio_text.chars().count()as u16 // Characters occupied by the folio name
-                        - folio_commands_inline.chars().count()as u16 // Characters occupied the commands
-                        - LIST_HIGHLIGHT_SYMBOL.chars().count()as u16; // Characters occupied by the highlight of the list
+                        let n_blanks = area.width as i16// Width of the allocated space, i.e. the max
+                        - folio_text.chars().count()as i16 // Characters occupied by the folio name
+                        - folio_commands_inline.chars().count()as i16 // Characters occupied the commands
+                        - LIST_HIGHLIGHT_SYMBOL.chars().count()as i16; // Characters occupied by the highlight of the list
 
-                        // Add commands to selected folio
-                        folio_text = format!(
-                            "{}{}{}",
-                            folio_text,
-                            " ".repeat(n_blanks as usize),
-                            folio_commands_inline
-                        );
+                        if n_blanks <= 0 {
+                            // Not enough space - truncate the folio name
+                            // 3 chars for ...
+                            // 2 chars for blank spaces to improve readibility
+                            let n_chars_to_keep =
+                                folio_text.chars().count() as i16 + n_blanks - 3 - 2;
+                            folio_text =
+                                folio_text.chars().take(n_chars_to_keep as usize).collect();
+                            folio_text = format!("{}...  {}", folio_text, codex_commands_inline);
+                        } else {
+                            // Add commands to selected folio
+                            folio_text = format!(
+                                "{}{}{}",
+                                folio_text,
+                                " ".repeat(n_blanks as usize),
+                                folio_commands_inline
+                            );
+                        }
                     }
 
                     codices_and_folia.push(ListItem::from(folio_text));
