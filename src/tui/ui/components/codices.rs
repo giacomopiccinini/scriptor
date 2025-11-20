@@ -41,12 +41,83 @@ impl CodicesComponent {
 
     /// Select next codex in the list
     pub fn select_next(&mut self) {
-        self.codex_state.select_next();
+        // Check if something is selected
+        if let Some(visual_idx) = self.codex_state.selected() {
+            // Convert visual index to codex and folio indices
+            let (codex_idx, folio_idx_opt) = self.get_codex_and_folio_at_visual_index(visual_idx);
+
+            if let Some(folio_idx) = folio_idx_opt {
+                // Currently on a folio
+                let selected_codex = &self.codices[codex_idx];
+
+                // If it's the last folio, move to next visual item (next codex)
+                if folio_idx == selected_codex.folia.len() - 1 {
+                    self.codex_state.select_next();
+                } else {
+                    // Move to next folio
+                    self.codex_state.select_next();
+                }
+            } else {
+                // Currently on a codex
+                let selected_codex = &self.codices[codex_idx];
+
+                // If codex is expanded and has folia, move to first folio
+                if selected_codex.is_expanded && !selected_codex.folia.is_empty() {
+                    self.codex_state.select_next();
+                } else {
+                    // Move to next codex (collapsed or no folia)
+                    self.codex_state.select_next();
+                }
+            }
+        }
+        // No selection, start from the beginning
+        else {
+            self.codex_state.select_first();
+        }
     }
 
     /// Select previous codex in the list
     pub fn select_previous(&mut self) {
-        self.codex_state.select_previous();
+        // Check if something is selected
+        if let Some(visual_idx) = self.codex_state.selected() {
+            // Convert visual index to codex and folio indices
+            let (codex_idx, folio_idx_opt) = self.get_codex_and_folio_at_visual_index(visual_idx);
+
+            if let Some(folio_idx) = folio_idx_opt {
+                // Currently on a folio
+
+                // If it's the first folio, move to parent codex
+                if folio_idx == 0 {
+                    self.codex_state.select_previous();
+                } else {
+                    // Move to previous folio
+                    self.codex_state.select_previous();
+                }
+            } else {
+                // Currently on a codex
+
+                // If we're not on the first codex, check if previous codex is expanded
+                if codex_idx > 0 {
+                    let prev_codex = &self.codices[codex_idx - 1];
+
+                    // If previous codex is expanded and has folia, jump to its last folio
+                    if prev_codex.is_expanded && !prev_codex.folia.is_empty() {
+                        // Move up to the last folio of the previous codex
+                        self.codex_state.select_previous();
+                    } else {
+                        // Move to previous codex (collapsed or no folia)
+                        self.codex_state.select_previous();
+                    }
+                } else {
+                    // Already at the first item, wrap around or do nothing
+                    self.codex_state.select_previous();
+                }
+            }
+        }
+        // No selection, do nothing (could also select last item)
+        else {
+            self.codex_state.select_first();
+        }
     }
 
     /// Get currently selected codex index
@@ -248,14 +319,11 @@ impl CodicesComponent {
             Span::styled("[A]", Style::default().fg(theme.highlight)),
             Span::styled("dd", Style::default().fg(theme.foreground)),
             Span::raw("   "),
-            Span::styled("[D]", Style::default().fg(theme.highlight)),
-            Span::styled("elete", Style::default().fg(theme.foreground)),
-            Span::raw("   "),
-            Span::styled("[E]", Style::default().fg(theme.highlight)),
+            Span::styled("[↵]", Style::default().fg(theme.highlight)),
             Span::styled("xpand", Style::default().fg(theme.foreground)),
             Span::raw("   "),
-            Span::styled("[M]", Style::default().fg(theme.highlight)),
-            Span::styled("odify", Style::default().fg(theme.foreground)),
+            Span::styled("[q]", Style::default().fg(theme.highlight)),
+            Span::styled("uit", Style::default().fg(theme.foreground)),
         ])
         .centered();
 
@@ -266,8 +334,15 @@ impl CodicesComponent {
         let mut codices_and_folia: Vec<ListItem> = Vec::new();
 
         // Inline command hints
-        let codex_commands_inline = "[M]odify  [D]elete  ".to_string();
-        let folio_commands_inline = "[a]dd  [m]odify  [d]elete  ".to_string();
+        let codex_commands_inline = "[r]ec  [a]dd  [m]od  [d]el  ".to_string();
+        let folio_commands_inline = "[m]od  [d]el  ".to_string();
+
+        // Get current selection and convert to codex/folio indices
+        let (selected_codex_idx, selected_folio_idx) = if let Some(visual_idx) = self.selected() {
+            self.get_codex_and_folio_at_visual_index(visual_idx)
+        } else {
+            (usize::MAX, None) // Use MAX as sentinel for "nothing selected"
+        };
 
         for (codex_idx, ui_codex) in self.codices.iter().enumerate() {
             // Show codex with medieval expand/collapse indicator
@@ -281,7 +356,7 @@ impl CodicesComponent {
             let mut codex_text = format!("{} {}", indicator, ui_codex.codex.name);
 
             // If Codex is selected, add relevant commands *inline*
-            if self.selected() == Some(codex_idx) {
+            if codex_idx == selected_codex_idx && selected_folio_idx.is_none() {
                 // Compute number of blanks spaces to leave after the codex name
                 let n_blanks = area.width // Width of the allocated space, i.e. the max
                 - codex_text.chars().count()as u16 // Characters occupied by the codex name
@@ -300,21 +375,19 @@ impl CodicesComponent {
 
             // Show folia if expanded (no symbol, just indent)
             if ui_codex.is_expanded {
-                // Index of selected folio
-                let selected_folio_idx = ui_codex.folio_state.selected();
-
                 for (folio_idx, ui_folio) in ui_codex.folia.iter().enumerate() {
                     // Default text, irrespective of whether the folio is selected or not
                     let mut folio_text = format!("    {}", ui_folio.folio.name);
 
-                    if Some(folio_idx) == selected_folio_idx {
+                    // Check if this folio is selected
+                    if codex_idx == selected_codex_idx && selected_folio_idx == Some(folio_idx) {
                         // Compute number of blanks spaces to leave after the folio name
                         let n_blanks = area.width // Width of the allocated space, i.e. the max
                         - folio_text.chars().count()as u16 // Characters occupied by the folio name
                         - folio_commands_inline.chars().count()as u16 // Characters occupied the commands
                         - LIST_HIGHLIGHT_SYMBOL.chars().count()as u16; // Characters occupied by the highlight of the list
 
-                        // Add commands to selected codex
+                        // Add commands to selected folio
                         folio_text = format!(
                             "{}{}{}",
                             folio_text,
