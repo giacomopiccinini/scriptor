@@ -174,30 +174,22 @@ impl CodicesComponent {
                         if n_folia > 0 {
                             self.list_state.select_next();
                             selected_codex.folio_state.select_first();
-                        } else {
-                            if has_next_codex {
-                                self.list_state.select_next();
-                                self.codex_state.select_next();
-                                selected_codex.folio_state.select(None);
-                            }
-                        }
-                    } else {
-                        if selected_folio_idx.unwrap() < n_folia - 1 {
+                        } else if has_next_codex {
                             self.list_state.select_next();
-                            selected_codex.folio_state.select_next();
-                        } else {
-                            if has_next_codex {
-                                self.list_state.select_next();
-                                self.codex_state.select_next();
-                                selected_codex.folio_state.select(None);
-                            }
+                            self.codex_state.select_next();
+                            selected_codex.folio_state.select(None);
                         }
-                    }
-                } else {
-                    if has_next_codex {
+                    } else if selected_folio_idx.unwrap() < n_folia - 1 {
+                        self.list_state.select_next();
+                        selected_codex.folio_state.select_next();
+                    } else if has_next_codex {
                         self.list_state.select_next();
                         self.codex_state.select_next();
+                        selected_codex.folio_state.select(None);
                     }
+                } else if has_next_codex {
+                    self.list_state.select_next();
+                    self.codex_state.select_next();
                 }
             }
         } else {
@@ -221,28 +213,12 @@ impl CodicesComponent {
                             self.list_state.select_previous();
                             selected_codex.folio_state.select(None);
                         }
-                    } else {
-                        if has_previous_codex {
-                            self.list_state.select_previous();
-                            self.codex_state.select_previous();
-                            if let Some(previous_codex) =
-                                self.codices.get_mut(selected_codex_idx - 1)
-                            {
-                                if previous_codex.is_expanded {
-                                    previous_codex
-                                        .folio_state
-                                        .select(previous_codex.folia.len().checked_sub(1));
-                                } else {
-                                    previous_codex.folio_state.select(None);
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    if has_previous_codex {
+                    } else if has_previous_codex {
                         self.list_state.select_previous();
                         self.codex_state.select_previous();
-                        if let Some(previous_codex) = self.codices.get_mut(selected_codex_idx - 1) {
+                        if let Some(previous_codex) =
+                            self.codices.get_mut(selected_codex_idx - 1)
+                        {
                             if previous_codex.is_expanded {
                                 previous_codex
                                     .folio_state
@@ -252,6 +228,18 @@ impl CodicesComponent {
                             }
                         }
                     }
+                } else if has_previous_codex {
+                    self.list_state.select_previous();
+                    self.codex_state.select_previous();
+                    if let Some(previous_codex) = self.codices.get_mut(selected_codex_idx - 1) {
+                        if previous_codex.is_expanded {
+                            previous_codex
+                                .folio_state
+                                .select(previous_codex.folia.len().checked_sub(1));
+                        } else {
+                            previous_codex.folio_state.select(None);
+                        }
+                    }
                 }
             }
         }
@@ -259,17 +247,15 @@ impl CodicesComponent {
 
     /// Toggle expand/collapse for the currently selected codex
     pub fn toggle_selected_codex_expansion(&mut self) {
-        if let Some(selected_codex_idx) = self.codex_state.selected() {
-            if let Some(codex) = self.codices.get_mut(selected_codex_idx) {
-                if codex.is_expanded {
-                    if let Some(selected_folio_idx) = codex.folio_state.selected() {
+        if let Some(selected_codex_idx) = self.codex_state.selected()
+            && let Some(codex) = self.codices.get_mut(selected_codex_idx) {
+                if codex.is_expanded
+                    && let Some(selected_folio_idx) = codex.folio_state.selected() {
                         self.list_state.scroll_up_by(selected_folio_idx as u16 + 1);
                         codex.folio_state.select(None);
                     }
-                }
                 codex.is_expanded = !codex.is_expanded;
             }
-        }
     }
 
     /// Refresh codices from archivum (used after reordering)
@@ -433,7 +419,7 @@ impl CodicesComponent {
 
         if is_selected {
             // Compute number of blanks spaces to leave after the folio name
-            let n_blanks = area_width as i16// Width of the allocated space, i.e. the max
+            let n_blanks = area_width// Width of the allocated space, i.e. the max
             - folio_text.chars().count()as i16 // Characters occupied by the folio name
             - FOLIO_COMMANDS_INLINE.chars().count()as i16 // Characters occupied the commands
             - LIST_HIGHLIGHT_SYMBOL.chars().count()as i16; // Characters occupied by the highlight of the list
