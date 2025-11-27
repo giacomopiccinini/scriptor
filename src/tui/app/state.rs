@@ -1,7 +1,6 @@
 use crate::tui::app::events::EventHandler;
 use crate::tui::db::config::{Config, DBConfig};
 use crate::tui::db::connections::init_db;
-use crate::tui::db::models::{Codex, UICodex};
 use crate::tui::ui::components::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, CodicesComponent,
     FragmentaComponent, InputState, ModifyCodexPopUp, ModifyFolioPopUp,

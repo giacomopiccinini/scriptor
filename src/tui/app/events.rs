@@ -215,7 +215,10 @@ impl EventHandler {
             KeyCode::Enter => {
                 let folio_name = app.input_state.get_text().to_string();
                 println!("THIS IS FINE");
-                println!("Selected codex: {:?}", app.codices_component.get_selected_codex_mut());
+                println!(
+                    "Selected codex: {:?}",
+                    app.codices_component.get_selected_codex_mut()
+                );
                 if !folio_name.trim().is_empty()
                     && let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
                 {

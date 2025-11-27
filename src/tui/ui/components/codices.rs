@@ -12,10 +12,13 @@ use sqlx::SqlitePool;
 const LIST_HIGHLIGHT_SYMBOL: &str = "  ";
 const OPEN_CODEX_SYMBOL: &str = "❖";
 const CLOSED_CODEX_SYMBOL: &str = "◆";
+const CODEX_COMMANDS_INLINE: &str = "[r]ec  [a]dd  [m]od  [d]el  ";
+const FOLIO_COMMANDS_INLINE: &str = "[m]od  [d]el  ";
 
 /// Component for managing and displaying codices (projects)
 pub struct CodicesComponent {
     pub codices: Vec<UICodex>,
+    pub list_state: ListState,
     pub codex_state: ListState,
 }
 
@@ -29,6 +32,7 @@ impl CodicesComponent {
     pub fn new() -> Self {
         Self {
             codices: Vec::new(),
+            list_state: ListState::default(),
             codex_state: ListState::default(),
         }
     }
@@ -157,103 +161,113 @@ impl CodicesComponent {
             .unwrap_or((None, None))
     }
 
-    /// Select next codex in the list
+    ///  Scroll down in the component, moving between codices and folia
     pub fn select_next(&mut self) {
-        // Check if something is selected
-        if let Some(visual_idx) = self.codex_state.selected() {
-            // Convert visual index to codex and folio indices
-            let (codex_idx, folio_idx_opt) =
-                self.get_codex_and_folio_index_at_visual_index(visual_idx);
+        if let Some(selected_codex_idx) = self.codex_state.selected() {
+            let has_next_codex = selected_codex_idx < self.codices.len() - 1;
+            if let Some(selected_codex) = self.codices.get_mut(selected_codex_idx) {
+                if selected_codex.is_expanded {
+                    let selected_folio_idx = selected_codex.folio_state.selected_mut();
+                    let n_folia = selected_codex.folia.len();
 
-            if let Some(folio_idx) = folio_idx_opt {
-                // Currently on a folio
-                let selected_codex = &self.codices[codex_idx];
-
-                // If it's the last folio, move to next visual item (next codex)
-                if folio_idx == selected_codex.folia.len() - 1 {
-                    self.codex_state.select_next();
+                    if selected_folio_idx.is_none() {
+                        if n_folia > 0 {
+                            self.list_state.select_next();
+                            selected_codex.folio_state.select_first();
+                        } else {
+                            if has_next_codex {
+                                self.list_state.select_next();
+                                self.codex_state.select_next();
+                                selected_codex.folio_state.select(None);
+                            }
+                        }
+                    } else {
+                        if selected_folio_idx.unwrap() < n_folia - 1 {
+                            self.list_state.select_next();
+                            selected_codex.folio_state.select_next();
+                        } else {
+                            if has_next_codex {
+                                self.list_state.select_next();
+                                self.codex_state.select_next();
+                                selected_codex.folio_state.select(None);
+                            }
+                        }
+                    }
                 } else {
-                    // Move to next folio
-                    self.codex_state.select_next();
-                }
-            } else {
-                // Currently on a codex
-                let selected_codex = &self.codices[codex_idx];
-
-                // If codex is expanded and has folia, move to first folio
-                if selected_codex.is_expanded && !selected_codex.folia.is_empty() {
-                    self.codex_state.select_next();
-                } else {
-                    // Move to next codex (collapsed or no folia)
-                    self.codex_state.select_next();
+                    if has_next_codex {
+                        self.list_state.select_next();
+                        self.codex_state.select_next();
+                    }
                 }
             }
-        }
-        // No selection, start from the beginning
-        else {
+        } else {
+            self.list_state.select_first();
             self.codex_state.select_first();
         }
     }
 
-    /// Select previous codex in the list
+    ///  Scroll up in the component, moving between codices and folia
     pub fn select_previous(&mut self) {
-        // Check if something is selected
-        if let Some(visual_idx) = self.codex_state.selected() {
-            // Convert visual index to codex and folio indices
-            let (codex_idx, folio_idx_opt) =
-                self.get_codex_and_folio_index_at_visual_index(visual_idx);
+        if let Some(selected_codex_idx) = self.codex_state.selected() {
+            let has_previous_codex = selected_codex_idx > 0;
 
-            if let Some(folio_idx) = folio_idx_opt {
-                // Currently on a folio
-
-                // If it's the first folio, move to parent codex
-                if folio_idx == 0 {
-                    self.codex_state.select_previous();
-                } else {
-                    // Move to previous folio
-                    self.codex_state.select_previous();
-                }
-            } else {
-                // Currently on a codex
-
-                // If we're not on the first codex, check if previous codex is expanded
-                if codex_idx > 0 {
-                    let prev_codex = &self.codices[codex_idx - 1];
-
-                    // If previous codex is expanded and has folia, jump to its last folio
-                    if prev_codex.is_expanded && !prev_codex.folia.is_empty() {
-                        // Move up to the last folio of the previous codex
-                        self.codex_state.select_previous();
+            if let Some(selected_codex) = self.codices.get_mut(selected_codex_idx) {
+                if selected_codex.is_expanded {
+                    if let Some(selected_folio_idx) = selected_codex.folio_state.selected_mut() {
+                        if *selected_folio_idx > 0 {
+                            self.list_state.select_previous();
+                            selected_codex.folio_state.select_previous();
+                        } else {
+                            self.list_state.select_previous();
+                            selected_codex.folio_state.select(None);
+                        }
                     } else {
-                        // Move to previous codex (collapsed or no folia)
-                        self.codex_state.select_previous();
+                        if has_previous_codex {
+                            self.list_state.select_previous();
+                            self.codex_state.select_previous();
+                            if let Some(previous_codex) =
+                                self.codices.get_mut(selected_codex_idx - 1)
+                            {
+                                if previous_codex.is_expanded {
+                                    previous_codex
+                                        .folio_state
+                                        .select(previous_codex.folia.len().checked_sub(1));
+                                } else {
+                                    previous_codex.folio_state.select(None);
+                                }
+                            }
+                        }
                     }
                 } else {
-                    // Already at the first item, wrap around or do nothing
-                    self.codex_state.select_previous();
+                    if has_previous_codex {
+                        self.list_state.select_previous();
+                        self.codex_state.select_previous();
+                        if let Some(previous_codex) = self.codices.get_mut(selected_codex_idx - 1) {
+                            if previous_codex.is_expanded {
+                                previous_codex
+                                    .folio_state
+                                    .select(previous_codex.folia.len().checked_sub(1));
+                            } else {
+                                previous_codex.folio_state.select(None);
+                            }
+                        }
+                    }
                 }
             }
-        }
-        // No selection, do nothing (could also select last item)
-        else {
-            self.codex_state.select_first();
         }
     }
 
     /// Toggle expand/collapse for the currently selected codex
     pub fn toggle_selected_codex_expansion(&mut self) {
-        if let Some(selected_idx) = self.codex_state.selected() {
-            // Find which codex we're on
-            let (codex_idx, _) = self.get_codex_and_folio_index_at_visual_index(selected_idx);
-
-            if let Some(codex) = self.codices.get_mut(codex_idx) {
-                codex.is_expanded = !codex.is_expanded;
-
-                // If collapsing, ensure selection stays on the codex line
-                if !codex.is_expanded {
-                    let visual_idx = self.get_visual_index_for_codex(codex_idx);
-                    self.codex_state.select(Some(visual_idx));
+        if let Some(selected_codex_idx) = self.codex_state.selected() {
+            if let Some(codex) = self.codices.get_mut(selected_codex_idx) {
+                if codex.is_expanded {
+                    if let Some(selected_folio_idx) = codex.folio_state.selected() {
+                        self.list_state.scroll_up_by(selected_folio_idx as u16 + 1);
+                        codex.folio_state.select(None);
+                    }
                 }
+                codex.is_expanded = !codex.is_expanded;
             }
         }
     }
@@ -365,6 +379,86 @@ impl CodicesComponent {
         Ok(())
     }
 
+    /// Builds the rendered string for a codex row, optionally appending inline commands
+    /// when the row represents the currently selected codex.
+    ///
+    /// * `codex` – codex being rendered
+    /// * `is_selected` – whether this codex is the active selection in the list
+    /// * `area_width` – width of the list area used to compute padding/truncation
+    fn format_codex(&self, codex: &UICodex, is_selected: bool, area_width: i16) -> String {
+        // Show codex with medieval expand/collapse indicator
+        let indicator = if codex.is_expanded {
+            OPEN_CODEX_SYMBOL
+        } else {
+            CLOSED_CODEX_SYMBOL
+        };
+        let mut codex_text = format!("{} {}", indicator, codex.codex.name);
+
+        if is_selected {
+            // Compute number of blanks spaces to leave after the codex name
+            let n_blanks = area_width// Width of the allocated space, i.e. the max
+            - codex_text.chars().count()as i16 // Characters occupied by the codex name
+            - CODEX_COMMANDS_INLINE.chars().count()as i16 // Characters occupied the commands
+            - LIST_HIGHLIGHT_SYMBOL.chars().count()as i16; // Characters occupied by the highlight of the list
+
+            if n_blanks <= 0 {
+                // Not enough space - truncate the codex name
+                // 3 chars for ...
+                // 2 chars for blank spaces to improve readibility
+                let n_chars_to_keep = codex_text.chars().count() as i16 + n_blanks - 3 - 2;
+                codex_text = codex_text.chars().take(n_chars_to_keep as usize).collect();
+                codex_text = format!("{}...  {}", codex_text, CODEX_COMMANDS_INLINE);
+            } else {
+                // Add commands to selected codex
+                codex_text = format!(
+                    "{}{}{}",
+                    codex_text,
+                    " ".repeat(n_blanks as usize),
+                    CODEX_COMMANDS_INLINE
+                );
+            }
+        }
+
+        codex_text
+    }
+
+    /// Builds the rendered string for a folio row, optionally appending inline commands
+    /// when the row represents the currently selected folio.
+    ///
+    /// * `folio` – codex being rendered
+    /// * `is_selected` – whether this folio is the active selection in the list
+    /// * `area_width` – width of the list area used to compute padding/truncation
+    fn format_folio(&self, folio: &UIFolio, is_selected: bool, area_width: i16) -> String {
+        let mut folio_text = format!("    {}", folio.folio.name);
+
+        if is_selected {
+            // Compute number of blanks spaces to leave after the folio name
+            let n_blanks = area_width as i16// Width of the allocated space, i.e. the max
+            - folio_text.chars().count()as i16 // Characters occupied by the folio name
+            - FOLIO_COMMANDS_INLINE.chars().count()as i16 // Characters occupied the commands
+            - LIST_HIGHLIGHT_SYMBOL.chars().count()as i16; // Characters occupied by the highlight of the list
+
+            if n_blanks <= 0 {
+                // Not enough space - truncate the folio name
+                // 3 chars for ...
+                // 2 chars for blank spaces to improve readibility
+                let n_chars_to_keep = folio_text.chars().count() as i16 + n_blanks - 3 - 2;
+                folio_text = folio_text.chars().take(n_chars_to_keep as usize).collect();
+                folio_text = format!("{}...  {}", folio_text, FOLIO_COMMANDS_INLINE);
+            } else {
+                // Add commands to selected folio
+                folio_text = format!(
+                    "{}{}{}",
+                    folio_text,
+                    " ".repeat(n_blanks as usize),
+                    FOLIO_COMMANDS_INLINE
+                );
+            }
+        }
+
+        folio_text
+    }
+
     /// Render the hierarchical tree of codices with collapsible folia
     pub fn render(&mut self, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
         // Command hints for codices
@@ -386,90 +480,40 @@ impl CodicesComponent {
         // We initiate a list that is composed of both codices and folia, in a nested way
         let mut codices_and_folia: Vec<ListItem> = Vec::new();
 
-        // Inline command hints
-        let codex_commands_inline = "[r]ec  [a]dd  [m]od  [d]el  ".to_string();
-        let folio_commands_inline = "[m]od  [d]el  ".to_string();
+        // Find the index of the selected codex
+        let selected_codex_idx = self.codex_state.selected();
 
-        // Get current selection and convert to codex/folio indices
-        let (selected_codex_idx, selected_folio_idx) =
-            if let Some(visual_idx) = self.codex_state.selected() {
-                self.get_codex_and_folio_index_at_visual_index(visual_idx)
-            } else {
-                (usize::MAX, None) // Use MAX as sentinel for "nothing selected"
-            };
-
+        // Add all codices and possibly folia to the list to be displayed in the UI
         for (codex_idx, ui_codex) in self.codices.iter().enumerate() {
-            // Show codex with medieval expand/collapse indicator
-            let indicator = if ui_codex.is_expanded {
-                OPEN_CODEX_SYMBOL
-            } else {
-                CLOSED_CODEX_SYMBOL
-            };
+            // Format the codex text to be displayed, possibly with inline command hints
+            let codex_text = self.format_codex(
+                ui_codex,
+                selected_codex_idx
+                    .map(|idx| idx == codex_idx)
+                    .unwrap_or(false)
+                    && ui_codex.folio_state.selected().is_none(),
+                area.width as i16,
+            );
 
-            // Default text, irrespective of whether the codex is selected or not
-            let mut codex_text = format!("{} {}", indicator, ui_codex.codex.name);
-
-            // If Codex is selected, add relevant commands *inline*
-            if codex_idx == selected_codex_idx && selected_folio_idx.is_none() {
-                // Compute number of blanks spaces to leave after the codex name
-                let n_blanks = area.width as i16// Width of the allocated space, i.e. the max
-                - codex_text.chars().count()as i16 // Characters occupied by the codex name
-                - codex_commands_inline.chars().count()as i16 // Characters occupied the commands
-                - LIST_HIGHLIGHT_SYMBOL.chars().count()as i16; // Characters occupied by the highlight of the list
-
-                if n_blanks <= 0 {
-                    // Not enough space - truncate the codex name
-                    // 3 chars for ...
-                    // 2 chars for blank spaces to improve readibility
-                    let n_chars_to_keep = codex_text.chars().count() as i16 + n_blanks - 3 - 2;
-                    codex_text = codex_text.chars().take(n_chars_to_keep as usize).collect();
-                    codex_text = format!("{}...  {}", codex_text, codex_commands_inline);
-                } else {
-                    // Add commands to selected codex
-                    codex_text = format!(
-                        "{}{}{}",
-                        codex_text,
-                        " ".repeat(n_blanks as usize),
-                        codex_commands_inline
-                    );
-                }
-            }
+            // Always add the formatted codex text to the list
             codices_and_folia.push(ListItem::from(codex_text));
 
-            // Show folia if expanded (no symbol, just indent)
+            // If the codex is expanded, we also need to add the folia to the list
             if ui_codex.is_expanded {
+                // Find the index of the selected folio
+                let selected_folio_idx = ui_codex.folio_state.selected();
+
                 for (folio_idx, ui_folio) in ui_codex.folia.iter().enumerate() {
-                    // Default text, irrespective of whether the folio is selected or not
-                    let mut folio_text = format!("    {}", ui_folio.folio.name);
+                    // Format the folio text to be displayed, possibly with inline command hints
+                    let folio_text = self.format_folio(
+                        ui_folio,
+                        selected_folio_idx
+                            .map(|idx| idx == folio_idx)
+                            .unwrap_or(false),
+                        area.width as i16,
+                    );
 
-                    // Check if this folio is selected
-                    if codex_idx == selected_codex_idx && selected_folio_idx == Some(folio_idx) {
-                        // Compute number of blanks spaces to leave after the folio name
-                        let n_blanks = area.width as i16// Width of the allocated space, i.e. the max
-                        - folio_text.chars().count()as i16 // Characters occupied by the folio name
-                        - folio_commands_inline.chars().count()as i16 // Characters occupied the commands
-                        - LIST_HIGHLIGHT_SYMBOL.chars().count()as i16; // Characters occupied by the highlight of the list
-
-                        if n_blanks <= 0 {
-                            // Not enough space - truncate the folio name
-                            // 3 chars for ...
-                            // 2 chars for blank spaces to improve readibility
-                            let n_chars_to_keep =
-                                folio_text.chars().count() as i16 + n_blanks - 3 - 2;
-                            folio_text =
-                                folio_text.chars().take(n_chars_to_keep as usize).collect();
-                            folio_text = format!("{}...  {}", folio_text, codex_commands_inline);
-                        } else {
-                            // Add commands to selected folio
-                            folio_text = format!(
-                                "{}{}{}",
-                                folio_text,
-                                " ".repeat(n_blanks as usize),
-                                folio_commands_inline
-                            );
-                        }
-                    }
-
+                    // Always add the formatted codex text to the list
                     codices_and_folia.push(ListItem::from(folio_text));
                 }
             }
@@ -484,6 +528,6 @@ impl CodicesComponent {
             )
             .highlight_spacing(HighlightSpacing::Always);
 
-        StatefulWidget::render(list, area, buf, &mut self.codex_state);
+        StatefulWidget::render(list, area, buf, &mut self.list_state);
     }
 }
