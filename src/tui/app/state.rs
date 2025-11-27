@@ -208,13 +208,23 @@ impl App {
     }
 
     /// Enter the "Modify Codex" screen by opening the corresponding pop-up
-    pub fn enter_modify_codex_screen(&mut self, selected_codex: &Codex) {
+    pub fn enter_modify_codex_screen(&mut self, name: String) {
         self.input_state = InputState {
-            current_input: selected_codex.name.clone(),
+            current_input: name,
             cursor_pos: 0,
             is_modifying: true,
         };
         self.current_screen = CurrentScreen::ModifyCodex;
+    }
+
+    /// Enter the "Modify Folio" screen by opening the corresponding pop-up
+    pub fn enter_modify_folio_screen(&mut self, name: String) {
+        self.input_state = InputState {
+            current_input: name,
+            cursor_pos: 0,
+            is_modifying: true,
+        };
+        self.current_screen = CurrentScreen::ModifyFolio;
     }
 
     /// Enter the "Add Folio" screen by opening the corresponding pop-up
@@ -225,22 +235,6 @@ impl App {
         }
     }
 
-    /// Enter the "Modify Folio" screen by opening the corresponding pop-up
-    pub fn enter_modify_folio_screen(&mut self, ui_codex: &UICodex) {
-        if self.codices_component.codex_state.selected().is_some()
-            && let Some(j) = ui_codex.folio_state.selected()
-        {
-            let selected_folio = ui_codex.folia[j].folio.clone();
-
-            self.input_state = InputState {
-                current_input: selected_folio.name.clone(),
-                cursor_pos: 0,
-                is_modifying: true,
-            };
-            self.current_screen = CurrentScreen::ModifyFolio;
-        }
-    }
-
     /// Exit the Add Codex screen without saving
     pub fn exit_add_or_modify_codex_without_saving(&mut self) {
         self.current_screen = CurrentScreen::Main;
@@ -248,7 +242,7 @@ impl App {
     }
 
     /// Exit the Add Folio screen without saving
-    pub fn exit_add_item_without_saving(&mut self) {
+    pub fn exit_add_or_modify_folio_without_saving(&mut self) {
         self.current_screen = CurrentScreen::Main;
         self.input_state.clear();
     }
@@ -394,10 +388,10 @@ impl Widget for &mut App {
                 ModifyCodexPopUp::render(&self.input_state, codices_area, buf, theme)
             }
             CurrentScreen::AddFolio => {
-                AddFolioPopUp::render(&self.input_state, bookmark_area, buf, theme)
+                AddFolioPopUp::render(&self.input_state, codices_area, buf, theme)
             }
             CurrentScreen::ModifyFolio => {
-                ModifyFolioPopUp::render(&self.input_state, bookmark_area, buf, theme)
+                ModifyFolioPopUp::render(&self.input_state, codices_area, buf, theme)
             }
             CurrentScreen::ChangeArchivum => ChangeArchivumPopUp::render(
                 &self.config,

@@ -49,7 +49,9 @@ impl FoliaComponent {
         name: String,
         pool: &SqlitePool,
     ) -> Result<()> {
+        println!("OK here");
         if let Some(j) = ui_codex.folio_state.selected() {
+            println!("FOUND");
             let mut folio = ui_codex.folia[j].folio.clone();
             folio.update_name(pool, name).await?;
 

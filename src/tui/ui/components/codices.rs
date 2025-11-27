@@ -39,11 +39,6 @@ impl CodicesComponent {
         Ok(())
     }
 
-    // /// Get currently selected codex index
-    // pub fn selected(&self) -> Option<usize> {
-    //     self.codex_state.selected()
-    // }
-
     /// Get the currently selected codex (mutable)
     pub fn get_selected_codex_mut(&mut self) -> Option<&mut UICodex> {
         if let Some(i) = self.codex_state.selected() {

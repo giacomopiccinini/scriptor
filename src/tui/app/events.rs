@@ -64,12 +64,12 @@ impl EventHandler {
             (KeyCode::Char('m'), KeyModifiers::NONE) => {
                 match app.codices_component.get_selected_codex_and_folio() {
                     // If a folio is selected, modify the folio
-                    (Some(codex), Some(_folio)) => {
-                        app.enter_modify_folio_screen(&codex.clone());
+                    (Some(_codex), Some(folio)) => {
+                        app.enter_modify_folio_screen(folio.folio.name.clone());
                     }
                     // If only a codex is selected (no folio), modify the codex
                     (Some(codex), None) => {
-                        app.enter_modify_codex_screen(&codex.codex.clone());
+                        app.enter_modify_codex_screen(codex.codex.name.clone());
                     }
 
                     // Cannot happen, but needed for consistency
@@ -206,28 +206,34 @@ impl EventHandler {
     /// Handle key press from user in add folio screen
     pub async fn handle_add_or_modify_folio_screen_key(app: &mut App, key: KeyEvent) {
         match key.code {
-            KeyCode::Esc => app.exit_add_item_without_saving(),
+            KeyCode::Esc => app.exit_add_or_modify_folio_without_saving(),
             KeyCode::Backspace => app.input_state.remove_char_before_cursor(),
             KeyCode::Delete => app.input_state.delete_char_after_cursor(),
             KeyCode::Left => app.input_state.move_cursor_left(),
             KeyCode::Right => app.input_state.move_cursor_right(),
             KeyCode::Char(value) => app.input_state.add_char(value),
             KeyCode::Enter => {
-                let item_name = app.input_state.get_text().to_string();
-                if !item_name.trim().is_empty()
+                let folio_name = app.input_state.get_text().to_string();
+                println!("THIS IS FINE");
+                println!("Selected codex: {:?}", app.codices_component.get_selected_codex_mut());
+                if !folio_name.trim().is_empty()
                     && let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
                 {
+                    println!("QUI CI SONO");
                     if app.input_state.is_modifying {
+                        println!("IS MODIFYING");
                         if let Err(e) =
-                            FoliaComponent::update_item(selected_codex, item_name, &app.pool).await
+                            FoliaComponent::update_item(selected_codex, folio_name, &app.pool).await
                         {
+                            println!("ERROR");
                             eprintln!("Failed to update item: {}", e);
                         } else {
+                            println!("BOH");
                             app.current_screen = CurrentScreen::Main;
                             app.input_state.clear();
                         }
                     } else if let Err(e) =
-                        FoliaComponent::create_item(selected_codex, item_name, &app.pool).await
+                        FoliaComponent::create_item(selected_codex, folio_name, &app.pool).await
                     {
                         eprintln!("Failed to create item: {}", e);
                     } else {
