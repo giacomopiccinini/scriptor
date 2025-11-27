@@ -219,7 +219,7 @@ impl App {
 
     /// Enter the "Add Folio" screen by opening the corresponding pop-up
     pub fn enter_add_folio_screen(&mut self) {
-        if self.codices_component.selected().is_some() {
+        if self.codices_component.codex_state.selected().is_some() {
             self.input_state = InputState::default();
             self.current_screen = CurrentScreen::AddFolio;
         }
@@ -227,7 +227,7 @@ impl App {
 
     /// Enter the "Modify Folio" screen by opening the corresponding pop-up
     pub fn enter_modify_folio_screen(&mut self, ui_codex: &UICodex) {
-        if self.codices_component.selected().is_some()
+        if self.codices_component.codex_state.selected().is_some()
             && let Some(j) = ui_codex.folio_state.selected()
         {
             let selected_folio = ui_codex.folia[j].folio.clone();

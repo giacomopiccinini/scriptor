@@ -51,42 +51,36 @@ impl EventHandler {
             }
 
             // Add new codex
-            (KeyCode::Char('A'), KeyModifiers::SHIFT) => app.enter_add_codex_screen(),
+            (KeyCode::Char('n'), KeyModifiers::NONE) => app.enter_add_codex_screen(),
 
             // Add new item
+            // TODO
             (KeyCode::Char('a'), KeyModifiers::NONE) => app.enter_add_folio_screen(),
 
             // Change archivum
             (KeyCode::Tab, KeyModifiers::NONE) => app.enter_change_archivum_screen(),
 
-            // Modify existing codex
-            (KeyCode::Char('M'), KeyModifiers::SHIFT) => {
-                if let Some(selected_codex) = app.codices_component.get_selected_codex() {
-                    app.enter_modify_codex_screen(&selected_codex.codex.clone())
-                }
-            }
-
             // Modify existing item
             (KeyCode::Char('m'), KeyModifiers::NONE) => {
-                if let Some(selected_codex) = app.codices_component.get_selected_codex() {
-                    app.enter_modify_folio_screen(&selected_codex.clone())
+                match app.codices_component.get_selected_codex_and_folio() {
+                    // If a folio is selected, modify the folio
+                    (Some(codex), Some(_folio)) => {
+                        app.enter_modify_folio_screen(&codex.clone());
+                    }
+                    // If only a codex is selected (no folio), modify the codex
+                    (Some(codex), None) => {
+                        app.enter_modify_codex_screen(&codex.codex.clone());
+                    }
+
+                    // Cannot happen, but needed for consistency
+                    (None, Some(_folio)) => {}
+
+                    // Nothing selected, do nothing
+                    (None, None) => {}
                 }
             }
 
-            // Delete codex
-            (KeyCode::Char('D'), KeyModifiers::SHIFT) => {
-                if let Err(e) = CodicesComponent::delete_selected_codex_static(
-                    &mut app.codices_component,
-                    &app.pool,
-                )
-                .await
-                {
-                    // Log error but don't crash the application
-                    eprintln!("Failed to delete codex: {}", e);
-                }
-            }
-
-            // Delete folio
+            // Delete folio or codex, depending on which one is selected
             (KeyCode::Char('d'), KeyModifiers::NONE) => {
                 if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
                     && let Err(e) =
