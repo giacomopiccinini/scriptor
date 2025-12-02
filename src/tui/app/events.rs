@@ -214,24 +214,15 @@ impl EventHandler {
             KeyCode::Char(value) => app.input_state.add_char(value),
             KeyCode::Enter => {
                 let folio_name = app.input_state.get_text().to_string();
-                println!("THIS IS FINE");
-                println!(
-                    "Selected codex: {:?}",
-                    app.codices_component.get_selected_codex_mut()
-                );
                 if !folio_name.trim().is_empty()
                     && let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
                 {
-                    println!("QUI CI SONO");
                     if app.input_state.is_modifying {
-                        println!("IS MODIFYING");
                         if let Err(e) =
                             FoliaComponent::update_item(selected_codex, folio_name, &app.pool).await
                         {
-                            println!("ERROR");
                             eprintln!("Failed to update item: {}", e);
                         } else {
-                            println!("BOH");
                             app.current_screen = CurrentScreen::Main;
                             app.input_state.clear();
                         }
