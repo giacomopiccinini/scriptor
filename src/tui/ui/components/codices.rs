@@ -61,83 +61,7 @@ impl CodicesComponent {
         }
     }
 
-    /// Get the visual index (display position) for a given codex index
-    ///
-    /// This function converts a logical codex index (position in the codices vector)
-    /// to a visual index (position in the displayed list, accounting for expanded folia).
-    ///
-    /// # Arguments
-    /// * `codex_idx` - The logical index of the codex in the codices vector
-    ///
-    /// # Returns
-    /// The visual index where this codex appears in the displayed list
-    ///
-    /// # Example
-    /// If we have 3 codices where the first is expanded with 2 folia:
-    /// - Codex 0 (expanded): visual index 0
-    /// - Folio 0.1: visual index 1  
-    /// - Folio 0.2: visual index 2
-    /// - Codex 1: visual index 3
-    /// - Codex 2: visual index 4
-    ///
-    /// So `get_visual_index_for_codex(1)` would return 3.
-    pub fn get_visual_index_for_codex(&self, codex_idx: usize) -> usize {
-        let mut visual_idx = 0;
-
-        // Iterate through all codices up to the target index
-        for (idx, codex) in self.codices.iter().enumerate() {
-            // If we've reached the target codex, return its visual position
-            if idx == codex_idx {
-                return visual_idx;
-            }
-
-            // Count this codex in the visual index
-            visual_idx += 1;
-
-            // If this codex is expanded, also count all its folia
-            if codex.is_expanded {
-                visual_idx += codex.folia.len();
-            }
-        }
-
-        // If codex_idx is out of bounds, return the next visual position
-        visual_idx
-    }
-
-    /// Get codex index and optional folio index from visual list index
-    /// Returns (codex_idx, Some(folio_idx)) if on a folio, or (codex_idx, None) if on a codex
-    pub fn get_codex_and_folio_index_at_visual_index(
-        &self,
-        visual_idx: usize,
-    ) -> (usize, Option<usize>) {
-        let mut current_visual_idx = 0;
-
-        for (codex_idx, codex) in self.codices.iter().enumerate() {
-            if current_visual_idx == visual_idx {
-                // We're on the codex line
-                return (codex_idx, None);
-            }
-            current_visual_idx += 1;
-
-            if codex.is_expanded {
-                for folio_idx in 0..codex.folia.len() {
-                    if current_visual_idx == visual_idx {
-                        // We're on a folio line
-                        return (codex_idx, Some(folio_idx));
-                    }
-                    current_visual_idx += 1;
-                }
-            }
-        }
-
-        // Default: return last codex
-        (self.codices.len().saturating_sub(1), None)
-    }
-
     /// Returns the currently selected codex and folio (if a folio is selected).
-    ///
-    /// This method translates the visual selection index (which accounts for expanded/collapsed
-    /// codices) into actual codex and folio references.
     ///
     /// # Returns
     /// - `(Some(codex), Some(folio))` - A folio within a codex is selected
@@ -146,16 +70,13 @@ impl CodicesComponent {
     pub fn get_selected_codex_and_folio(&self) -> (Option<&UICodex>, Option<&UIFolio>) {
         self.codex_state
             .selected()
-            .and_then(|visual_idx| {
-                // Convert visual index to actual codex and folio indices
-                let (codex_idx, folio_idx) =
-                    self.get_codex_and_folio_index_at_visual_index(visual_idx);
-
-                // Get the codex, returning None if index is invalid
+            .and_then(|codex_idx| {
                 self.codices.get(codex_idx).map(|codex| {
-                    // Get the folio if a folio index is provided
-                    let folio = folio_idx.and_then(|idx| codex.folia.get(idx));
-                    (Some(codex), folio)
+                    codex
+                        .folio_state
+                        .selected()
+                        .map(|folio_idx| (Some(codex), codex.folia.get(folio_idx)))
+                        .unwrap_or((Some(codex), None))
                 })
             })
             .unwrap_or((None, None))
@@ -216,9 +137,7 @@ impl CodicesComponent {
                     } else if has_previous_codex {
                         self.list_state.select_previous();
                         self.codex_state.select_previous();
-                        if let Some(previous_codex) =
-                            self.codices.get_mut(selected_codex_idx - 1)
-                        {
+                        if let Some(previous_codex) = self.codices.get_mut(selected_codex_idx - 1) {
                             if previous_codex.is_expanded {
                                 previous_codex
                                     .folio_state
@@ -248,14 +167,16 @@ impl CodicesComponent {
     /// Toggle expand/collapse for the currently selected codex
     pub fn toggle_selected_codex_expansion(&mut self) {
         if let Some(selected_codex_idx) = self.codex_state.selected()
-            && let Some(codex) = self.codices.get_mut(selected_codex_idx) {
-                if codex.is_expanded
-                    && let Some(selected_folio_idx) = codex.folio_state.selected() {
-                        self.list_state.scroll_up_by(selected_folio_idx as u16 + 1);
-                        codex.folio_state.select(None);
-                    }
-                codex.is_expanded = !codex.is_expanded;
+            && let Some(codex) = self.codices.get_mut(selected_codex_idx)
+        {
+            if codex.is_expanded
+                && let Some(selected_folio_idx) = codex.folio_state.selected()
+            {
+                self.list_state.scroll_up_by(selected_folio_idx as u16 + 1);
+                codex.folio_state.select(None);
             }
+            codex.is_expanded = !codex.is_expanded;
+        }
     }
 
     /// Refresh codices from archivum (used after reordering)
