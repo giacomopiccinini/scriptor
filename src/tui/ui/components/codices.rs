@@ -201,17 +201,27 @@ impl CodicesComponent {
         codices_component: &mut CodicesComponent,
         pool: &SqlitePool,
     ) -> Result<()> {
-        if let Some(i) = codices_component.codex_state.selected() {
-            let mut codex = codices_component.codices[i].codex.clone();
-            codex.move_up(pool).await?;
+        if let Some(i) = codices_component.codex_state.selected()
+            && i > 0
+        {
+            let mut codex_below = codices_component.codices[i].codex.clone();
+
+            // Extract the visual length of the codex above
+            // visual length = 1 (codex) + # folia (if expanded)
+            let visual_len_codex_above = 1
+                + (codices_component.codices[i - 1].is_expanded as usize)
+                    * codices_component.codices[i - 1].folia.len();
+
+            codex_below.move_up(pool).await?;
 
             // Refresh codices to reflect the new order
-            codices_component.refresh_codices(pool).await?;
+            codices_component.codices.swap(i, i - 1);
 
             // Adjust selection to follow the moved codex
-            if i > 0 {
-                codices_component.codex_state.select(Some(i - 1));
-            }
+            codices_component.codex_state.select(Some(i - 1));
+            codices_component
+                .list_state
+                .scroll_up_by(visual_len_codex_above as u16);
         }
         Ok(())
     }
@@ -221,17 +231,28 @@ impl CodicesComponent {
         codices_component: &mut CodicesComponent,
         pool: &SqlitePool,
     ) -> Result<()> {
-        if let Some(i) = codices_component.codex_state.selected() {
-            let mut codex = codices_component.codices[i].codex.clone();
-            codex.move_down(pool).await?;
+        if let Some(i) = codices_component.codex_state.selected()
+            && i < codices_component.codices.len() - 1
+        {
+            let mut codex_above = codices_component.codices[i].codex.clone();
+
+            // Extract the visual length of the codex below
+            // visual length = 1 (codex) + # folia (if expanded)
+            let visual_len_codex_below = 1
+                + (codices_component.codices[i + 1].is_expanded as usize)
+                    * codices_component.codices[i + 1].folia.len();
+
+            codex_above.move_down(pool).await?;
 
             // Refresh codices to reflect the new order
-            codices_component.refresh_codices(pool).await?;
+            //codices_component.refresh_codices(pool).await?;
+            codices_component.codices.swap(i, i + 1);
 
             // Adjust selection to follow the moved codex
-            if i + 1 < codices_component.codices.len() {
-                codices_component.codex_state.select(Some(i + 1));
-            }
+            codices_component.codex_state.select(Some(i + 1));
+            codices_component
+                .list_state
+                .scroll_down_by(visual_len_codex_below as u16);
         }
         Ok(())
     }
@@ -247,7 +268,6 @@ impl CodicesComponent {
 
             // Refresh the codices from archivum
             codices_component.codices.remove(i);
-            //codices_component.load_codices(pool).await?;
 
             // Adjust selection after deletion
             if codices_component.codices.is_empty() {
@@ -276,7 +296,6 @@ impl CodicesComponent {
             is_expanded: false,
         };
         codices_component.codices.push(ui_codex);
-        //codices_component.load_codices(pool).await?;
         Ok(())
     }
 
@@ -290,7 +309,6 @@ impl CodicesComponent {
             let mut codex = codices_component.codices[i].codex.clone();
             codex.update_name(pool, name).await?;
             codices_component.codices[i].codex = codex;
-            //codices_component.load_codices(pool).await?;
         }
         Ok(())
     }
