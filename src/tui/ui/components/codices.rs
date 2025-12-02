@@ -179,23 +179,6 @@ impl CodicesComponent {
         }
     }
 
-    /// Refresh codices from archivum (used after reordering)
-    pub async fn refresh_codices(&mut self, pool: &SqlitePool) -> Result<()> {
-        let selected_index = self.codex_state.selected();
-        self.load_codices(pool).await?;
-
-        // Restore selection if it was set and still valid
-        if let Some(index) = selected_index {
-            if index < self.codices.len() {
-                self.codex_state.select(Some(index));
-            } else if !self.codices.is_empty() {
-                self.codex_state.select(Some(self.codices.len() - 1));
-            }
-        }
-
-        Ok(())
-    }
-
     /// Move the currently selected codex up
     pub async fn move_selected_codex_up(
         codices_component: &mut CodicesComponent,
@@ -245,7 +228,6 @@ impl CodicesComponent {
             codex_above.move_down(pool).await?;
 
             // Refresh codices to reflect the new order
-            //codices_component.refresh_codices(pool).await?;
             codices_component.codices.swap(i, i + 1);
 
             // Adjust selection to follow the moved codex
