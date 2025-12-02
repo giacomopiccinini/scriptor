@@ -246,7 +246,8 @@ impl CodicesComponent {
             codex.delete(pool).await?;
 
             // Refresh the codices from archivum
-            codices_component.load_codices(pool).await?;
+            codices_component.codices.remove(i);
+            //codices_component.load_codices(pool).await?;
 
             // Adjust selection after deletion
             if codices_component.codices.is_empty() {
@@ -267,8 +268,15 @@ impl CodicesComponent {
         pool: &SqlitePool,
     ) -> Result<()> {
         let new_codex = NewCodex { name };
-        Codex::create(pool, new_codex).await?;
-        codices_component.load_codices(pool).await?;
+        let db_codex = Codex::create(pool, new_codex).await?;
+        let ui_codex = UICodex {
+            codex: db_codex,
+            folio_state: ListState::default(),
+            folia: Vec::new(),
+            is_expanded: false,
+        };
+        codices_component.codices.push(ui_codex);
+        //codices_component.load_codices(pool).await?;
         Ok(())
     }
 
@@ -281,7 +289,8 @@ impl CodicesComponent {
         if let Some(i) = codices_component.codex_state.selected() {
             let mut codex = codices_component.codices[i].codex.clone();
             codex.update_name(pool, name).await?;
-            codices_component.load_codices(pool).await?;
+            codices_component.codices[i].codex = codex;
+            //codices_component.load_codices(pool).await?;
         }
         Ok(())
     }
