@@ -90,13 +90,31 @@ impl EventHandler {
             // Move codex/folio down, reordering the list
             (KeyCode::Down, KeyModifiers::CONTROL) => match app.current_region {
                 CurrentRegion::CodexAndFolio => {
-                    if let Err(e) = CodicesComponent::move_selected_codex_down(
-                        &mut app.codices_component,
-                        &app.pool,
-                    )
-                    .await
-                    {
-                        eprintln!("Failed to move codex down: {}", e);
+                    match app.codices_component.get_selected_codex_and_folio() {
+                        // Folio selected - move folio down
+                        (Some(_), Some(_)) => {
+                            if let Err(e) = CodicesComponent::move_selected_folio_down(
+                                &mut app.codices_component,
+                                &app.pool,
+                            )
+                            .await
+                            {
+                                eprintln!("Failed to move folio down: {}", e);
+                            }
+                        }
+                        // Only codex selected - move codex down
+                        (Some(_), None) => {
+                            if let Err(e) = CodicesComponent::move_selected_codex_down(
+                                &mut app.codices_component,
+                                &app.pool,
+                            )
+                            .await
+                            {
+                                eprintln!("Failed to move codex down: {}", e);
+                            }
+                        }
+                        // Nothing selected
+                        _ => {}
                     }
                 }
                 CurrentRegion::Fragmentum => {}
@@ -105,13 +123,31 @@ impl EventHandler {
             // Move codex/folio up, reordering the list
             (KeyCode::Up, KeyModifiers::CONTROL) => match app.current_region {
                 CurrentRegion::CodexAndFolio => {
-                    if let Err(e) = CodicesComponent::move_selected_codex_up(
-                        &mut app.codices_component,
-                        &app.pool,
-                    )
-                    .await
-                    {
-                        eprintln!("Failed to move codex up: {}", e);
+                    match app.codices_component.get_selected_codex_and_folio() {
+                        // Folio selected - move folio up
+                        (Some(_), Some(_)) => {
+                            if let Err(e) = CodicesComponent::move_selected_folio_up(
+                                &mut app.codices_component,
+                                &app.pool,
+                            )
+                            .await
+                            {
+                                eprintln!("Failed to move folio up: {}", e);
+                            }
+                        }
+                        // Only codex selected - move codex up
+                        (Some(_), None) => {
+                            if let Err(e) = CodicesComponent::move_selected_codex_up(
+                                &mut app.codices_component,
+                                &app.pool,
+                            )
+                            .await
+                            {
+                                eprintln!("Failed to move codex up: {}", e);
+                            }
+                        }
+                        // Nothing selected
+                        _ => {}
                     }
                 }
                 CurrentRegion::Fragmentum => {}

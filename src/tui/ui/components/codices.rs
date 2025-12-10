@@ -239,6 +239,62 @@ impl CodicesComponent {
         Ok(())
     }
 
+    /// Move the currently selected folio up
+    pub async fn move_selected_folio_up(
+        codices_component: &mut CodicesComponent,
+        pool: &SqlitePool,
+    ) -> Result<()> {
+        if let Some(codex_idx) = codices_component.codex_state.selected()
+            && let Some(folio_idx) = codices_component.codices[codex_idx].folio_state.selected()
+            && folio_idx > 0
+        {
+            let mut folio = codices_component.codices[codex_idx].folia[folio_idx]
+                .folio
+                .clone();
+            folio.move_up(pool).await?;
+
+            // Swap folia in the Vec (no DB refresh)
+            codices_component.codices[codex_idx]
+                .folia
+                .swap(folio_idx, folio_idx - 1);
+
+            // Adjust both folio_state and list_state
+            codices_component.codices[codex_idx]
+                .folio_state
+                .select(Some(folio_idx - 1));
+            codices_component.list_state.scroll_up_by(1);
+        }
+        Ok(())
+    }
+
+    /// Move the currently selected folio down
+    pub async fn move_selected_folio_down(
+        codices_component: &mut CodicesComponent,
+        pool: &SqlitePool,
+    ) -> Result<()> {
+        if let Some(codex_idx) = codices_component.codex_state.selected()
+            && let Some(folio_idx) = codices_component.codices[codex_idx].folio_state.selected()
+            && folio_idx < codices_component.codices[codex_idx].folia.len() - 1
+        {
+            let mut folio = codices_component.codices[codex_idx].folia[folio_idx]
+                .folio
+                .clone();
+            folio.move_down(pool).await?;
+
+            // Swap folia in the Vec (no DB refresh)
+            codices_component.codices[codex_idx]
+                .folia
+                .swap(folio_idx, folio_idx + 1);
+
+            // Adjust both folio_state and list_state
+            codices_component.codices[codex_idx]
+                .folio_state
+                .select(Some(folio_idx + 1));
+            codices_component.list_state.scroll_down_by(1);
+        }
+        Ok(())
+    }
+
     /// Delete selected item, either codex or folio
     pub async fn delete_selected(&mut self, pool: &SqlitePool) -> Result<()> {
         // Extract the selected codex and folio (might be none)

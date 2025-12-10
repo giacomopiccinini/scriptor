@@ -58,38 +58,4 @@ impl FoliaComponent {
         }
         Ok(())
     }
-
-    /// Move the currently selected folio up
-    pub async fn move_selected_folio_up(ui_codex: &mut UICodex, pool: &SqlitePool) -> Result<()> {
-        if let Some(j) = ui_codex.folio_state.selected() {
-            let mut folio = ui_codex.folia[j].folio.clone();
-            folio.move_up(pool).await?;
-
-            // Update folia to reflect the new order
-            ui_codex.update_folia(pool).await?;
-
-            // Adjust selection to follow the moved folio
-            if j > 0 {
-                ui_codex.folio_state.select(Some(j - 1));
-            }
-        }
-        Ok(())
-    }
-
-    /// Move the currently selected folio down
-    pub async fn move_selected_folio_down(ui_codex: &mut UICodex, pool: &SqlitePool) -> Result<()> {
-        if let Some(j) = ui_codex.folio_state.selected() {
-            let mut folio = ui_codex.folia[j].folio.clone();
-            folio.move_down(pool).await?;
-
-            // Update folia to reflect the new order
-            ui_codex.update_folia(pool).await?;
-
-            // Adjust selection to follow the moved folio
-            if j + 1 < ui_codex.folia.len() {
-                ui_codex.folio_state.select(Some(j + 1));
-            }
-        }
-        Ok(())
-    }
 }
