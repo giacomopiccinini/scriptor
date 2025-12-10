@@ -82,11 +82,8 @@ impl EventHandler {
 
             // Delete folio or codex, depending on which one is selected
             (KeyCode::Char('d'), KeyModifiers::NONE) => {
-                if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
-                    && let Err(e) =
-                        FoliaComponent::delete_selected_folio(selected_codex, &app.pool).await
-                {
-                    eprintln!("Failed to delete folio: {}", e);
+                if let Err(e) = app.codices_component.delete_selected(&app.pool).await {
+                    eprintln!("Failed to delete: {}", e);
                 }
             }
 

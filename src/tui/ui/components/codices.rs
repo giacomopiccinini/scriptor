@@ -239,27 +239,35 @@ impl CodicesComponent {
         Ok(())
     }
 
-    /// Delete the currently selected codex
-    pub async fn delete_selected_codex_static(
-        codices_component: &mut CodicesComponent,
-        pool: &SqlitePool,
-    ) -> Result<()> {
-        if let Some(i) = codices_component.codex_state.selected() {
-            let codex = codices_component.codices[i].codex.clone();
-            codex.delete(pool).await?;
+    /// Delete selected item, either codex or folio
+    pub async fn delete_selected(&mut self, pool: &SqlitePool) -> Result<()> {
+        // Extract the selected codex and folio (might be none)
+        // Clone the data we need BEFORE mutating, to release the immutable borrow
+        let (codex, folio) = self.get_selected_codex_and_folio();
+        let codex_to_delete = codex.map(|c| c.codex.clone());
+        let folio_to_delete = folio.map(|f| f.folio.clone());
 
-            // Refresh the codices from archivum
-            codices_component.codices.remove(i);
+        // A codex must be selected, or else neither a folio nor a codex are selected
+        if codex_to_delete.is_some() {
+            // There has to be a valid codex idx, we can unwrap
+            let codex_idx = self.codex_state.selected().unwrap();
 
-            // Adjust selection after deletion
-            if codices_component.codices.is_empty() {
-                codices_component.codex_state.select(None);
-            } else if i >= codices_component.codices.len() {
-                codices_component
-                    .codex_state
-                    .select(Some(codices_component.codices.len() - 1));
+            // If also a folio is selected
+            if let Some(folio) = folio_to_delete {
+                // There has to be a valid folio idx, we can unwrap
+                let folio_idx = self.codices[codex_idx].folio_state.selected().unwrap();
+
+                // Remove from list and database
+                self.codices[codex_idx].folia.remove(folio_idx);
+                folio.delete(pool).await?;
+            } else if let Some(codex) = codex_to_delete {
+                self.codices.remove(codex_idx);
+                codex.delete(pool).await?;
             }
+
+            self.select_previous();
         }
+
         Ok(())
     }
 
