@@ -58,6 +58,11 @@ pub fn read_audio_file_mono(audio_file_path: &Path) -> Result<(Vec<f32>, u32)> {
 
 /// Resample audio file to target sample rate
 pub fn resample(samples: Vec<f32>, original_sr: u32, target_sr: u32) -> Result<Vec<f32>> {
+    // If resampling is not needed, don't bother
+    if original_sr == target_sr {
+        return Ok(samples);
+    }
+
     // Initialize the resampler
     let mut resampler = FftFixedIn::<f32>::new(
         original_sr as usize,
@@ -75,6 +80,57 @@ pub fn resample(samples: Vec<f32>, original_sr: u32, target_sr: u32) -> Result<V
 
     // Take ownership of the first channel, avoiding cloning
     Ok(resampled.swap_remove(0))
+}
+
+/// Convert stereo samples to mono by averaging left and right channels
+pub fn convert_to_mono(samples: Vec<f32>, n_channels: u16) -> Vec<f32> {
+    // If mono, exit
+    if n_channels == 1 {
+        return samples;
+    }
+    // If two channels, average them
+    else {
+        samples
+            .chunks(2)
+            .map(|pair| {
+                if pair.len() == 2 {
+                    (pair[0] + pair[1]) / 2.0
+                } else {
+                    // Should not happen because it's stereo, but we leave room for bug, partial buffer etc.
+                    pair[0]
+                }
+            })
+            .collect()
+    }
+}
+
+/// Write recording to file, with the exact settings as when it was recorded
+pub fn write_wav(samples: Vec<f32>, wav_spec: hound::WavSpec, output_path: &Path) -> Result<()> {
+    // Calculate the max value based on bits_per_sample for proper scaling
+    let max_value = 2_f64.powi((wav_spec.bits_per_sample - 1) as i32);
+
+    // Instantiate the write
+    let mut writer = WavWriter::create(output_path, wav_spec)
+        .with_context(|| format!("Couldn't write wav to {:?}", output_path))?;
+
+    // Write to file
+    samples.iter().try_for_each(|&sample| {
+        match wav_spec.sample_format {
+            SampleFormat::Float => {
+                writer.write_sample(sample)?; // Write f32 directly
+            }
+            SampleFormat::Int => match wav_spec.bits_per_sample {
+                8 => writer.write_sample((sample as f64 * max_value).round() as i8)?,
+                16 => writer.write_sample((sample as f64 * max_value).round() as i16)?,
+                24 | 32 => writer.write_sample((sample as f64 * max_value).round() as i32)?,
+                _ => anyhow::bail!("Unsupported bits per sample: {}", wav_spec.bits_per_sample),
+            },
+        }
+        Ok(())
+    })?;
+
+    writer.finalize()?;
+    Ok(())
 }
 
 /// Write audio to file
