@@ -49,8 +49,8 @@ impl Fractor {
     /// Constructor with custom Fractor configuration
     pub fn with_config(vad: VoiceActivityDetector, config: FractorConfig) -> Self {
         Self {
-            vad: vad,
-            config: config,
+            vad,
+            config,
         }
     }
 
@@ -65,10 +65,10 @@ impl Fractor {
         current_duration_secs: f32,
         current_consecutive_silence_in_chunks: u32,
     ) -> bool {
-        if current_duration_secs < self.config.min_fragmentum_duration_seconds as f32 {
+        if current_duration_secs < self.config.min_fragmentum_duration_seconds {
             return false; // Too short, keep recording
         }
-        if current_duration_secs >= self.config.max_fragmentum_duration_seconds as f32 {
+        if current_duration_secs >= self.config.max_fragmentum_duration_seconds {
             return true; // Force cut at max duration
         }
         // In target window: cut on pause.

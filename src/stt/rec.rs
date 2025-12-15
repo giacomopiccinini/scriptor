@@ -5,9 +5,8 @@ use cpal::{Device, SupportedStreamConfig};
 use hound::WavSpec;
 use ringbuf::{
     HeapCons, HeapProd, HeapRb,
-    traits::{Consumer, Observer, Producer, Split},
+    traits::{Producer, Split},
 };
-use std::thread;
 
 pub struct Recorder {
     stream: Stream,
@@ -40,10 +39,10 @@ impl RecorderConfig {
             estimate_buffer_capacity(sample_rate, channels, max_fragmentum_duration_seconds);
 
         Ok(Self {
-            input_device: input_device,
-            input_config: input_config,
-            wav_config: wav_config,
-            buffer_capacity: buffer_capacity,
+            input_device,
+            input_config,
+            wav_config,
+            buffer_capacity,
         })
     }
 }
@@ -55,17 +54,17 @@ impl Recorder {
             .with_context(|| "Unable to create recorder config")?;
 
         // Create the audio stream
-        let (stream, mut consumer) = setup_audio_stream(
+        let (stream, consumer) = setup_audio_stream(
             config.input_device.clone(),
             config.input_config.clone(),
-            config.buffer_capacity.clone(),
+            config.buffer_capacity,
         )
         .with_context(|| "Unable to create an audio stream")?;
 
         Ok(Self {
-            stream: stream,
-            consumer: consumer,
-            config: config,
+            stream,
+            consumer,
+            config,
         })
     }
 
@@ -162,7 +161,7 @@ fn wav_spec_from_config(config: &SupportedStreamConfig) -> hound::WavSpec {
         channels: config.channels() as _,
         sample_rate: config.sample_rate().0 as _,
         bits_per_sample: (config.sample_format().sample_size() * 8) as _,
-        sample_format: sample_format,
+        sample_format,
     }
 }
 

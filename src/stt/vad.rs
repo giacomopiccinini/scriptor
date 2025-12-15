@@ -28,7 +28,7 @@ impl Default for VadConfig {
             .join("silero-vad.onnx");
 
         Self {
-            model_path: model_path,
+            model_path,
             sample_rate: 16_000,
             chunk_size: 512,
             state_shape: (2, 1, 128),
@@ -75,7 +75,7 @@ impl VoiceActivityDetector {
             model,
             config,
             threshold,
-            state: state,
+            state,
         })
     }
 

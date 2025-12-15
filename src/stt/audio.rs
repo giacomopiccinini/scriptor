@@ -86,7 +86,7 @@ pub fn resample(samples: Vec<f32>, original_sr: u32, target_sr: u32) -> Result<V
 pub fn convert_to_mono(samples: Vec<f32>, n_channels: u16) -> Vec<f32> {
     // If mono, exit
     if n_channels == 1 {
-        return samples;
+        samples
     }
     // If two channels, average them
     else {
