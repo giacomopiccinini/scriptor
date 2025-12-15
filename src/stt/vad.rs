@@ -5,23 +5,35 @@ use ort::session::Session;
 use ort::value::TensorRef;
 use std::path::PathBuf;
 
-/// Silero VAD v5 requires exactly 512 samples per chunk at 16kHz
-const CHUNK_SIZE: usize = 512;
-/// Sample rate is fixed at 16kHz for Silero VAD
-const SAMPLE_RATE: i64 = 16000;
-/// Hidden state dimensions for Silero VAD v5: shape (2, 1, 128)
-/// - 2 layers (stacked LSTM)
-/// - 1 batch size
-/// - 128 hidden units per layer
-const STATE_SHAPE: (usize, usize, usize) = (2, 1, 128);
-
 /// Configuration for VoiceActivityDetector
 #[derive(Debug, Clone)]
 pub struct VadConfig {
-    /// Path to directory containing `silero-vad.onnx`
-    pub model_dir: PathBuf,
-    /// Speech probability threshold for `predict()`. Range: [0.0, 1.0]
-    pub threshold: f32,
+    /// Path to VAD model
+    pub model_path: PathBuf,
+    /// Sample rate for VAD
+    pub sample_rate: i64,
+    /// Number of samples in a chunk for speech detection
+    pub chunk_size: usize,
+    /// Shape of tensor describing the state
+    pub state_shape: (usize, usize, usize),
+}
+
+impl Default for VadConfig {
+    fn default() -> Self {
+        let model_path = dirs::data_dir()
+            .expect("Could not find data directory")
+            .join("scriba")
+            .join("models")
+            .join("vad")
+            .join("silero-vad.onnx");
+
+        Self {
+            model_path: model_path,
+            sample_rate: 16_000,
+            chunk_size: 512,
+            state_shape: (2, 1, 128),
+        }
+    }
 }
 
 /// Minimalistic Voice Activity Detector using Silero VAD v5
@@ -35,39 +47,56 @@ pub struct VadConfig {
 /// - For **isolated chunks**: call `reset()` before each prediction
 /// - The state is automatically updated after each `predict_proba()` call
 pub struct VoiceActivityDetector {
+    /// Loaded ONNX model
     model: Session,
+    /// VAD model config
     config: VadConfig,
+    /// Speech probability threshold for `predict()`. Range: [0.0, 1.0]
+    threshold: f32,
     /// LSTM hidden state, shape (2, 1, 128). Updated after each inference.
     state: Array3<f32>,
 }
 
 impl VoiceActivityDetector {
     /// Create a new VAD from config
-    pub fn new(config: VadConfig, inference_config: InferenceConfig) -> Result<Self> {
-        let model_path = config.model_dir.join("silero-vad.onnx");
-        let model = load_onnx_model(model_path, inference_config)
+    pub fn with_config(
+        config: VadConfig,
+        inference_config: InferenceConfig,
+        threshold: f32,
+    ) -> Result<Self> {
+        // Load ONNX model
+        let model = load_onnx_model(config.model_path.clone(), inference_config)
             .with_context(|| "Failed to load Silero VAD model")?;
+
+        // Define the state
+        let state = Array3::zeros(config.state_shape);
 
         Ok(Self {
             model,
             config,
-            state: Array3::zeros(STATE_SHAPE),
+            threshold,
+            state: state,
         })
+    }
+
+    /// VAD with default config
+    pub fn new(inference_config: InferenceConfig, threshold: f32) -> Result<Self> {
+        Self::with_config(VadConfig::default(), inference_config, threshold)
     }
 
     /// Reset the LSTM state. Call this when switching to a new audio stream.
     pub fn reset(&mut self) {
-        self.state = Array3::zeros(STATE_SHAPE);
+        self.state = Array3::zeros(self.config.state_shape);
     }
 
     /// Returns the expected chunk size (512 samples at 16kHz = 32ms)
     pub fn chunk_size(&self) -> usize {
-        CHUNK_SIZE
+        self.config.chunk_size
     }
 
     /// Returns the configured threshold
     pub fn threshold(&self) -> f32 {
-        self.config.threshold
+        self.threshold
     }
 
     /// Predict speech probability for an audio chunk.
@@ -76,13 +105,13 @@ impl VoiceActivityDetector {
     /// Output: probability in [0.0, 1.0].
     pub fn predict_proba(&mut self, samples: Vec<f32>) -> Result<f32> {
         // Prepare input: pad with zeros or truncate to CHUNK_SIZE
-        let mut input = Array2::<f32>::zeros((1, CHUNK_SIZE));
-        for (i, &sample) in samples.iter().take(CHUNK_SIZE).enumerate() {
+        let mut input = Array2::<f32>::zeros((1, self.config.chunk_size));
+        for (i, &sample) in samples.iter().take(self.config.chunk_size).enumerate() {
             input[[0, i]] = sample;
         }
 
         // Sample rate as 1D array (model expects this shape)
-        let sr = Array1::from_vec(vec![SAMPLE_RATE]);
+        let sr = Array1::from_vec(vec![self.config.sample_rate]);
 
         // Prepare inputs using views (no copies)
         let inputs = ort::inputs![
@@ -124,6 +153,6 @@ impl VoiceActivityDetector {
         let prob = self
             .predict_proba(samples)
             .with_context(|| "Failed to predict proba")?;
-        Ok(prob >= self.config.threshold)
+        Ok(prob >= self.threshold)
     }
 }

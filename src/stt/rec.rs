@@ -11,7 +11,6 @@ use ringbuf::{
     HeapCons, HeapProd, HeapRb,
     traits::{Consumer, Observer, Producer, Split},
 };
-use rubato::{FftFixedIn, Resampler};
 
 // Define the target duration for a fragmentum
 const MAX_FRAGMENTUM_LENGTH_SECONDS: u32 = 10;
@@ -99,6 +98,28 @@ fn wav_spec_from_config(config: &SupportedStreamConfig) -> hound::WavSpec {
         bits_per_sample: (config.sample_format().sample_size() * 8) as _,
         sample_format: sample_format,
     }
+}
+
+/// Determine if we should cut the current recording based on duration and pause detection
+fn should_cut(
+    duration_secs: f32,
+    consecutive_silence_chunks: u32,
+    min_recording_duration_seconds: f32,
+    max_recording_duration_seconds: f32,
+    pause_chunks_threshold: u32,
+) -> bool {
+    if duration_secs < min_recording_duration_seconds as f32 {
+        return false; // Too short, keep recording
+    }
+    if duration_secs >= max_recording_duration_seconds as f32 {
+        return true; // Force cut at max duration
+    }
+    // In target window: cut on pause.
+    // A "chunk" is a chunk of samples (typically 512)
+    // If in multiple consecutive chunks there's no speech, we declare it a pause
+    // The threshold on chunks determines how long a pause should be, e.g.
+    // pause_chunks_threshold = 16 means ~0.5s of pause at 16kHz
+    consecutive_silence_chunks >= pause_chunks_threshold
 }
 
 /// Pre-processing pipeline for STT
