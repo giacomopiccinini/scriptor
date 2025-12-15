@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod fractor;
 pub mod model;
 pub mod onnx;
 pub mod parakeet;
