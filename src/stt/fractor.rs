@@ -1,8 +1,13 @@
-use crate::stt::audio::{convert_to_mono, resample};
+use crate::stt::audio::{convert_to_mono, resample, write_wav};
 use crate::stt::rec::Recorder;
 use crate::stt::vad::VoiceActivityDetector;
+use anyhow::{Context, Result};
+use chrono::{DateTime, Local};
 use cpal::traits::StreamTrait;
 use ringbuf::traits::{Consumer, Observer};
+use std::fs;
+use std::path::PathBuf;
+use uuid::{NoContext, Timestamp, Uuid};
 
 /// Configuration for Fractor, responsible of dividing audio in fragmenta (chunks)
 #[derive(Debug, Clone)]
@@ -49,16 +54,26 @@ struct FractorState {
     read_buffer: Vec<f32>,
     consecutive_silence_chunks: u32,
     vad_audio_buffer: Vec<f32>,
+    start_datetime: DateTime<Local>,
 }
 
 impl FractorState {
-    fn new(max_input_samples_for_vad: usize, max_samples_in_fragmentum: usize) -> Self {
+    fn new(target_input_samples_for_vad: usize, max_samples_in_fragmentum: usize) -> Self {
         Self {
             fragmentum_buffer: Vec::with_capacity(max_samples_in_fragmentum),
-            read_buffer: vec![0.0f32; max_input_samples_for_vad],
+            read_buffer: vec![0.0f32; target_input_samples_for_vad],
             consecutive_silence_chunks: 0_u32,
             vad_audio_buffer: Vec::new(),
+            start_datetime: Local::now(),
         }
+    }
+
+    fn reset(&mut self) {
+        self.fragmentum_buffer.clear();
+        self.read_buffer.fill(0.0f32);
+        self.consecutive_silence_chunks = 0_u32;
+        self.vad_audio_buffer.clear();
+        self.start_datetime = Local::now();
     }
 }
 
@@ -72,7 +87,7 @@ pub struct Fractor {
     /// State of Fractor
     pub state: FractorState,
     /// Maximum allowed samples in VAD
-    pub max_input_samples_for_vad: usize,
+    pub target_input_samples_for_vad: usize,
     /// Maximum allowed samples in a fragmentum
     pub max_samples_in_fragmentum: usize,
 }
@@ -93,7 +108,7 @@ impl Fractor {
         // The VAD accepts only a limited number of samples in input at a given sample rate.
         // The stream/recorder might have different sr, hence we need to calculate what the vad chunk size corresponds
         // in the recorder sr (and channels!)
-        let max_input_samples_for_vad = (vad_chunk_size as f32 * input_sample_rate as f32
+        let target_input_samples_for_vad = (vad_chunk_size as f32 * input_sample_rate as f32
             / vad_sample_rate as f32) as usize
             * input_channels as usize;
 
@@ -103,14 +118,14 @@ impl Fractor {
             * input_channels as f32) as usize;
 
         // Init state of Fractor
-        let state = FractorState::new(max_input_samples_for_vad, max_samples_in_fragmentum);
+        let state = FractorState::new(target_input_samples_for_vad, max_samples_in_fragmentum);
 
         Self {
             recorder,
             vad,
             config,
             state,
-            max_input_samples_for_vad,
+            target_input_samples_for_vad,
             max_samples_in_fragmentum,
         }
     }
@@ -136,28 +151,72 @@ impl Fractor {
         current_consecutive_silence_in_chunks >= self.config.pause_threshold_in_chunks
     }
 
-    // Start recording and fragmenting
-    fn start_recording(&mut self) {
+    /// Start recording and fragmenting
+    fn start_recording(&mut self) -> Result<()> {
         self.recorder.is_recording = true;
-        self.recorder.play();
+        self.recorder.play().with_context(|| "Unable to play")?;
+        Ok(())
     }
 
-    // Stop recording and fragmenting
+    /// Stop recording and fragmenting
     fn stop_recording(&mut self) {
         self.recorder.is_recording = false;
     }
 
-    fn run(mut self) {
+    /// Save fragmentum to audio file
+    fn save_fragmentum(
+        &self,
+        samples: Vec<f32>,
+        datetime: DateTime<Local>,
+        codex_name: &str,
+    ) -> Result<PathBuf> {
+        // Create unique ID using uuid v7 (for fun!)
+        let ts = Timestamp::from_unix(
+            NoContext,
+            datetime.timestamp() as u64,
+            datetime.timestamp_subsec_nanos(),
+        );
+        let id = Uuid::new_v7(ts);
+
+        // Format the name of the file (filesystem-safe datetime format)
+        let filename = format!("{}_{}.wav", datetime.format("%Y-%m-%d@%H:%M:%S"), id);
+
+        let output_dir = dirs::data_dir()
+            .expect("Could not find data directory")
+            .join("scriba")
+            .join("audio")
+            .join(codex_name);
+
+        // Create directory if it doesn't exist
+        fs::create_dir_all(&output_dir)
+            .with_context(|| format!("Failed to create directory: {}", output_dir.display()))?;
+
+        // Define output path
+        let output_path = output_dir.join(filename);
+
+        write_wav(samples, self.recorder.config.wav_config, &output_path)
+            .with_context(|| "Failed to write audio to file")?;
+
+        Ok(output_path)
+    }
+
+    fn run(mut self, codex_name: &str) -> Result<()> {
         // Change status of recorder
-        self.start_recording();
+        self.start_recording().with_context(|| "Unable to play")?;
 
         while self.recorder.is_recording {
             // Read available samples in small batches
-            let available = self.recorder.consumer.occupied_len();
-            if available < self.max_input_samples_for_vad {
+            let available_samples_in_buffer = self.recorder.consumer.occupied_len();
+
+            // If we are not meeting the requirements for the VAD, we keep recording
+            // Remember that the target value is in the "recorder" frame, i.e. depends on the recorder
+            // sr and channels. It might not coincide with the number of samples the VAD expects.
+            // That's why we convert to mono and resample later on.
+            if available_samples_in_buffer < self.target_input_samples_for_vad {
                 continue;
             }
 
+            // If we arrive here, we have the right number of samples
             // Pop a chunk of samples
             let popped = self
                 .recorder
@@ -167,7 +226,7 @@ impl Fractor {
                 continue;
             }
 
-            // Accumulate raw samples for the fragmentum
+            // Accumulate raw samples for the fragmentum into a buffer
             self.state
                 .fragmentum_buffer
                 .extend_from_slice(&self.state.read_buffer[..popped]);
@@ -183,9 +242,11 @@ impl Fractor {
                 self.vad.config.sample_rate as u32,
             )
             .unwrap_or_default();
+
+            // Add the processed samples to the buffer that will feed the VAD
             self.state.vad_audio_buffer.extend(resampled);
 
-            // Process complete VAD chunks (512 samples each)
+            // Process complete VAD chunks
             while self.state.vad_audio_buffer.len() >= self.vad.config.chunk_size {
                 let vad_chunk: Vec<f32> = self
                     .state
@@ -214,25 +275,22 @@ impl Fractor {
                 / (self.recorder.config.wav_config.sample_rate as f32
                     * self.recorder.config.wav_config.channels as f32);
 
-            // Check if we should cut
+            // Check if we should cut the recording because enough pauses have accumulated
             if self.should_cut(duration_secs, self.state.consecutive_silence_chunks) {
-                println!(
-                    "Cutting fragmentum: {:.1}s, silence_chunks: {}",
-                    duration_secs, self.state.consecutive_silence_chunks
-                );
-
                 // Process the fragmentum (saves to file and runs STT)
                 let samples_to_process = std::mem::take(&mut self.state.fragmentum_buffer);
 
-                // TODO
-                //process_fragmentum(samples_to_process, wav_config);
+                // Save fragmentum
+                self.save_fragmentum(samples_to_process, self.state.start_datetime, codex_name);
 
-                // Reset state for next fragmentum
-                self.state.fragmentum_buffer = Vec::with_capacity(self.max_samples_in_fragmentum);
-                self.state.consecutive_silence_chunks = 0;
-                self.state.vad_audio_buffer.clear();
+                // TODO: Add to queue
+
+                // Reset states for next fragmentum
+                self.state.reset(); // Reset state of fractor buffer
                 self.vad.reset(); // Reset LSTM state for new segment
             }
         }
+
+        Ok(())
     }
 }
