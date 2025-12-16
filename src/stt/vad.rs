@@ -48,13 +48,13 @@ impl Default for VadConfig {
 /// - The state is automatically updated after each `predict_proba()` call
 pub struct VoiceActivityDetector {
     /// Loaded ONNX model
-    model: Session,
+    pub model: Session,
     /// VAD model config
-    config: VadConfig,
+    pub config: VadConfig,
     /// Speech probability threshold for `predict()`. Range: [0.0, 1.0]
-    threshold: f32,
+    pub threshold: f32,
     /// LSTM hidden state, shape (2, 1, 128). Updated after each inference.
-    state: Array3<f32>,
+    pub state: Array3<f32>,
 }
 
 impl VoiceActivityDetector {

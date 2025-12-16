@@ -9,15 +9,16 @@ use ringbuf::{
 };
 
 pub struct Recorder {
-    stream: Stream,
-    consumer: HeapCons<f32>,
-    config: RecorderConfig,
+    pub stream: Stream,
+    pub consumer: HeapCons<f32>,
+    pub config: RecorderConfig,
+    pub is_recording: bool,
 }
 
-struct RecorderConfig {
+pub struct RecorderConfig {
     input_device: Device,
     input_config: SupportedStreamConfig,
-    wav_config: WavSpec,
+    pub wav_config: WavSpec,
     buffer_capacity: usize,
 }
 
@@ -48,7 +49,7 @@ impl RecorderConfig {
 }
 
 impl Recorder {
-    fn new(max_fragmentum_duration_seconds: f32) -> Result<Self> {
+    pub fn new(max_fragmentum_duration_seconds: f32) -> Result<Self> {
         // Call construct for recorder config
         let config = RecorderConfig::new(max_fragmentum_duration_seconds)
             .with_context(|| "Unable to create recorder config")?;
@@ -65,11 +66,12 @@ impl Recorder {
             stream,
             consumer,
             config,
+            is_recording: false,
         })
     }
 
     /// Start recording
-    fn play(self) -> Result<()> {
+    pub fn play(&self) -> Result<()> {
         self.stream
             .play()
             .with_context(|| "Unable to start the stream")?;
