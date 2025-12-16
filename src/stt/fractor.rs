@@ -3,7 +3,6 @@ use crate::stt::rec::Recorder;
 use crate::stt::vad::VoiceActivityDetector;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local};
-use cpal::traits::StreamTrait;
 use ringbuf::traits::{Consumer, Observer};
 use std::fs;
 use std::path::PathBuf;
