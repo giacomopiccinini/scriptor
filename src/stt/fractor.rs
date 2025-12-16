@@ -281,7 +281,8 @@ impl Fractor {
                 let samples_to_process = std::mem::take(&mut self.state.fragmentum_buffer);
 
                 // Save fragmentum
-                self.save_fragmentum(samples_to_process, self.state.start_datetime, codex_name);
+                self.save_fragmentum(samples_to_process, self.state.start_datetime, codex_name)
+                    .with_context(|| "Failed to save recording")?;
 
                 // TODO: Add to queue
 
