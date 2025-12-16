@@ -199,7 +199,7 @@ impl Fractor {
         Ok(output_path)
     }
 
-    fn run(mut self, codex_name: &str) -> Result<()> {
+    pub fn run(mut self, codex_name: &str) -> Result<()> {
         // Change status of recorder
         self.start_recording().with_context(|| "Unable to play")?;
 
