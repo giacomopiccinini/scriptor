@@ -1,16 +1,8 @@
 use crate::stt::audio::{convert_to_mono, resample};
 use crate::stt::rec::Recorder;
 use crate::stt::vad::VoiceActivityDetector;
-use anyhow::{Context, Result};
-use cpal::Stream;
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, SupportedStreamConfig};
-use hound::WavSpec;
+use cpal::traits::StreamTrait;
 use ringbuf::traits::{Consumer, Observer};
-use ringbuf::{
-    HeapCons, HeapProd, HeapRb,
-    traits::{Producer, Split},
-};
 
 /// Configuration for Fractor, responsible of dividing audio in fragmenta (chunks)
 #[derive(Debug, Clone)]
