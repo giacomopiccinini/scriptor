@@ -1,4 +1,4 @@
-use crate::tui::db::config::ThemeConfig;
+use crate::configs::theme::ThemeConfig;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;

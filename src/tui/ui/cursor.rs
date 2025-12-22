@@ -1,4 +1,4 @@
-use crate::tui::db::config::ThemeConfig;
+use crate::configs::theme::ThemeConfig;
 use ratatui::style::Style;
 use ratatui::text::Span;
 

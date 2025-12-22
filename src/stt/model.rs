@@ -1,4 +1,6 @@
-use super::onnx::InferenceConfig;
+use super::parakeet::ParakeetModel;
+use crate::configs::inference::InferenceConfig;
+use crate::configs::stt::{ModelConfigKind, STTConfig};
 use anyhow::Result;
 use std::path::Path;
 
@@ -31,13 +33,13 @@ pub struct SegmentTranscription {
 }
 
 /// Inspired by https://github.com/cjpais/transcribe-rs/blob/main/src/lib.rs
-// Trait for speech-to-text (STT) models
-pub trait STTModel {
+/// Trait for STT model backends (internal implementation detail)
+pub trait STTBackend {
     /// Model-specific configuration parameters
     type ModelConfig;
 
     /// Load model weights and config
-    fn new(mdeol_config: Self::ModelConfig, inference_config: InferenceConfig) -> Result<Self>
+    fn load(model_config: Self::ModelConfig, inference_config: InferenceConfig) -> Result<Self>
     where
         Self: Sized;
 
@@ -46,4 +48,52 @@ pub trait STTModel {
 
     /// Transcribe samples
     fn transcribe(&mut self, audio_samples: Vec<f32>) -> Result<Transcription>;
+}
+
+/// Object-safe trait for audio transcription
+pub trait AudioTranscriber {
+    /// Load audio from .wav file
+    fn load_audio(&self, audio_path: &Path) -> Result<Vec<f32>>;
+
+    /// Transcribe audio samples to text
+    fn transcribe(&mut self, audio_samples: Vec<f32>) -> Result<Transcription>;
+}
+
+/// Blanket implementation: any STTBackend automatically implements AudioTranscriber
+impl<T: STTBackend> AudioTranscriber for T {
+    fn load_audio(&self, audio_path: &Path) -> Result<Vec<f32>> {
+        <Self as STTBackend>::load_audio(self, audio_path)
+    }
+
+    fn transcribe(&mut self, audio_samples: Vec<f32>) -> Result<Transcription> {
+        <Self as STTBackend>::transcribe(self, audio_samples)
+    }
+}
+
+/// High-level speech-to-text model interface
+///
+/// This struct provides a unified API for loading and using STT models
+/// based on user configuration.
+pub struct STTModel {
+    transcriber: Box<dyn AudioTranscriber>,
+}
+
+impl STTModel {
+    /// Create a new STT model based on configuration
+    pub fn new(stt_config: &STTConfig, inference_config: InferenceConfig) -> Result<Self> {
+        let transcriber: Box<dyn AudioTranscriber> = match stt_config.get_model_config()? {
+            ModelConfigKind::Parakeet(cfg) => Box::new(ParakeetModel::load(cfg, inference_config)?),
+        };
+        Ok(Self { transcriber })
+    }
+
+    /// Load audio from a .wav file
+    pub fn load_audio(&self, audio_path: &Path) -> Result<Vec<f32>> {
+        self.transcriber.load_audio(audio_path)
+    }
+
+    /// Transcribe audio samples to text
+    pub fn transcribe(&mut self, audio_samples: Vec<f32>) -> Result<Transcription> {
+        self.transcriber.transcribe(audio_samples)
+    }
 }

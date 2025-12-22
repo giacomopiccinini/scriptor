@@ -1,7 +1,9 @@
 use super::audio::{read_audio_file_mono, resample};
-use super::model::{STTModel, Transcription};
-use super::onnx::{InferenceConfig, load_onnx_model, load_vocabulary};
+use super::model::{STTBackend, Transcription};
+use super::onnx::{load_onnx_model, load_vocabulary};
 use super::transcription::{TimestampGranularity, TimestampedResult, convert_timestamps};
+use crate::configs::inference::InferenceConfig;
+use crate::configs::parakeet::ParakeetConfig;
 use anyhow::{Context, Result};
 use ndarray::{Array, Array1, Array2, Array3, ArrayD, ArrayViewD, IxDyn};
 use once_cell::sync::Lazy;
@@ -10,7 +12,6 @@ use ort::session::Session;
 use ort::value::TensorRef;
 use regex::Regex;
 use std::path::Path;
-use std::path::PathBuf;
 
 /// Model-specific constants
 const SUBSAMPLING_FACTOR: usize = 8;
@@ -22,12 +23,6 @@ const BLANK_IDX: i32 = 8192;
 /// Regex for decoding spaces in transcription
 static DECODE_SPACE_RE: Lazy<Result<Regex, regex::Error>> =
     Lazy::new(|| Regex::new(r"\A\s|\s\B|(\s)\b"));
-
-/// Parakeet-specific configuration
-pub struct ParakeetConfig {
-    pub quantized: bool,
-    pub model_dir: PathBuf,
-}
 
 /// Parakeet model implementing RNN-T architecture
 pub struct ParakeetModel {
@@ -312,36 +307,23 @@ impl ParakeetModel {
     }
 }
 
-/// Implement STTModel trait for Parakeet
-impl STTModel for ParakeetModel {
+/// Implement STTBackend trait for Parakeet
+impl STTBackend for ParakeetModel {
     type ModelConfig = ParakeetConfig;
 
-    fn new(model_config: Self::ModelConfig, inference_config: InferenceConfig) -> Result<Self> {
-        // Determine model paths based on quantization
-        let encoder_path = if model_config.quantized {
-            model_config.model_dir.join("encoder-model.int8.onnx")
-        } else {
-            model_config.model_dir.join("encoder-model.onnx")
-        };
-        let decoder_joint_path = if model_config.quantized {
-            model_config.model_dir.join("decoder_joint-model.int8.onnx")
-        } else {
-            model_config.model_dir.join("decoder_joint-model.onnx")
-        };
-
+    fn load(model_config: Self::ModelConfig, inference_config: InferenceConfig) -> Result<Self> {
         // Load ONNX models
-        let encoder = load_onnx_model(encoder_path, inference_config.clone())
+        let encoder = load_onnx_model(model_config.encoder_path, inference_config.clone())
             .with_context(|| "Failed to load encoder")?;
-        let decoder_joint = load_onnx_model(decoder_joint_path, inference_config.clone())
-            .with_context(|| "Failed to load decoder joint")?;
-        let preprocessor = load_onnx_model(
-            model_config.model_dir.join("nemo128.onnx"),
-            inference_config.clone(),
-        )
-        .with_context(|| "Failed to load preprocessor")?;
+        let decoder_joint =
+            load_onnx_model(model_config.decoder_joint_path, inference_config.clone())
+                .with_context(|| "Failed to load decoder joint")?;
+        let preprocessor =
+            load_onnx_model(model_config.preprocessor_path, inference_config.clone())
+                .with_context(|| "Failed to load preprocessor")?;
 
         // Load vocabulary
-        let vocab = load_vocabulary(model_config.model_dir.join("vocabulary.txt"))
+        let vocab = load_vocabulary(model_config.vocab_path)
             .with_context(|| "Failed to load vocabulary")?;
         let vocab_size = vocab.len();
 

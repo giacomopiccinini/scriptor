@@ -1,5 +1,5 @@
 pub struct ArchivumSelector;
-use crate::tui::db::config::ThemeConfig;
+use crate::configs::theme::ThemeConfig;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::Style;

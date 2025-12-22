@@ -1,5 +1,6 @@
+use crate::configs::db::DBConfig;
+use crate::configs::scriba::ScribaConfig;
 use crate::tui::app::events::EventHandler;
-use crate::tui::db::config::{Config, DBConfig};
 use crate::tui::db::connections::init_db;
 use crate::tui::ui::components::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, CodicesComponent,
@@ -46,7 +47,7 @@ pub enum CurrentRegion {
 /// Main application state
 pub struct App {
     /// App configuration (db, stt inference parameters, theme)
-    pub config: Config,
+    pub config: ScribaConfig,
     /// Current active screen
     pub current_screen: CurrentScreen,
     /// Current active region
@@ -74,7 +75,7 @@ impl App {
     /// and sets up the initial UI state.
     pub async fn new() -> Self {
         // Read the config (creates default if missing)
-        let config = Config::read().expect("Failed to read config file");
+        let config = ScribaConfig::read().expect("Failed to read config file");
 
         // Connect to default archivum (db)
         let pool = init_db(&config.default.db.connection_str)

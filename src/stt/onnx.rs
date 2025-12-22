@@ -1,3 +1,4 @@
+use crate::configs::inference::{ExecutionProvider, InferenceConfig};
 use anyhow::{Context, Result};
 use ort::execution_providers::ExecutionProviderDispatch;
 use ort::execution_providers::{
@@ -6,41 +7,6 @@ use ort::execution_providers::{
 use ort::session::{Session, builder::GraphOptimizationLevel};
 use std::fs;
 use std::path::PathBuf;
-
-/// Common inference configuration for all STT models using ONNX Runtime
-///
-/// The actual conversion of InferenceConfig into objects ort understands is deferred to
-/// model loading. The reason is that some of the ort objects do not implement clone/copy so it might become cumbersome
-/// when loading multiple models.
-///
-/// Available execution providers
-#[derive(Debug, Copy, Clone, clap::ValueEnum)]
-pub enum ExecutionProvider {
-    Cuda,
-    Tensorrt,
-    Coreml,
-    Cpu,
-}
-
-#[derive(Debug, Clone)]
-pub struct InferenceConfig {
-    pub graph_optimization_level: usize,
-    pub n_intra_threads: usize,
-    pub parallel_execution: bool,
-    pub execution_providers: Vec<ExecutionProvider>,
-}
-
-/// Default (decent) inference config
-impl Default for InferenceConfig {
-    fn default() -> Self {
-        Self {
-            graph_optimization_level: 3,
-            n_intra_threads: 4,
-            parallel_execution: true,
-            execution_providers: vec![ExecutionProvider::Cuda],
-        }
-    }
-}
 
 /// Load a ONNX model from a locally-saved .onnx file.
 /// Applies graph optimization of various level, introduces intra threads and
@@ -52,11 +18,18 @@ pub fn load_onnx_model(
     inference_config: InferenceConfig,
 ) -> Result<Session> {
     // Sanity check on file
-    if !onnx_file_path.is_file()
-        || onnx_file_path.extension().and_then(|ext| ext.to_str()) != Some("onnx")
-    {
-        anyhow::bail!("Model not admissible. Must be a single .onnx file.")
-    }
+    if !onnx_file_path.exists() {
+        anyhow::bail!(format!(
+            "Model not admissible. {} does not exist!",
+            onnx_file_path.display()
+        ))
+    };
+    if !onnx_file_path.is_file() {
+        anyhow::bail!("Model not admissible. Model is not a file.")
+    };
+    if onnx_file_path.extension().and_then(|ext| ext.to_str()) != Some("onnx") {
+        anyhow::bail!("Model is not in ONNX format")
+    };
 
     // Convert to actual GraphOptimizationLevel object used by ort
     let graph_optimization_level = match inference_config.graph_optimization_level {

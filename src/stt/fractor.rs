@@ -1,3 +1,4 @@
+use crate::configs::fractor::FractorConfig;
 use crate::stt::audio::{convert_to_mono, resample, write_wav};
 use crate::stt::rec::Recorder;
 use crate::stt::vad::VoiceActivityDetector;
@@ -7,44 +8,6 @@ use ringbuf::traits::{Consumer, Observer};
 use std::fs;
 use std::path::PathBuf;
 use uuid::{NoContext, Timestamp, Uuid};
-
-/// Configuration for Fractor, responsible of dividing audio in fragmenta (chunks)
-#[derive(Debug, Clone)]
-pub struct FractorConfig {
-    // Minimum duration of a fragmentum, to avoid very short recordings
-    min_fragmentum_duration_seconds: f32,
-    // Maximum duration of a fragmentum, to avoid large files harder to handle
-    max_fragmentum_duration_seconds: f32,
-    // A "chunk" is a chunk of samples (typically 512)
-    // If in multiple consecutive chunks there's no speech, we declare it a pause
-    // The threshold on chunks determines how long a pause should be, e.g.
-    // pause_threshold_in_chunks = 16 means ~0.5s of pause at 16kHz
-    pause_threshold_in_chunks: u32,
-}
-
-impl Default for FractorConfig {
-    fn default() -> Self {
-        Self {
-            min_fragmentum_duration_seconds: 5.0_f32,
-            max_fragmentum_duration_seconds: 20.0_f32,
-            pause_threshold_in_chunks: 16_u32,
-        }
-    }
-}
-
-impl FractorConfig {
-    fn new(
-        min_fragmentum_duration_seconds: f32,
-        max_fragmentum_duration_seconds: f32,
-        pause_threshold_in_chunks: u32,
-    ) -> Self {
-        Self {
-            min_fragmentum_duration_seconds,
-            max_fragmentum_duration_seconds,
-            pause_threshold_in_chunks,
-        }
-    }
-}
 
 /// State of Fractor
 #[derive(Debug, Clone)]

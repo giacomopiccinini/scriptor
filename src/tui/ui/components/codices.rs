@@ -1,4 +1,4 @@
-use crate::tui::db::config::ThemeConfig;
+use crate::configs::theme::ThemeConfig;
 use crate::tui::db::models::{Codex, NewCodex, UICodex, UIFolio};
 use anyhow::Result;
 use ratatui::buffer::Buffer;
