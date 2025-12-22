@@ -3,7 +3,6 @@
 /// The actual conversion of InferenceConfig into objects ort understands is deferred to
 /// model loading. The reason is that some of the ort objects do not implement clone/copy so it might become cumbersome
 /// when loading multiple models.
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 /// Available execution providers
@@ -32,20 +31,5 @@ impl Default for InferenceConfig {
             parallel_execution: true,
             execution_providers: vec![ExecutionProvider::Cuda],
         }
-    }
-}
-
-// TODO: check if necessary?
-/// Parse device string from config to ExecutionProvider
-fn parse_device(device: &str) -> Result<ExecutionProvider> {
-    match device.to_lowercase().as_str() {
-        "coreml" => Ok(ExecutionProvider::Coreml),
-        "cuda" => Ok(ExecutionProvider::Cuda),
-        "tensorrt" => Ok(ExecutionProvider::Tensorrt),
-        "cpu" => Ok(ExecutionProvider::Cpu),
-        _ => anyhow::bail!(
-            "Unknown device: {}. Use cuda, tensorrt, coreml, or cpu.",
-            device
-        ),
     }
 }
