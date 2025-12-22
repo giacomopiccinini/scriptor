@@ -19,7 +19,10 @@ pub enum Commands {
         file: PathBuf,
     },
     /// Start recording and split into fragments
-    Record {},
+    Record {
+        /// Directory where recordings are saved (optional)
+        output_dir: Option<PathBuf>,
+    },
 }
 
 pub fn run_cli() -> Result<()> {
@@ -28,7 +31,7 @@ pub fn run_cli() -> Result<()> {
 
     match args.command {
         Some(Commands::FromFile { file }) => transcribe_from_file(&file),
-        Some(Commands::Record {}) => record_and_transcribe(),
+        Some(Commands::Record { output_dir }) => record_and_transcribe(output_dir),
         None => run_tui().map_err(|e| anyhow::anyhow!("{}", e)),
     }
 }

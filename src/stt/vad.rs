@@ -1,128 +1,138 @@
+use super::silero::SileroVAD;
 use crate::configs::inference::InferenceConfig;
-use crate::configs::vad::VadConfig;
-use crate::stt::onnx::load_onnx_model;
-use anyhow::{Context, Result};
-use ndarray::{Array1, Array2, Array3};
-use ort::session::Session;
-use ort::value::TensorRef;
+use crate::configs::vad::{VADConfig, VADConfigKind};
+use anyhow::Result;
 
-/// Minimalistic Voice Activity Detector using Silero VAD v5
-///
-/// Silero VAD is an LSTM-based recurrent neural network. The `state` field holds
-/// the LSTM hidden states (h, c) which carry temporal context from previous audio
-/// chunks. This allows the model to make better predictions by "remembering" what
-/// it heard before.
-///
-/// - For **streaming audio**: keep the state between calls to maintain context
-/// - For **isolated chunks**: call `reset()` before each prediction
-/// - The state is automatically updated after each `predict_proba()` call
-pub struct VoiceActivityDetector {
-    /// Loaded ONNX model
-    pub model: Session,
-    /// VAD model config
-    pub config: VadConfig,
-    /// Speech probability threshold for `predict()`. Range: [0.0, 1.0]
-    pub threshold: f32,
-    /// LSTM hidden state, shape (2, 1, 128). Updated after each inference.
-    pub state: Array3<f32>,
-}
+/// Trait for VAD model backends (internal implementation detail)
+pub trait VADBackend {
+    /// Model-specific configuration parameters
+    type ModelConfig;
 
-impl VoiceActivityDetector {
-    /// Create a new VAD from config
-    pub fn with_config(
-        config: VadConfig,
+    /// Load VAD model from config
+    fn load(
+        model_config: Self::ModelConfig,
         inference_config: InferenceConfig,
         threshold: f32,
-    ) -> Result<Self> {
-        // Load ONNX model
-        let model = load_onnx_model(config.model_path.clone(), inference_config)
-            .with_context(|| "Failed to load Silero VAD model")?;
+    ) -> Result<Self>
+    where
+        Self: Sized;
 
-        // Define the state
-        let state = Array3::zeros(config.state_shape);
+    /// Reset the internal state (for streaming, call between audio streams)
+    fn reset(&mut self);
 
-        Ok(Self {
-            model,
-            config,
-            threshold,
-            state,
-        })
+    /// Returns the expected chunk size in samples
+    fn chunk_size(&self) -> usize;
+
+    /// Returns the expected sample rate in Hz
+    fn sample_rate(&self) -> u32;
+
+    /// Returns the configured threshold
+    fn threshold(&self) -> f32;
+
+    /// Predict speech probability for an audio chunk
+    /// Output: probability in [0.0, 1.0]
+    fn predict_proba(&mut self, samples: Vec<f32>) -> Result<f32>;
+
+    /// Predict whether the audio chunk contains speech
+    /// Returns `true` if speech probability >= threshold
+    fn predict(&mut self, samples: Vec<f32>) -> Result<bool>;
+}
+
+/// Object-safe trait for voice activity detection
+pub trait VoiceDetector {
+    /// Reset the internal state
+    fn reset(&mut self);
+
+    /// Returns the expected chunk size in samples
+    fn chunk_size(&self) -> usize;
+
+    /// Returns the expected sample rate in Hz
+    fn sample_rate(&self) -> u32;
+
+    /// Returns the configured threshold
+    fn threshold(&self) -> f32;
+
+    /// Predict speech probability for an audio chunk
+    fn predict_proba(&mut self, samples: Vec<f32>) -> Result<f32>;
+
+    /// Predict whether the audio chunk contains speech
+    fn predict(&mut self, samples: Vec<f32>) -> Result<bool>;
+}
+
+/// Blanket implementation: any VADBackend automatically implements VoiceDetector
+impl<T: VADBackend> VoiceDetector for T {
+    fn reset(&mut self) {
+        <Self as VADBackend>::reset(self)
     }
 
-    /// VAD with default config
-    pub fn new(inference_config: InferenceConfig, threshold: f32) -> Result<Self> {
-        Self::with_config(VadConfig::default(), inference_config, threshold)
+    fn chunk_size(&self) -> usize {
+        <Self as VADBackend>::chunk_size(self)
     }
 
-    /// Reset the LSTM state. Call this when switching to a new audio stream.
+    fn sample_rate(&self) -> u32 {
+        <Self as VADBackend>::sample_rate(self)
+    }
+
+    fn threshold(&self) -> f32 {
+        <Self as VADBackend>::threshold(self)
+    }
+
+    fn predict_proba(&mut self, samples: Vec<f32>) -> Result<f32> {
+        <Self as VADBackend>::predict_proba(self, samples)
+    }
+
+    fn predict(&mut self, samples: Vec<f32>) -> Result<bool> {
+        <Self as VADBackend>::predict(self, samples)
+    }
+}
+
+/// High-level voice activity detection interface
+///
+/// This struct provides a unified API for loading and using VAD models
+/// based on user configuration.
+pub struct VADModel {
+    detector: Box<dyn VoiceDetector>,
+}
+
+impl VADModel {
+    /// Create a new VAD model based on configuration
+    pub fn new(vad_config: &VADConfig, inference_config: InferenceConfig) -> Result<Self> {
+        let threshold = vad_config.threshold;
+        let detector: Box<dyn VoiceDetector> = match vad_config.get_model_config()? {
+            VADConfigKind::Silero(cfg) => {
+                Box::new(SileroVAD::load(cfg, inference_config, threshold)?)
+            }
+        };
+        Ok(Self { detector })
+    }
+
+    /// Reset the internal state (call between audio streams)
     pub fn reset(&mut self) {
-        self.state = Array3::zeros(self.config.state_shape);
+        self.detector.reset()
     }
 
-    /// Returns the expected chunk size (512 samples at 16kHz = 32ms)
+    /// Returns the expected chunk size in samples
     pub fn chunk_size(&self) -> usize {
-        self.config.chunk_size
+        self.detector.chunk_size()
+    }
+
+    /// Returns the expected sample rate in Hz
+    pub fn sample_rate(&self) -> u32 {
+        self.detector.sample_rate()
     }
 
     /// Returns the configured threshold
     pub fn threshold(&self) -> f32 {
-        self.threshold
+        self.detector.threshold()
     }
 
-    /// Predict speech probability for an audio chunk.
-    ///
-    /// Input: f32 samples at 16kHz. Padded/truncated to 512 samples.
-    /// Output: probability in [0.0, 1.0].
+    /// Predict speech probability for an audio chunk
     pub fn predict_proba(&mut self, samples: Vec<f32>) -> Result<f32> {
-        // Prepare input: pad with zeros or truncate to CHUNK_SIZE
-        let mut input = Array2::<f32>::zeros((1, self.config.chunk_size));
-        for (i, &sample) in samples.iter().take(self.config.chunk_size).enumerate() {
-            input[[0, i]] = sample;
-        }
-
-        // Sample rate as 1D array (model expects this shape)
-        let sr = Array1::from_vec(vec![self.config.sample_rate]);
-
-        // Prepare inputs using views (no copies)
-        let inputs = ort::inputs![
-            "input" => TensorRef::from_array_view(input.view()).with_context(|| "Failed to instantiate input tensor")?,
-            "state" => TensorRef::from_array_view(self.state.view()).with_context(|| "Failed to instantiate state tensor")?,
-            "sr" => TensorRef::from_array_view(sr.view()).with_context(|| "Failed to instantiate sr tensor")?,
-        ];
-
-        let outputs = self
-            .model
-            .run(inputs)
-            .with_context(|| "VAD inference failed")?;
-
-        // Update LSTM state for next call
-        let new_state = outputs
-            .get("stateN")
-            .with_context(|| "Missing 'stateN' output")?
-            .try_extract_array::<f32>()
-            .with_context(|| "Failed to extract state")?;
-        self.state = new_state
-            .to_owned()
-            .into_dimensionality()
-            .with_context(|| "State has wrong shape")?;
-
-        // Extract speech probability
-        let output = outputs
-            .get("output")
-            .with_context(|| "Missing 'output'")?
-            .try_extract_array::<f32>()
-            .with_context(|| "Failed to extract output")?;
-
-        Ok(output[[0, 0]])
+        self.detector.predict_proba(samples)
     }
 
-    /// Predict whether the audio chunk contains speech (bool).
-    ///
-    /// Returns `true` if speech probability >= threshold.
+    /// Predict whether the audio chunk contains speech
     pub fn predict(&mut self, samples: Vec<f32>) -> Result<bool> {
-        let prob = self
-            .predict_proba(samples)
-            .with_context(|| "Failed to predict proba")?;
-        Ok(prob >= self.threshold)
+        self.detector.predict(samples)
     }
 }

@@ -3,6 +3,7 @@ pub mod fractor;
 pub mod inference;
 pub mod parakeet;
 pub mod scriba;
+pub mod silero;
 pub mod stt;
 pub mod theme;
 pub mod vad;

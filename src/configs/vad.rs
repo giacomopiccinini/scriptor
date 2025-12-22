@@ -1,33 +1,41 @@
+use crate::configs::silero::SileroConfig;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
-/// Configuration for VoiceActivityDetector
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct VadConfig {
-    /// Path to VAD model
-    pub model_path: PathBuf,
-    /// Sample rate for VAD
-    pub sample_rate: i64,
-    /// Number of samples in a chunk for speech detection
-    pub chunk_size: usize,
-    /// Shape of tensor describing the state
-    pub state_shape: (usize, usize, usize),
+/// Available models for VAD (user-facing, for TOML)
+#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub enum AvailableVADModel {
+    #[default]
+    #[serde(rename = "silero")]
+    Silero,
 }
 
-impl Default for VadConfig {
-    fn default() -> Self {
-        let model_path = dirs::data_dir()
-            .expect("Could not find data directory")
-            .join("scriba")
-            .join("models")
-            .join("vad")
-            .join("silero-vad.onnx");
+/// Wrapper for model-specific configurations
+pub enum VADConfigKind {
+    Silero(SileroConfig),
+}
 
+/// Voice Activity Detection configuration (from TOML)
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct VADConfig {
+    pub model: AvailableVADModel,
+    pub threshold: f32,
+}
+
+impl Default for VADConfig {
+    fn default() -> Self {
         Self {
-            model_path,
-            sample_rate: 16_000,
-            chunk_size: 512,
-            state_shape: (2, 1, 128),
+            model: AvailableVADModel::default(),
+            threshold: 0.1,
+        }
+    }
+}
+
+impl VADConfig {
+    /// Get the model-specific config with resolved paths
+    pub fn get_model_config(&self) -> Result<VADConfigKind> {
+        match self.model {
+            AvailableVADModel::Silero => Ok(VADConfigKind::Silero(SileroConfig::default())),
         }
     }
 }

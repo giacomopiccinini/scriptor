@@ -3,7 +3,7 @@ use crate::configs::fractor::FractorConfig;
 use crate::configs::inference::InferenceConfig;
 use crate::configs::stt::STTConfig;
 use crate::configs::theme::ThemeConfig;
-use crate::configs::vad::VadConfig;
+use crate::configs::vad::VADConfig;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -15,7 +15,7 @@ pub struct ScribaConfig {
     pub default: DefaultConfig,
     pub dbs: Vec<DBConfig>,
     pub stts: Vec<STTConfig>,
-    pub vads: Vec<VadConfig>,
+    pub vads: Vec<VADConfig>,
 }
 
 /// Default configurations for db, theme and speech-to-text options
@@ -23,7 +23,7 @@ pub struct ScribaConfig {
 pub struct DefaultConfig {
     pub db: DBConfig,
     pub inference: InferenceConfig,
-    pub vad: VadConfig,
+    pub vad: VADConfig,
     pub fractor: FractorConfig,
     pub stt: STTConfig,
     pub theme: ThemeConfig,
@@ -36,7 +36,7 @@ impl Default for ScribaConfig {
             default: DefaultConfig::default(),
             dbs: vec![DBConfig::default()],
             stts: vec![STTConfig::default()],
-            vads: vec![VadConfig::default()],
+            vads: vec![VADConfig::default()],
         }
     }
 }

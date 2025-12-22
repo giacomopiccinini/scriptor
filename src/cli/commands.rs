@@ -1,9 +1,8 @@
-//use crate::configs::inference::InferenceConfig;
 use crate::configs::scriba::ScribaConfig;
-//use crate::stt::fractor::Fractor;
+use crate::stt::fractor::Fractor;
 use crate::stt::model::STTModel;
-//use crate::stt::rec::Recorder;
-//use crate::stt::vad::VoiceActivityDetector;
+use crate::stt::rec::Recorder;
+use crate::stt::vad::VADModel;
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 
@@ -39,37 +38,43 @@ pub fn transcribe_from_file(file: &PathBuf) -> Result<()> {
 }
 
 /// Start recording and split audio into fragments using VAD
-pub fn record_and_transcribe() -> Result<()> {
-    todo!()
-    // // Read config
-    // let config = Config::read().with_context(|| "Failed to read config file")?;
-    // let stt_config = &config.default.stt;
+pub fn record_and_transcribe(output_dir: Option<PathBuf>) -> Result<()> {
+    // Sanity check on output dir for audio files
+    let output_dir = if let Some(dir) = output_dir {
+        // TODO this fails but we need to put some guardrails
+        // if !dir.is_dir() {
+        //     anyhow::bail!("Output path {} is not a directory.", dir.display());
+        // }
+        if !dir.exists() {
+            std::fs::create_dir_all(&dir)
+                .with_context(|| format!("Failed to create output directory {}", dir.display()))?;
+        }
+        Some(dir)
+    } else {
+        None
+    };
 
-    // // Build inference config for VAD
-    // let inference_config = build_inference_config(&config)?;
+    // Read config
+    let config = ScribaConfig::read().with_context(|| "Failed to read config file")?;
 
-    // // Create recorder with max fragmentum duration from config
-    // let recorder = Recorder::new(stt_config.fragmentum_length as f32)
-    //     .with_context(|| "Failed to create recorder")?;
+    // Load STT model
+    let mut stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
 
-    // // Create VAD with threshold of 0.5
-    // let vad = VoiceActivityDetector::new(inference_config, 0.5)
-    //     .with_context(|| "Failed to create voice activity detector")?;
+    // Create recorder with max fragmentum duration from config
+    let recorder = Recorder::new(config.default.fractor.max_fragmentum_duration_seconds)
+        .with_context(|| "Failed to create recorder")?;
 
-    // // Create fractor and run
-    // let fractor = Fractor::new(recorder, vad);
+    // Create VAD model
+    let vad_model = VADModel::new(&config.default.vad, config.default.inference.clone())
+        .with_context(|| "Failed to create voice activity detector")?;
 
-    // println!("Recording started. Audio fragments will be saved to:");
-    // println!(
-    //     "  {}",
-    //     dirs::data_dir()
-    //         .expect("Could not find data directory")
-    //         .join("scriba")
-    //         .join("audio")
-    //         .join(codex_name)
-    //         .display()
-    // );
-    // println!("Press Ctrl+C to stop recording.");
+    // Create fractor and run
+    let fractor = Fractor::new(recorder, vad_model);
 
-    // fractor.run(codex_name)
+    println!("Recording started.");
+    println!("Press Ctrl+C to stop recording.");
+
+    fractor.run(output_dir);
+
+    Ok(())
 }
