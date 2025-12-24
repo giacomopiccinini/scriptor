@@ -27,13 +27,13 @@ impl ParakeetConfig {
             let preprocessor_path = model_dir_path.join("nemo128.onnx");
             let vocab_path = model_dir_path.join("vocabulary.txt");
 
-            return Ok(Self {
+            Ok(Self {
                 quantized: true,
-                encoder_path: encoder_path,
-                decoder_joint_path: decoder_joint_path,
-                preprocessor_path: preprocessor_path,
-                vocab_path: vocab_path,
-            });
+                encoder_path,
+                decoder_joint_path,
+                preprocessor_path,
+                vocab_path,
+            })
         } else {
             let model_name = "parakeet-tdt-0.6b-v3-fp32".to_string();
             let model_dir_path = dirs::data_dir()
@@ -47,13 +47,13 @@ impl ParakeetConfig {
             let preprocessor_path = model_dir_path.join("nemo128.onnx");
             let vocab_path = model_dir_path.join("vocabulary.txt");
 
-            return Ok(Self {
+            Ok(Self {
                 quantized: true,
-                encoder_path: encoder_path,
-                decoder_joint_path: decoder_joint_path,
-                preprocessor_path: preprocessor_path,
-                vocab_path: vocab_path,
-            });
+                encoder_path,
+                decoder_joint_path,
+                preprocessor_path,
+                vocab_path,
+            })
         }
     }
 }

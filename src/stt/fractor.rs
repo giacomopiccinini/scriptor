@@ -145,7 +145,7 @@ impl Fractor {
 
         // Create directory if it doesn't exist
         if !output_dir.exists() {
-            fs::create_dir_all(&output_dir)
+            fs::create_dir_all(output_dir)
                 .with_context(|| format!("Failed to create directory: {}", output_dir.display()))?;
         }
 

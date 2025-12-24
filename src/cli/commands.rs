@@ -10,13 +10,13 @@ use anyhow::{Context, Result};
 use crossterm::style::Stylize;
 use spinoff::{Color, Spinner, Streams, spinners};
 use std::io::{self, BufRead};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 /// Transcribe an existing WAV file
-pub fn transcribe_from_file(file: &PathBuf) -> Result<()> {
+pub fn transcribe_from_file(file: &Path) -> Result<()> {
     // Validate file
     if !file.exists() {
         anyhow::bail!("Input file {} does not exist.", file.display());
