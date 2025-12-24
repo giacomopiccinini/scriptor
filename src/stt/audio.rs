@@ -32,26 +32,43 @@ pub fn read_audio_file_mono(audio_file_path: &Path) -> Result<(Vec<f32>, u32)> {
     // Define accumulator to compute average in case of stereo (using i64 to prevent overflow)
     let mut acc = 0_i64;
 
-    // Read into samples vec
-    reader
-        .samples::<i32>()
-        .map(|s| s.with_context(|| "Couldn't read samples"))
-        .collect::<Result<Vec<_>, _>>()?
-        .iter()
-        .enumerate()
-        .for_each(|(i, &sample)| {
-            if channels == 2 {
-                acc += sample as i64;
-                if i % 2 != 0 {
-                    // Average and normalize by dividing by max_value
-                    samples.push(acc as f32 / 2.0 / max_value as f32);
-                    acc = 0_i64;
+    // Read samples based on the actual format in the file
+    match spec.sample_format {
+        SampleFormat::Float => {
+            // Read as f32 directly
+            let raw_samples: Vec<f32> = reader
+                .samples::<f32>()
+                .map(|s| s.with_context(|| "Couldn't read samples"))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            // Convert to mono if stereo
+            raw_samples.chunks(channels).for_each(|chunk| {
+                let avg: f32 = chunk.iter().sum::<f32>() / channels as f32;
+                samples.push(avg);
+            });
+        }
+        SampleFormat::Int => {
+            // Read as i32 and normalize
+            let raw_samples: Vec<i32> = reader
+                .samples::<i32>()
+                .map(|s| s.with_context(|| "Couldn't read samples"))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            raw_samples.iter().enumerate().for_each(|(i, &sample)| {
+                if channels == 2 {
+                    acc += sample as i64;
+                    if i % 2 != 0 {
+                        // Average and normalize by dividing by max_value
+                        samples.push(acc as f32 / 2.0 / max_value as f32);
+                        acc = 0_i64;
+                    }
+                } else if channels == 1 {
+                    // Normalize by dividing by max_value
+                    samples.push(sample as f32 / max_value as f32);
                 }
-            } else if channels == 1 {
-                // Normalize by dividing by max_value
-                samples.push(sample as f32 / max_value as f32);
-            }
-        });
+            });
+        }
+    }
 
     Ok((samples, sr))
 }
