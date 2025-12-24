@@ -4,9 +4,11 @@ use crate::stt::model::STTModel;
 use crate::stt::queue::FragmentumToTranscribe;
 use crate::stt::queue::{transcriber_to_file_worker, transcriber_to_stdout_worker};
 use crate::stt::rec::Recorder;
-use crate::stt::text::{Spinner, create_file_if_not_exists};
+use crate::stt::text::create_file_if_not_exists;
 use crate::stt::vad::VADModel;
 use anyhow::{Context, Result};
+use crossterm::style::Stylize;
+use spinoff::{Color, Spinner, Streams, spinners};
 use std::io::{self, BufRead};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -66,6 +68,14 @@ pub fn record_and_transcribe(
         None
     };
 
+    // Create spinner
+    let mut spinner = Spinner::new_with_stream(
+        spinners::Dots,
+        "Loading models...",
+        Color::Blue,
+        Streams::Stderr,
+    );
+
     // Read config
     let config = ScriptorConfig::read().with_context(|| "Failed to read config file")?;
 
@@ -92,6 +102,14 @@ pub fn record_and_transcribe(
         config.default.queue.max_queue_elements,
     );
 
+    // Signal successful model loading
+    spinner.success("Models loaded!");
+    eprintln!(
+        "{} {}",
+        "● [ON AIR]".red().bold(),
+        "Press Enter to stop recording.".italic()
+    );
+
     // Run fractor in a separate thread
     let fractor_handle = thread::spawn(move || fractor.run(audio_dir, stop_signal_clone, tx));
     let transcriber_handle = thread::spawn(move || {
@@ -102,16 +120,12 @@ pub fn record_and_transcribe(
         }
     });
 
-    // Start spinner and wait for Enter
-    let spinner = Spinner::start("Recording in progress. Press Enter to stop...");
-
     // Wait for Enter key
     let stdin = io::stdin();
     let _ = stdin.lock().lines().next();
 
     // Signal stop and wait for fractor to finish
     stop_signal.store(true, Ordering::Relaxed);
-    spinner.stop();
 
     // Wait for fractor thread to complete
     match fractor_handle.join() {
@@ -123,8 +137,6 @@ pub fn record_and_transcribe(
         Ok(result) => result?,
         Err(_) => anyhow::bail!("Transcribing thread panicked"),
     }
-
-    println!("Recording stopped.");
 
     Ok(())
 }

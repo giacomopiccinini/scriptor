@@ -37,6 +37,7 @@ pub fn transcriber_to_stdout_worker(
     mut stt_model: STTModel,
     rx: Receiver<FragmentumToTranscribe>,
 ) -> Result<()> {
+    println!();
     // Loop until channel is closed (sender dropped)
     while let Ok(item) = rx.recv() {
         // Load and transcribe
