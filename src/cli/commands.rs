@@ -1,6 +1,8 @@
 use crate::configs::scriptor::ScriptorConfig;
 use crate::stt::fractor::Fractor;
 use crate::stt::model::STTModel;
+use crate::stt::queue::FragmentumToTranscribe;
+use crate::stt::queue::{transcriber_to_file_worker, transcriber_to_stdout_worker};
 use crate::stt::rec::Recorder;
 use crate::stt::text::{Spinner, create_file_if_not_exists};
 use crate::stt::vad::VADModel;
@@ -68,7 +70,7 @@ pub fn record_and_transcribe(
     let config = ScriptorConfig::read().with_context(|| "Failed to read config file")?;
 
     // Load STT model
-    let _stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
+    let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
 
     // Create recorder with max fragmentum duration from config
     let recorder = Recorder::new(config.default.fractor.max_fragmentum_duration_seconds)
@@ -85,8 +87,20 @@ pub fn record_and_transcribe(
     let stop_signal = Arc::new(AtomicBool::new(false));
     let stop_signal_clone = Arc::clone(&stop_signal);
 
+    // Create queue
+    let (tx, rx) = std::sync::mpsc::sync_channel::<FragmentumToTranscribe>(
+        config.default.queue.max_queue_elements,
+    );
+
     // Run fractor in a separate thread
-    let fractor_handle = thread::spawn(move || fractor.run(audio_dir, stop_signal_clone));
+    let fractor_handle = thread::spawn(move || fractor.run(audio_dir, stop_signal_clone, tx));
+    let transcriber_handle = thread::spawn(move || {
+        if let Some(transcription_file) = transcription_file {
+            transcriber_to_file_worker(stt_model, transcription_file, rx)
+        } else {
+            transcriber_to_stdout_worker(stt_model, rx)
+        }
+    });
 
     // Start spinner and wait for Enter
     let spinner = Spinner::start("Recording in progress. Press Enter to stop...");
@@ -103,6 +117,11 @@ pub fn record_and_transcribe(
     match fractor_handle.join() {
         Ok(result) => result?,
         Err(_) => anyhow::bail!("Recording thread panicked"),
+    }
+
+    match transcriber_handle.join() {
+        Ok(result) => result?,
+        Err(_) => anyhow::bail!("Transcribing thread panicked"),
     }
 
     println!("Recording stopped.");

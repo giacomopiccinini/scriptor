@@ -1,5 +1,6 @@
 use crate::configs::fractor::FractorConfig;
 use crate::stt::audio::{convert_to_mono, resample, write_wav};
+use crate::stt::queue::FragmentumToTranscribe;
 use crate::stt::rec::Recorder;
 use crate::stt::vad::VADModel;
 use anyhow::{Context, Result};
@@ -9,6 +10,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::SyncSender;
 use uuid::{NoContext, Timestamp, Uuid};
 
 /// State of Fractor
@@ -156,7 +158,12 @@ impl Fractor {
         Ok(output_path)
     }
 
-    pub fn run(mut self, output_dir: Option<PathBuf>, stop_signal: Arc<AtomicBool>) -> Result<()> {
+    pub fn run(
+        mut self,
+        output_dir: Option<PathBuf>,
+        stop_signal: Arc<AtomicBool>,
+        tx: SyncSender<FragmentumToTranscribe>,
+    ) -> Result<()> {
         // Change status of recorder
         self.start_recording().with_context(|| "Unable to play")?;
 
@@ -245,10 +252,19 @@ impl Fractor {
                 let samples_to_process = std::mem::take(&mut self.state.fragmentum_buffer);
 
                 // Save fragmentum
-                self.save_fragmentum(samples_to_process, self.state.start_datetime, &output_dir)
+                let fragmentum_path = self
+                    .save_fragmentum(samples_to_process, self.state.start_datetime, &output_dir)
                     .with_context(|| "Failed to save recording")?;
 
-                // TODO: Add to queue
+                // Create queue element
+                let fragmentum_queue_element = FragmentumToTranscribe {
+                    path: fragmentum_path,
+                    start_datetime: self.state.start_datetime,
+                };
+
+                // Add to queue
+                tx.send(fragmentum_queue_element)
+                    .with_context(|| "Failed to send to transcription queue")?;
 
                 // Reset states for next fragmentum
                 self.state.reset(); // Reset state of fractor buffer

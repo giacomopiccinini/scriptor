@@ -51,7 +51,7 @@ pub trait STTBackend {
 }
 
 /// Object-safe trait for audio transcription
-pub trait AudioTranscriber {
+pub trait AudioTranscriber: Send {
     /// Load audio from .wav file
     fn load_audio(&self, audio_path: &Path) -> Result<Vec<f32>>;
 
@@ -60,7 +60,7 @@ pub trait AudioTranscriber {
 }
 
 /// Blanket implementation: any STTBackend automatically implements AudioTranscriber
-impl<T: STTBackend> AudioTranscriber for T {
+impl<T: STTBackend + Send> AudioTranscriber for T {
     fn load_audio(&self, audio_path: &Path) -> Result<Vec<f32>> {
         <Self as STTBackend>::load_audio(self, audio_path)
     }

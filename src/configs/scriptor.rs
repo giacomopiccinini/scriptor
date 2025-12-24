@@ -1,6 +1,7 @@
 use crate::configs::db::DBConfig;
 use crate::configs::fractor::FractorConfig;
 use crate::configs::inference::InferenceConfig;
+use crate::configs::queue::QueueConfig;
 use crate::configs::stt::STTConfig;
 use crate::configs::theme::ThemeConfig;
 use crate::configs::vad::VADConfig;
@@ -25,6 +26,7 @@ pub struct DefaultConfig {
     pub inference: InferenceConfig,
     pub vad: VADConfig,
     pub fractor: FractorConfig,
+    pub queue: QueueConfig,
     pub stt: STTConfig,
     pub theme: ThemeConfig,
 }
