@@ -160,6 +160,14 @@ impl Fractor {
         // Change status of recorder
         self.start_recording().with_context(|| "Unable to play")?;
 
+        // We always store audio because it is needed by STT implementation.
+        // If not required to save it, we remove it at the end of the processing
+        let (output_dir, erase) = if let Some(dir) = output_dir {
+            (dir, false)
+        } else {
+            (std::env::temp_dir().join("scriptor_audio"), true)
+        };
+
         while self.recorder.is_recording && !stop_signal.load(Ordering::Relaxed) {
             // Read available samples in small batches
             let available_samples_in_buffer = self.recorder.consumer.occupied_len();
@@ -237,17 +245,20 @@ impl Fractor {
                 let samples_to_process = std::mem::take(&mut self.state.fragmentum_buffer);
 
                 // Save fragmentum
-                if let Some(ref dir) = output_dir {
-                    self.save_fragmentum(samples_to_process, self.state.start_datetime, dir)
-                        .with_context(|| "Failed to save recording")?;
+                self.save_fragmentum(samples_to_process, self.state.start_datetime, &output_dir)
+                    .with_context(|| "Failed to save recording")?;
 
-                    // TODO: Add to queue
-                }
+                // TODO: Add to queue
 
                 // Reset states for next fragmentum
                 self.state.reset(); // Reset state of fractor buffer
                 self.vad.reset(); // Reset LSTM state for new segment
             }
+        }
+
+        //
+        if erase {
+            fs::remove_dir_all(output_dir).with_context(|| "Unable to remove temp audio files")?;
         }
 
         Ok(())
