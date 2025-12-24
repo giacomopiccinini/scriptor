@@ -127,15 +127,28 @@ pub fn record_and_transcribe(
     // Signal stop and wait for fractor to finish
     stop_signal.store(true, Ordering::Relaxed);
 
-    // Wait for fractor thread to complete
-    match fractor_handle.join() {
+    // Wait for fractor thread to complete and get temp dir to clean up (if any)
+    let temp_dir_to_erase = match fractor_handle.join() {
         Ok(result) => result?,
         Err(_) => anyhow::bail!("Recording thread panicked"),
-    }
+    };
 
+    // Wait for transcriber to finish processing all items
     match transcriber_handle.join() {
         Ok(result) => result?,
         Err(_) => anyhow::bail!("Transcribing thread panicked"),
+    }
+
+    // Clean up temp directory after transcription is complete
+    if let Some(temp_dir) = temp_dir_to_erase {
+        if temp_dir.exists() {
+            std::fs::remove_dir_all(&temp_dir).with_context(|| {
+                format!(
+                    "Unable to remove temp audio files at {}",
+                    temp_dir.display()
+                )
+            })?;
+        }
     }
 
     Ok(())

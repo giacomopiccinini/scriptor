@@ -12,11 +12,11 @@ pub fn create_file_if_not_exists(path: &Path) -> Result<bool> {
 
     // Create parent directories if needed
     if let Some(parent) = path.parent()
-        && !parent.exists() {
-            std::fs::create_dir_all(parent).with_context(|| {
-                format!("Failed to create parent directory: {}", parent.display())
-            })?;
-        }
+        && !parent.exists()
+    {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create parent directory: {}", parent.display()))?;
+    }
 
     File::create(path).with_context(|| format!("Failed to create file: {}", path.display()))?;
 

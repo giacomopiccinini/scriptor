@@ -158,12 +158,13 @@ impl Fractor {
         Ok(output_path)
     }
 
+    /// Run the fractor. Returns the temp directory to clean up (if any) after transcription completes.
     pub fn run(
         mut self,
         output_dir: Option<PathBuf>,
         stop_signal: Arc<AtomicBool>,
         tx: SyncSender<FragmentumToTranscribe>,
-    ) -> Result<()> {
+    ) -> Result<Option<PathBuf>> {
         // Change status of recorder
         self.start_recording().with_context(|| "Unable to play")?;
 
@@ -272,14 +273,44 @@ impl Fractor {
             }
         }
 
+        // Drain any remaining samples from the ring buffer into fragmentum_buffer
+        let remaining_in_ring = self.recorder.consumer.occupied_len();
+        if remaining_in_ring > 0 {
+            let mut drain_buffer = vec![0.0f32; remaining_in_ring];
+            let drained = self.recorder.consumer.pop_slice(&mut drain_buffer);
+            self.state
+                .fragmentum_buffer
+                .extend_from_slice(&drain_buffer[..drained]);
+        }
+
+        // Save and send the final fragmentum if there's any content
+        if !self.state.fragmentum_buffer.is_empty() {
+            let samples_to_process = std::mem::take(&mut self.state.fragmentum_buffer);
+
+            // Save fragmentum
+            let fragmentum_path = self
+                .save_fragmentum(samples_to_process, self.state.start_datetime, &output_dir)
+                .with_context(|| "Failed to save final recording")?;
+
+            // Create queue element
+            let fragmentum_queue_element = FragmentumToTranscribe {
+                path: fragmentum_path,
+                start_datetime: self.state.start_datetime,
+            };
+
+            // Add to queue
+            tx.send(fragmentum_queue_element)
+                .with_context(|| "Failed to send final fragment to transcription queue")?;
+        }
+
         // Stop the recording
         self.stop_recording();
 
-        // Erase the temp directory
-        if erase && output_dir.exists() {
-            fs::remove_dir_all(output_dir).with_context(|| "Unable to remove temp audio files")?;
+        // Return the temp directory to clean up after transcription completes (if any)
+        if erase {
+            Ok(Some(output_dir))
+        } else {
+            Ok(None)
         }
-
-        Ok(())
     }
 }
