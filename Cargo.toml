@@ -42,7 +42,10 @@ toml = "0.9.8"
 uuid = { version = "1.19.0", features = ["v4", "v7"] }
 
 [profile.release]
+codegen-units = 1
 lto = true
+opt-level = 3
+strip = true
 
 [dev-dependencies]
 color-eyre = "0.6.5"
