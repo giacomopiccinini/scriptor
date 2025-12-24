@@ -1,5 +1,5 @@
 use anyhow::Result;
-use scriba::cli::interface::run_cli;
+use scriptor::cli::interface::run_cli;
 fn main() -> Result<()> {
     run_cli()
 }

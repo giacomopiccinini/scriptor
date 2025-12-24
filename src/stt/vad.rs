@@ -39,7 +39,7 @@ pub trait VADBackend {
 }
 
 /// Object-safe trait for voice activity detection
-pub trait VoiceDetector {
+pub trait VoiceDetector: Send {
     /// Reset the internal state
     fn reset(&mut self);
 
@@ -60,7 +60,7 @@ pub trait VoiceDetector {
 }
 
 /// Blanket implementation: any VADBackend automatically implements VoiceDetector
-impl<T: VADBackend> VoiceDetector for T {
+impl<T: VADBackend + Send> VoiceDetector for T {
     fn reset(&mut self) {
         <Self as VADBackend>::reset(self)
     }

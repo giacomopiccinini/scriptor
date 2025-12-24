@@ -14,7 +14,7 @@ pub struct DBConfig {
 impl Default for DBConfig {
     fn default() -> Self {
         // Use data directory to standardize storage
-        let data_dir = dirs::data_dir().unwrap().join("scriba");
+        let data_dir = dirs::data_dir().unwrap().join("scriptor");
 
         // Create directory
         std::fs::create_dir_all(&data_dir).unwrap();

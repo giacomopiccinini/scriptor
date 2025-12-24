@@ -4,10 +4,11 @@ use crate::stt::rec::Recorder;
 use crate::stt::vad::VADModel;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local};
-use ort::session::output;
 use ringbuf::traits::{Consumer, Observer};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use uuid::{NoContext, Timestamp, Uuid};
 
 /// State of Fractor
@@ -155,11 +156,11 @@ impl Fractor {
         Ok(output_path)
     }
 
-    pub fn run(mut self, output_dir: Option<PathBuf>) -> Result<()> {
+    pub fn run(mut self, output_dir: Option<PathBuf>, stop_signal: Arc<AtomicBool>) -> Result<()> {
         // Change status of recorder
         self.start_recording().with_context(|| "Unable to play")?;
 
-        while self.recorder.is_recording {
+        while self.recorder.is_recording && !stop_signal.load(Ordering::Relaxed) {
             // Read available samples in small batches
             let available_samples_in_buffer = self.recorder.consumer.occupied_len();
 

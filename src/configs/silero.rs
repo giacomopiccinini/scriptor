@@ -18,7 +18,7 @@ impl Default for SileroConfig {
     fn default() -> Self {
         let model_path = dirs::data_dir()
             .expect("Could not find data directory")
-            .join("scriba")
+            .join("scriptor")
             .join("models")
             .join("vad")
             .join("silero-vad.onnx");

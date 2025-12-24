@@ -1,5 +1,5 @@
 use crate::configs::db::DBConfig;
-use crate::configs::scriba::ScribaConfig;
+use crate::configs::scriptor::ScriptorConfig;
 use crate::tui::app::events::EventHandler;
 use crate::tui::db::connections::init_db;
 use crate::tui::ui::components::{
@@ -47,7 +47,7 @@ pub enum CurrentRegion {
 /// Main application state
 pub struct App {
     /// App configuration (db, stt inference parameters, theme)
-    pub config: ScribaConfig,
+    pub config: ScriptorConfig,
     /// Current active screen
     pub current_screen: CurrentScreen,
     /// Current active region
@@ -75,7 +75,7 @@ impl App {
     /// and sets up the initial UI state.
     pub async fn new() -> Self {
         // Read the config (creates default if missing)
-        let config = ScribaConfig::read().expect("Failed to read config file");
+        let config = ScriptorConfig::read().expect("Failed to read config file");
 
         // Connect to default archivum (db)
         let pool = init_db(&config.default.db.connection_str)
@@ -133,7 +133,7 @@ impl App {
         // Use data directory to standardize storage
         let data_dir = dirs::data_dir()
             .ok_or_else(|| color_eyre::eyre::eyre!("Could not find data directory"))?
-            .join("scriba");
+            .join("scriptor");
 
         // Create directory if it doesn't exist
         std::fs::create_dir_all(&data_dir)
@@ -168,8 +168,8 @@ impl App {
         // Write updated config to file
         let config_dir = dirs::config_dir()
             .ok_or_else(|| color_eyre::eyre::eyre!("Could not find config directory"))?
-            .join("scriba");
-        let config_path = config_dir.join("scriba.toml");
+            .join("scriptor");
+        let config_path = config_dir.join("scriptor.toml");
 
         self.config
             .write(&config_path)
@@ -329,8 +329,8 @@ impl App {
             // Write updated config to file
             let config_dir = dirs::config_dir()
                 .ok_or_else(|| color_eyre::eyre::eyre!("Could not find config directory"))?
-                .join("scriba");
-            let config_path = config_dir.join("scriba.toml");
+                .join("scriptor");
+            let config_path = config_dir.join("scriptor.toml");
 
             self.config
                 .write(&config_path)

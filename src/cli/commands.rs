@@ -1,12 +1,17 @@
-use crate::configs::scriba::ScribaConfig;
+use crate::configs::scriptor::ScriptorConfig;
 use crate::stt::fractor::Fractor;
 use crate::stt::model::STTModel;
 use crate::stt::rec::Recorder;
+use crate::stt::text::{Spinner, create_file_if_not_exists};
 use crate::stt::vad::VADModel;
 use anyhow::{Context, Result};
+use std::io::{self, BufRead};
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
 
-/// Transcribe a WAV file using settings from the config file
+/// Transcribe an existing WAV file
 pub fn transcribe_from_file(file: &PathBuf) -> Result<()> {
     // Validate file
     if !file.exists() {
@@ -20,7 +25,7 @@ pub fn transcribe_from_file(file: &PathBuf) -> Result<()> {
     }
 
     // Read config
-    let config = ScribaConfig::read().with_context(|| "Failed to read config file")?;
+    let config = ScriptorConfig::read().with_context(|| "Failed to read config file")?;
 
     // Load STT model
     let mut stt_model = STTModel::new(&config.default.stt, config.default.inference)?;
@@ -37,14 +42,19 @@ pub fn transcribe_from_file(file: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-/// Start recording and split audio into fragments using VAD
-pub fn record_and_transcribe(output_dir: Option<PathBuf>) -> Result<()> {
+/// Record and transcribe
+pub fn record_and_transcribe(
+    transcription_file: Option<PathBuf>,
+    audio_dir: Option<PathBuf>,
+) -> Result<()> {
+    // Create transcription file if provided
+    if let Some(ref path) = transcription_file {
+        create_file_if_not_exists(path)
+            .with_context(|| format!("Failed to create transcription file {}", path.display()))?;
+    }
+
     // Sanity check on output dir for audio files
-    let output_dir = if let Some(dir) = output_dir {
-        // TODO this fails but we need to put some guardrails
-        // if !dir.is_dir() {
-        //     anyhow::bail!("Output path {} is not a directory.", dir.display());
-        // }
+    let audio_dir = if let Some(dir) = audio_dir {
         if !dir.exists() {
             std::fs::create_dir_all(&dir)
                 .with_context(|| format!("Failed to create output directory {}", dir.display()))?;
@@ -55,10 +65,10 @@ pub fn record_and_transcribe(output_dir: Option<PathBuf>) -> Result<()> {
     };
 
     // Read config
-    let config = ScribaConfig::read().with_context(|| "Failed to read config file")?;
+    let config = ScriptorConfig::read().with_context(|| "Failed to read config file")?;
 
     // Load STT model
-    let mut stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
+    let _stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
 
     // Create recorder with max fragmentum duration from config
     let recorder = Recorder::new(config.default.fractor.max_fragmentum_duration_seconds)
@@ -68,13 +78,34 @@ pub fn record_and_transcribe(output_dir: Option<PathBuf>) -> Result<()> {
     let vad_model = VADModel::new(&config.default.vad, config.default.inference.clone())
         .with_context(|| "Failed to create voice activity detector")?;
 
-    // Create fractor and run
+    // Create fractor
     let fractor = Fractor::new(recorder, vad_model);
 
-    println!("Recording started.");
-    println!("Press Ctrl+C to stop recording.");
+    // Create stop signal
+    let stop_signal = Arc::new(AtomicBool::new(false));
+    let stop_signal_clone = Arc::clone(&stop_signal);
 
-    fractor.run(output_dir);
+    // Run fractor in a separate thread
+    let fractor_handle = thread::spawn(move || fractor.run(audio_dir, stop_signal_clone));
+
+    // Start spinner and wait for Enter
+    let spinner = Spinner::start("Recording in progress. Press Enter to stop...");
+
+    // Wait for Enter key
+    let stdin = io::stdin();
+    let _ = stdin.lock().lines().next();
+
+    // Signal stop and wait for fractor to finish
+    stop_signal.store(true, Ordering::Relaxed);
+    spinner.stop();
+
+    // Wait for fractor thread to complete
+    match fractor_handle.join() {
+        Ok(result) => result?,
+        Err(_) => anyhow::bail!("Recording thread panicked"),
+    }
+
+    println!("Recording stopped.");
 
     Ok(())
 }

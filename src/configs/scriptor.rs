@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 /// Config file definition
 #[derive(Deserialize, Serialize)]
-pub struct ScribaConfig {
+pub struct ScriptorConfig {
     pub default: DefaultConfig,
     pub dbs: Vec<DBConfig>,
     pub stts: Vec<STTConfig>,
@@ -29,7 +29,7 @@ pub struct DefaultConfig {
     pub theme: ThemeConfig,
 }
 
-impl Default for ScribaConfig {
+impl Default for ScriptorConfig {
     /// By default, the name is the default name with default config
     fn default() -> Self {
         Self {
@@ -41,12 +41,12 @@ impl Default for ScribaConfig {
     }
 }
 
-impl ScribaConfig {
-    /// Write config struct to scriba.toml file
+impl ScriptorConfig {
+    /// Write config struct to scriptor.toml file
     pub fn write(&self, config_path: &PathBuf) -> Result<()> {
         // Convert config to string to be written to config file
         let toml_content =
-            toml::to_string_pretty(&self).with_context(|| "Failed to serialize scriba.toml")?;
+            toml::to_string_pretty(&self).with_context(|| "Failed to serialize scriptor.toml")?;
 
         // Write string to file
         fs::write(config_path, toml_content).with_context(|| {
@@ -59,13 +59,13 @@ impl ScribaConfig {
         Ok(())
     }
 
-    /// Read and serialize a scriba.toml file
+    /// Read and serialize a scriptor.toml file
     pub fn read() -> Result<Self> {
         // Use config directory to standardize storage of config file
-        let config_dir = dirs::config_dir().unwrap().join("scriba");
+        let config_dir = dirs::config_dir().unwrap().join("scriptor");
 
         // Define the config file path
-        let config_path = config_dir.join("scriba.toml");
+        let config_path = config_dir.join("scriptor.toml");
 
         // Create config if not existing
         if !config_dir.exists() | !config_path.exists() {
@@ -85,16 +85,16 @@ impl ScribaConfig {
             return Ok(Self::default());
         }
 
-        // Serialize scriba.toml into YomoProject struct
-        let scriba_config: ScribaConfig = toml::from_str(
+        // Serialize scriptor.toml into YomoProject struct
+        let scriptor_config: ScriptorConfig = toml::from_str(
             &fs::read_to_string(config_path).with_context(|| "Failed to read into string")?,
         )
         .with_context(|| "Failed to serialize into struct")?;
 
-        Ok(scriba_config)
+        Ok(scriptor_config)
     }
 
-    /// Get scriba default config
+    /// Get scriptor default config
     pub fn get_default(&self) -> Result<DefaultConfig> {
         Ok(self.default.clone())
     }

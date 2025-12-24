@@ -18,7 +18,7 @@ impl ParakeetConfig {
             let model_name = "parakeet-tdt-0.6b-v3-int8".to_string();
             let model_dir_path = dirs::data_dir()
                 .with_context(|| "Failed to find data dir")?
-                .join("scriba")
+                .join("scriptor")
                 .join("models")
                 .join("stt")
                 .join(model_name);
@@ -38,7 +38,7 @@ impl ParakeetConfig {
             let model_name = "parakeet-tdt-0.6b-v3-fp32".to_string();
             let model_dir_path = dirs::data_dir()
                 .with_context(|| "Failed to find data dir")?
-                .join("scriba")
+                .join("scriptor")
                 .join("models")
                 .join("stt")
                 .join(model_name);

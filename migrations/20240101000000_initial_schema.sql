@@ -1,4 +1,4 @@
--- Initial schema for Scriba speech-to-text app
+-- Initial schema for Scriptor speech-to-text app
 -- Codex = Project, Folio = Recording, Fragmentum = Text/Audio chunk
 
 -- Table for codex

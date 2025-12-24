@@ -1,4 +1,4 @@
-use crate::configs::scriba::ScribaConfig;
+use crate::configs::scriptor::ScriptorConfig;
 use crate::configs::theme::ThemeConfig;
 use crate::tui::ui::cursor::CursorState;
 use ratatui::buffer::Buffer;
@@ -169,7 +169,7 @@ pub struct ChangeArchivumPopUp;
 impl ChangeArchivumPopUp {
     /// Render popup for selecting archivum
     pub fn render(
-        config: &ScribaConfig,
+        config: &ScriptorConfig,
         selected_index: usize,
         area: Rect,
         buf: &mut Buffer,

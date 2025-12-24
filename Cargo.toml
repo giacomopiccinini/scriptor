@@ -1,21 +1,21 @@
 [package]
-name = "scriba"
+name = "scriptor"
 version = "0.1.0"
 edition = "2024"
 authors = ["Giacomo Piccinini <giacomo.piccinini@proton.me>"]
 license = "MIT"
-description = "Scriba - Speech-to-Text CLI and TUI"
+description = "Scriptor - Speech-to-Text CLI and TUI"
 readme = "README.md"
-homepage = "https://github.com/giacomopiccinini/scriba"
-repository = "https://github.com/giacomopiccinini/scriba"
+homepage = "https://github.com/giacomopiccinini/scriptor"
+repository = "https://github.com/giacomopiccinini/scriptor"
 keywords = ["parakeet", "stt", "speech-to-text", "audio", "onnx"]
 
 [[bin]]
-name = "scriba"
+name = "scriptor"
 path = "src/main.rs"
 
 [lib]
-name = "scriba"
+name = "scriptor"
 path = "src/lib.rs"
 
 [dependencies]

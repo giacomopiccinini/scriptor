@@ -5,5 +5,6 @@ pub mod onnx;
 pub mod parakeet;
 pub mod rec;
 pub mod silero;
+pub mod text;
 pub mod transcription;
 pub mod vad;

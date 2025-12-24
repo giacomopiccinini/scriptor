@@ -1,4 +1,4 @@
-# scriba
+# scriptor
 
 Archivum
 Codex

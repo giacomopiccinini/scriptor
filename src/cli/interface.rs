@@ -4,24 +4,39 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+/// Local speech-to-text CLI & TUI
 #[derive(Parser)]
-#[command(version, about, long_about = None)]
+#[clap(name = "scriptor", version)]
+//#[command(version, about, long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
 
+// /// Swiss-army knife for media inspection and manipulation
+// #[derive(Debug, Parser)]
+// #[clap(name = "rush", version)]
+// pub struct App {
+//     #[clap(subcommand)]
+//     command: Command,
+// }
+
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Transcribe a WAV file using config file settings
+    /// Transcribe an existing WAV
     FromFile {
         /// Path to the .wav file
+        #[arg(required = true)]
         file: PathBuf,
     },
-    /// Start recording and split into fragments
+    /// Record & transcribe
     Record {
-        /// Directory where recordings are saved (optional)
-        output_dir: Option<PathBuf>,
+        /// File .txt where transcription is saved
+        #[arg(short)]
+        transcription_file: Option<PathBuf>,
+        /// Directory where recordings are saved
+        #[arg(short)]
+        audio_dir: Option<PathBuf>,
     },
 }
 
@@ -31,7 +46,10 @@ pub fn run_cli() -> Result<()> {
 
     match args.command {
         Some(Commands::FromFile { file }) => transcribe_from_file(&file),
-        Some(Commands::Record { output_dir }) => record_and_transcribe(output_dir),
+        Some(Commands::Record {
+            transcription_file,
+            audio_dir,
+        }) => record_and_transcribe(transcription_file, audio_dir),
         None => run_tui().map_err(|e| anyhow::anyhow!("{}", e)),
     }
 }

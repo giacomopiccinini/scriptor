@@ -18,7 +18,7 @@ It must record in mono at a sample rate of 16kHz. Use the utilities in src/stt/a
 ### Continuous transcription function
 
 There should be a function that when triggered, records the audio and at the end of the pre-determined chunk transcribes it a then 
-a) stores the wav file in the data directory .local/share/scriba
+a) stores the wav file in the data directory .local/share/scriptor
 b) adds a new fragmentum to the DB.
 Notice that the folio is the uninterrupted recording and fragmenta are the chunks. So if I record for 30s and get 3 fragmenta, I still have 1 folio. 
 Notice also that this function should update the DB also with the path to the audio file that was saved
@@ -26,12 +26,12 @@ Notice also that this function should update the DB also with the path to the au
 ## Temp
 
 momentarily the model is stored in models/ but really it should end up in the data diretory, likely something like
-~/local/share/scriba/models/parakeet. Copy it there for the time being we'll then need to figure out a way to store the model. 
+~/local/share/scriptor/models/parakeet. Copy it there for the time being we'll then need to figure out a way to store the model. 
 
 ## Layout
 It should be divided vertically in three spaces. 
 
-Above them, there should be a logo with "Scriba". The exact thing needs to be defined but let's put a placeholder there for now. 
+Above them, there should be a logo with "Scriptor". The exact thing needs to be defined but let's put a placeholder there for now. 
 
 Below the logo the definition should be the following 
 
