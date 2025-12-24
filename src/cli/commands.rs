@@ -140,8 +140,8 @@ pub fn record_and_transcribe(
     }
 
     // Clean up temp directory after transcription is complete
-    if let Some(temp_dir) = temp_dir_to_erase {
-        if temp_dir.exists() {
+    if let Some(temp_dir) = temp_dir_to_erase
+        && temp_dir.exists() {
             std::fs::remove_dir_all(&temp_dir).with_context(|| {
                 format!(
                     "Unable to remove temp audio files at {}",
@@ -149,7 +149,6 @@ pub fn record_and_transcribe(
                 )
             })?;
         }
-    }
 
     Ok(())
 }
