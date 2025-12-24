@@ -17,23 +17,9 @@ pub struct FractorConfig {
 impl Default for FractorConfig {
     fn default() -> Self {
         Self {
-            min_fragmentum_duration_seconds: 5.0_f32,
+            min_fragmentum_duration_seconds: 10.0_f32,
             max_fragmentum_duration_seconds: 20.0_f32,
-            pause_threshold_in_chunks: 16_u32,
-        }
-    }
-}
-
-impl FractorConfig {
-    fn new(
-        min_fragmentum_duration_seconds: f32,
-        max_fragmentum_duration_seconds: f32,
-        pause_threshold_in_chunks: u32,
-    ) -> Self {
-        Self {
-            min_fragmentum_duration_seconds,
-            max_fragmentum_duration_seconds,
-            pause_threshold_in_chunks,
+            pause_threshold_in_chunks: 24_u32,
         }
     }
 }

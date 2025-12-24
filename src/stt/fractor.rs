@@ -15,7 +15,7 @@ use uuid::{NoContext, Timestamp, Uuid};
 
 /// State of Fractor
 #[derive(Debug, Clone)]
-struct FractorState {
+pub struct FractorState {
     fragmentum_buffer: Vec<f32>,
     read_buffer: Vec<f32>,
     consecutive_silence_chunks: u32,

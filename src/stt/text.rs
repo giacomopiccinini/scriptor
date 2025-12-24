@@ -1,64 +1,7 @@
 use anyhow::{Context, Result};
 use std::fs::{File, OpenOptions};
-use std::io::{Write, stderr, stdout};
+use std::io::Write;
 use std::path::Path;
-// use std::sync::Arc;
-// use std::sync::atomic::{AtomicBool, Ordering};
-// use std::thread;
-// use std::time::Duration;
-
-// /// Spinner handle that can be used to stop the spinner
-// pub struct Spinner {
-//     running: Arc<AtomicBool>,
-//     handle: Option<thread::JoinHandle<()>>,
-// }
-
-// impl Spinner {
-//     /// Create and start a new spinner with a custom message
-//     pub fn start(message: &str) -> Self {
-//         let running = Arc::new(AtomicBool::new(true));
-//         let running_clone = Arc::clone(&running);
-//         let message = message.to_string();
-
-//         let handle = thread::spawn(move || {
-//             let frames = ['|', '/', '-', '\\'];
-//             let mut idx = 0;
-
-//             while running_clone.load(Ordering::Relaxed) {
-//                 eprint!("\r{} {} ", frames[idx], message);
-//                 stdout().flush().unwrap();
-//                 idx = (idx + 1) % frames.len();
-//                 thread::sleep(Duration::from_millis(100));
-//             }
-
-//             // Clear the spinner line
-//             eprint!("\r{}\r", " ".repeat(message.len() + 4));
-//             stdout().flush().unwrap();
-//         });
-
-//         Self {
-//             running,
-//             handle: Some(handle),
-//         }
-//     }
-
-//     /// Stop the spinner
-//     pub fn stop(mut self) {
-//         self.running.store(false, Ordering::Relaxed);
-//         if let Some(handle) = self.handle.take() {
-//             handle.join().unwrap();
-//         }
-//     }
-// }
-
-// impl Drop for Spinner {
-//     fn drop(&mut self) {
-//         self.running.store(false, Ordering::Relaxed);
-//         if let Some(handle) = self.handle.take() {
-//             let _ = handle.join();
-//         }
-//     }
-// }
 
 /// Create a text file at the given path if it doesn't exist
 /// Returns Ok(true) if the file was created, Ok(false) if it already existed
