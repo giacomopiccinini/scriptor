@@ -272,6 +272,9 @@ impl Fractor {
             }
         }
 
+        // Stop the recording
+        self.stop_recording();
+
         // Erase the temp directory
         if erase && output_dir.exists() {
             fs::remove_dir_all(output_dir).with_context(|| "Unable to remove temp audio files")?;
