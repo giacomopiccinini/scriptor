@@ -3,6 +3,7 @@ pub mod fractor;
 pub mod model;
 pub mod onnx;
 pub mod parakeet;
+pub mod playback;
 pub mod queue;
 pub mod rec;
 pub mod silero;

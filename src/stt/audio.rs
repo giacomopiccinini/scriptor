@@ -1,7 +1,33 @@
 use anyhow::{Context, Result};
+use cpal::SupportedStreamConfig;
 use hound::{SampleFormat, WavReader, WavSpec, WavWriter};
 use rubato::{FftFixedIn, Resampler};
 use std::path::Path;
+
+/// Read wav file
+pub fn read_audio(audio_file_path: &Path) -> Result<(Vec<f32>, WavSpec)> {
+    let reader = hound::WavReader::open(audio_file_path)?;
+    let spec = reader.spec();
+
+    // Calculate the maximum value based on bits_per_sample
+    let max_value = 2_f64.powi(spec.bits_per_sample as i32 - 1);
+
+    let samples: Vec<f32> = match spec.sample_format {
+        hound::SampleFormat::Float => reader
+            .into_samples::<f32>()
+            .map(|s| s.with_context(|| "Couldn't read samples"))
+            .collect::<Result<Vec<_>, _>>()?,
+        hound::SampleFormat::Int => reader
+            .into_samples::<i32>()
+            .map(|s| {
+                s.with_context(|| "Couldn't read samples")
+                    .map(|sample| sample as f32 / max_value as f32)
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    };
+
+    Ok((samples, spec))
+}
 
 /// Read audio file from file path and convert to mono by averaging left and right channel
 pub fn read_audio_file_mono(audio_file_path: &Path) -> Result<(Vec<f32>, u32)> {
@@ -99,6 +125,57 @@ pub fn resample(samples: Vec<f32>, original_sr: u32, target_sr: u32) -> Result<V
     Ok(resampled.swap_remove(0))
 }
 
+/// Resample audio file to target sample rate (supports mono or stereo)
+pub fn resample_stereo(
+    samples: Vec<f32>,
+    original_sr: u32,
+    target_sr: u32,
+    n_channels: u16,
+) -> Result<Vec<f32>> {
+    if original_sr == target_sr {
+        return Ok(samples);
+    }
+
+    let n_channels = n_channels as usize;
+    let n_frames = samples.len() / n_channels;
+
+    // Deinterleave into separate channel vectors
+    let mut channels: Vec<Vec<f32>> = (0..n_channels)
+        .map(|ch| {
+            samples
+                .iter()
+                .skip(ch)
+                .step_by(n_channels)
+                .copied()
+                .collect()
+        })
+        .collect();
+
+    let mut resampler = FftFixedIn::<f32>::new(
+        original_sr as usize,
+        target_sr as usize,
+        n_frames,
+        1024,
+        n_channels,
+    )
+    .with_context(|| "Can't initiate resampler")?;
+
+    let resampled = resampler
+        .process(&channels, None)
+        .with_context(|| "Can't resample file")?;
+
+    // Re-interleave channels back into a single vector
+    let out_frames = resampled[0].len();
+    let mut output = Vec::with_capacity(out_frames * n_channels);
+    for i in 0..out_frames {
+        for ch in &resampled {
+            output.push(ch[i]);
+        }
+    }
+
+    Ok(output)
+}
+
 /// Convert stereo samples to mono by averaging left and right channels
 pub fn convert_to_mono(samples: Vec<f32>, n_channels: u16) -> Vec<f32> {
     // If mono, exit
@@ -117,6 +194,21 @@ pub fn convert_to_mono(samples: Vec<f32>, n_channels: u16) -> Vec<f32> {
                     pair[0]
                 }
             })
+            .collect()
+    }
+}
+
+/// Convert mono samples to stereo by duplicating each sample to left and right channels
+pub fn convert_to_stereo(samples: Vec<f32>, n_channels: u16) -> Vec<f32> {
+    // If already stereo, exit
+    if n_channels == 2 {
+        samples
+    }
+    // If mono, duplicate each sample for left and right
+    else {
+        samples
+            .into_iter()
+            .flat_map(|sample| [sample, sample])
             .collect()
     }
 }
@@ -192,4 +284,22 @@ pub fn write_mono_wav(
     }
 
     Ok(())
+}
+
+/// Convert cpal streaming config to hound compatible config
+pub fn wav_spec_from_config(config: &SupportedStreamConfig) -> hound::WavSpec {
+    // Convert sample format
+    let sample_format = if config.sample_format().is_float() {
+        hound::SampleFormat::Float
+    } else {
+        hound::SampleFormat::Int
+    };
+
+    // Create hound wave spec
+    hound::WavSpec {
+        channels: config.channels() as _,
+        sample_rate: config.sample_rate().0 as _,
+        bits_per_sample: (config.sample_format().sample_size() * 8) as _,
+        sample_format,
+    }
 }

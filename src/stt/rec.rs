@@ -1,3 +1,4 @@
+use crate::stt::audio::wav_spec_from_config;
 use anyhow::{Context, Result};
 use cpal::Stream;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -79,7 +80,7 @@ impl Recorder {
     }
 }
 
-// Setup the recording by finding the default device with the corresponding config
+/// Setup the recording by finding the default device with the corresponding config
 fn setup_recording() -> Result<(Device, SupportedStreamConfig)> {
     // Get default audio host and input device
     let host = cpal::default_host();
@@ -147,22 +148,4 @@ fn setup_audio_stream(
     )?;
 
     Ok((stream, consumer))
-}
-
-/// Convert cpal streaming config to hound compatible config to write wav file as the original
-fn wav_spec_from_config(config: &SupportedStreamConfig) -> hound::WavSpec {
-    // Convert sample format
-    let sample_format = if config.sample_format().is_float() {
-        hound::SampleFormat::Float
-    } else {
-        hound::SampleFormat::Int
-    };
-
-    // Create hound wave spec
-    hound::WavSpec {
-        channels: config.channels() as _,
-        sample_rate: config.sample_rate().0 as _,
-        bits_per_sample: (config.sample_format().sample_size() * 8) as _,
-        sample_format,
-    }
 }
