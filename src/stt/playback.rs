@@ -2,13 +2,61 @@ use crate::stt::audio::{
     convert_to_mono, convert_to_stereo, read_audio, resample_stereo, wav_spec_from_config,
 };
 use anyhow::{Context, Result};
-use cpal::Stream;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, SampleFormat, SupportedStreamConfig};
+use cpal::{Device, FromSample, SampleFormat, SizedSample, Stream, SupportedStreamConfig};
 use hound::WavSpec;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
+
+/// Trait for audio sample types that can be converted from f32
+trait Sample: SizedSample + FromSample<f32> {
+    fn from_f32_clamped(value: f32) -> Self;
+    fn silence() -> Self;
+}
+
+impl Sample for f32 {
+    #[inline]
+    fn from_f32_clamped(value: f32) -> Self {
+        value
+    }
+    #[inline]
+    fn silence() -> Self {
+        0.0
+    }
+}
+
+impl Sample for i16 {
+    #[inline]
+    fn from_f32_clamped(value: f32) -> Self {
+        (value.clamp(-1.0, 1.0) * i16::MAX as f32) as i16
+    }
+    #[inline]
+    fn silence() -> Self {
+        0
+    }
+}
+
+impl Sample for i32 {
+    #[inline]
+    fn from_f32_clamped(value: f32) -> Self {
+        (value.clamp(-1.0, 1.0) * i32::MAX as f32) as i32
+    }
+    #[inline]
+    fn silence() -> Self {
+        0
+    }
+}
+
+/// Shared state for audio playback callbacks
+struct PlaybackState {
+    active_audio: Arc<RwLock<Option<Vec<f32>>>>,
+    next_audio: Arc<RwLock<Option<Vec<f32>>>>,
+    position: Arc<AtomicUsize>,
+    file_index: Arc<AtomicUsize>,
+    total_files: Arc<AtomicUsize>,
+    preload_flag: Arc<AtomicBool>,
+}
 
 /// Playback queue with double-buffering for gapless transitions
 pub struct PlayerQueue {
@@ -187,35 +235,6 @@ impl PlayerQueue {
         Ok(())
     }
 
-    /// Called when current track ends to swap buffers
-    /// Note: Automatic advancement is now handled inline in fill_buffer functions.
-    /// This method is kept for potential manual skip functionality.
-    #[allow(dead_code)]
-    fn advance(&self) -> Result<()> {
-        let mut active_audio = self
-            .active_audio
-            .write()
-            .map_err(|_| anyhow::anyhow!("Cannot acquire lock on active audio"))?;
-        let mut next_audio = self
-            .next_audio
-            .write()
-            .map_err(|_| anyhow::anyhow!("Cannot acquire lock on next audio"))?;
-
-        // Swap: preloaded becomes active
-        *active_audio = next_audio.take();
-        self.playback_position.store(0, Ordering::SeqCst);
-        self.current_file_index.fetch_add(1, Ordering::SeqCst);
-
-        drop(active_audio);
-        drop(next_audio);
-
-        // Start preloading the next one
-        self.preload_next()
-            .with_context(|| "Can't preload next audio file while advancing")?;
-
-        Ok(())
-    }
-
     /// Check if preloading is needed and trigger it
     /// This should be called periodically from the main thread (not audio callback)
     pub fn trigger_preload_if_needed(&self) -> Result<()> {
@@ -291,80 +310,49 @@ impl Player {
 
         // Set up stream if we have files loaded
         if !player.queue.is_empty() {
-            let stream = player.setup_output_stream(
-                player.config.output_config.sample_format(),
-                player.queue.active_audio.clone(),
-                player.queue.next_audio.clone(),
-                player.queue.playback_position.clone(),
-                player.queue.current_file_index.clone(),
-                player.queue.total_files.clone(),
-                player.queue.preload_needed.clone(),
-            )?;
+            let state = PlaybackState {
+                active_audio: player.queue.active_audio.clone(),
+                next_audio: player.queue.next_audio.clone(),
+                position: player.queue.playback_position.clone(),
+                file_index: player.queue.current_file_index.clone(),
+                total_files: player.queue.total_files.clone(),
+                preload_flag: player.queue.preload_needed.clone(),
+            };
+            let stream =
+                player.setup_output_stream(player.config.output_config.sample_format(), state)?;
             player.stream = Some(stream);
         }
 
         Ok(player)
     }
 
-    pub fn setup_output_stream(
+    fn setup_output_stream(
         &self,
         sample_format: SampleFormat,
-        active_audio: Arc<RwLock<Option<Vec<f32>>>>,
-        next_audio: Arc<RwLock<Option<Vec<f32>>>>,
-        position: Arc<AtomicUsize>,
-        file_index: Arc<AtomicUsize>,
-        total_files: Arc<AtomicUsize>,
-        preload_flag: Arc<AtomicBool>,
+        state: PlaybackState,
     ) -> Result<cpal::Stream> {
+        let config = &self.config.output_config.config();
+        let device = &self.config.output_device;
+
         match sample_format {
-            SampleFormat::F32 => {
-                let active = active_audio.clone();
-                let next = next_audio.clone();
-                let pos = position.clone();
-                let idx = file_index.clone();
-                let total = total_files.clone();
-                let preload = preload_flag.clone();
-                self.config.output_device.build_output_stream(
-                    &self.config.output_config.config(),
-                    move |data: &mut [f32], _| {
-                        fill_buffer_f32(data, &active, &next, &pos, &idx, &total, &preload);
-                    },
-                    |e| eprintln!("{e}"),
-                    None,
-                )
-            }
-            SampleFormat::I16 => {
-                let active = active_audio.clone();
-                let next = next_audio.clone();
-                let pos = position.clone();
-                let idx = file_index.clone();
-                let total = total_files.clone();
-                let preload = preload_flag.clone();
-                self.config.output_device.build_output_stream(
-                    &self.config.output_config.config(),
-                    move |data: &mut [i16], _| {
-                        fill_buffer_i16(data, &active, &next, &pos, &idx, &total, &preload);
-                    },
-                    |e| eprintln!("{e}"),
-                    None,
-                )
-            }
-            SampleFormat::I32 => {
-                let active = active_audio.clone();
-                let next = next_audio.clone();
-                let pos = position.clone();
-                let idx = file_index.clone();
-                let total = total_files.clone();
-                let preload = preload_flag.clone();
-                self.config.output_device.build_output_stream(
-                    &self.config.output_config.config(),
-                    move |data: &mut [i32], _| {
-                        fill_buffer_i32(data, &active, &next, &pos, &idx, &total, &preload);
-                    },
-                    |e| eprintln!("{e}"),
-                    None,
-                )
-            }
+            SampleFormat::F32 => device.build_output_stream(
+                config,
+                move |data: &mut [f32], _| fill_buffer(data, &state),
+                |e| eprintln!("{e}"),
+                None,
+            ),
+            SampleFormat::I16 => device.build_output_stream(
+                config,
+                move |data: &mut [i16], _| fill_buffer(data, &state),
+                |e| eprintln!("{e}"),
+                None,
+            ),
+            SampleFormat::I32 => device.build_output_stream(
+                config,
+                move |data: &mut [i32], _| fill_buffer(data, &state),
+                |e| eprintln!("{e}"),
+                None,
+            ),
             _ => anyhow::bail!("Unsupported sample format"),
         }
         .with_context(|| "Failed to build output stream")
@@ -408,30 +396,23 @@ impl Player {
     }
 }
 
-fn fill_buffer_f32(
-    data: &mut [f32],
-    active_audio: &Arc<RwLock<Option<Vec<f32>>>>,
-    next_audio: &Arc<RwLock<Option<Vec<f32>>>>,
-    pos: &Arc<AtomicUsize>,
-    file_index: &Arc<AtomicUsize>,
-    total_files: &Arc<AtomicUsize>,
-    preload_flag: &Arc<AtomicBool>,
-) {
+/// Generic buffer filling function for all sample types
+fn fill_buffer<S: Sample>(data: &mut [S], state: &PlaybackState) {
     let mut written = 0;
 
     while written < data.len() {
         // Try to read from current audio
         {
-            let guard = active_audio.read().unwrap();
+            let guard = state.active_audio.read().unwrap();
             if let Some(ref audio) = *guard {
-                let p = pos.load(Ordering::SeqCst);
+                let p = state.position.load(Ordering::SeqCst);
                 let available = audio.len().saturating_sub(p);
                 let to_write = (data.len() - written).min(available);
 
                 for i in 0..to_write {
-                    data[written + i] = audio[p + i];
+                    data[written + i] = S::from_f32_clamped(audio[p + i]);
                 }
-                pos.fetch_add(to_write, Ordering::SeqCst);
+                state.position.fetch_add(to_write, Ordering::SeqCst);
                 written += to_write;
             }
         }
@@ -442,168 +423,32 @@ fn fill_buffer_f32(
         }
 
         // Current audio exhausted, try to advance
-        let current_idx = file_index.load(Ordering::SeqCst);
-        let total = total_files.load(Ordering::SeqCst);
+        let current_idx = state.file_index.load(Ordering::SeqCst);
+        let total = state.total_files.load(Ordering::SeqCst);
 
         // If we're at the last file, fill remaining with silence
         if current_idx + 1 >= total {
             for out in &mut data[written..] {
-                *out = 0.0;
+                *out = S::silence();
             }
             break;
         }
 
         // Try to swap in next audio
         {
-            let mut active_guard = active_audio.write().unwrap();
-            let mut next_guard = next_audio.write().unwrap();
+            let mut active_guard = state.active_audio.write().unwrap();
+            let mut next_guard = state.next_audio.write().unwrap();
 
             if next_guard.is_some() {
                 *active_guard = next_guard.take();
-                pos.store(0, Ordering::SeqCst);
-                file_index.fetch_add(1, Ordering::SeqCst);
+                state.position.store(0, Ordering::SeqCst);
+                state.file_index.fetch_add(1, Ordering::SeqCst);
                 // Signal that preloading is needed
-                preload_flag.store(true, Ordering::SeqCst);
+                state.preload_flag.store(true, Ordering::SeqCst);
             } else {
                 // Next audio not ready yet, fill with silence
                 for out in &mut data[written..] {
-                    *out = 0.0;
-                }
-                break;
-            }
-        }
-    }
-}
-
-fn fill_buffer_i16(
-    data: &mut [i16],
-    active_audio: &Arc<RwLock<Option<Vec<f32>>>>,
-    next_audio: &Arc<RwLock<Option<Vec<f32>>>>,
-    pos: &Arc<AtomicUsize>,
-    file_index: &Arc<AtomicUsize>,
-    total_files: &Arc<AtomicUsize>,
-    preload_flag: &Arc<AtomicBool>,
-) {
-    let mut written = 0;
-
-    while written < data.len() {
-        // Try to read from current audio
-        {
-            let guard = active_audio.read().unwrap();
-            if let Some(ref audio) = *guard {
-                let p = pos.load(Ordering::SeqCst);
-                let available = audio.len().saturating_sub(p);
-                let to_write = (data.len() - written).min(available);
-
-                for i in 0..to_write {
-                    let s = audio[p + i];
-                    data[written + i] = (s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16;
-                }
-                pos.fetch_add(to_write, Ordering::SeqCst);
-                written += to_write;
-            }
-        }
-
-        // If we've filled the buffer, we're done
-        if written >= data.len() {
-            break;
-        }
-
-        // Current audio exhausted, try to advance
-        let current_idx = file_index.load(Ordering::SeqCst);
-        let total = total_files.load(Ordering::SeqCst);
-
-        // If we're at the last file, fill remaining with silence
-        if current_idx + 1 >= total {
-            for out in &mut data[written..] {
-                *out = 0;
-            }
-            break;
-        }
-
-        // Try to swap in next audio
-        {
-            let mut active_guard = active_audio.write().unwrap();
-            let mut next_guard = next_audio.write().unwrap();
-
-            if next_guard.is_some() {
-                *active_guard = next_guard.take();
-                pos.store(0, Ordering::SeqCst);
-                file_index.fetch_add(1, Ordering::SeqCst);
-                // Signal that preloading is needed
-                preload_flag.store(true, Ordering::SeqCst);
-            } else {
-                // Next audio not ready yet, fill with silence
-                for out in &mut data[written..] {
-                    *out = 0;
-                }
-                break;
-            }
-        }
-    }
-}
-
-fn fill_buffer_i32(
-    data: &mut [i32],
-    active_audio: &Arc<RwLock<Option<Vec<f32>>>>,
-    next_audio: &Arc<RwLock<Option<Vec<f32>>>>,
-    pos: &Arc<AtomicUsize>,
-    file_index: &Arc<AtomicUsize>,
-    total_files: &Arc<AtomicUsize>,
-    preload_flag: &Arc<AtomicBool>,
-) {
-    let mut written = 0;
-
-    while written < data.len() {
-        // Try to read from current audio
-        {
-            let guard = active_audio.read().unwrap();
-            if let Some(ref audio) = *guard {
-                let p = pos.load(Ordering::SeqCst);
-                let available = audio.len().saturating_sub(p);
-                let to_write = (data.len() - written).min(available);
-
-                for i in 0..to_write {
-                    let s = audio[p + i];
-                    data[written + i] = (s.clamp(-1.0, 1.0) * i32::MAX as f32) as i32;
-                }
-                pos.fetch_add(to_write, Ordering::SeqCst);
-                written += to_write;
-            }
-        }
-
-        // If we've filled the buffer, we're done
-        if written >= data.len() {
-            break;
-        }
-
-        // Current audio exhausted, try to advance
-        let current_idx = file_index.load(Ordering::SeqCst);
-        let total = total_files.load(Ordering::SeqCst);
-
-        // If we're at the last file, fill remaining with silence
-        if current_idx + 1 >= total {
-            for out in &mut data[written..] {
-                *out = 0;
-            }
-            break;
-        }
-
-        // Try to swap in next audio
-        {
-            let mut active_guard = active_audio.write().unwrap();
-            let mut next_guard = next_audio.write().unwrap();
-
-            if next_guard.is_some() {
-                *active_guard = next_guard.take();
-                pos.store(0, Ordering::SeqCst);
-                file_index.fetch_add(1, Ordering::SeqCst);
-                // Signal that preloading is needed
-                preload_flag.store(true, Ordering::SeqCst);
-            } else {
-                // Next audio not ready yet, fill with silence
-                for out in &mut data[written..] {
-                    *out = 0;
+                    *out = S::silence();
                 }
                 break;
             }

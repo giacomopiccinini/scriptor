@@ -211,15 +211,16 @@ pub fn play(input: PathBuf) -> Result<()> {
         // Poll for key events (non-blocking with timeout)
         if event::poll(Duration::from_millis(100))?
             && let Event::Key(key) = event::read()?
-                && key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char(' ') => {
-                            player.toggle_playback()?;
-                        }
-                        KeyCode::Enter | KeyCode::Char('q') => break,
-                        _ => {}
-                    }
+            && key.kind == KeyEventKind::Press
+        {
+            match key.code {
+                KeyCode::Char(' ') => {
+                    player.toggle_playback()?;
                 }
+                KeyCode::Enter | KeyCode::Char('q') => break,
+                _ => {}
+            }
+        }
     }
 
     // Restore terminal
