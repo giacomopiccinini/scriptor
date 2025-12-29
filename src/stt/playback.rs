@@ -73,6 +73,25 @@ impl PlayerQueue {
         self.current_file_index.load(Ordering::SeqCst)
     }
 
+    /// Check if playback has finished (all tracks played)
+    pub fn is_finished(&self) -> bool {
+        let current_idx = self.current_file_index.load(Ordering::SeqCst);
+        let position = self.playback_position.load(Ordering::SeqCst);
+
+        let is_last_file = current_idx >= self.files.len().saturating_sub(1);
+
+        let audio_finished = if let Ok(guard) = self.active_audio.read() {
+            match &*guard {
+                Some(audio) => position >= audio.len(),
+                None => true,
+            }
+        } else {
+            false
+        };
+
+        is_last_file && audio_finished
+    }
+
     /// Load current file into active_audio and preload the next one
     pub fn load_current_and_preload(&self) -> Result<()> {
         let idx = self.current_file_index.load(Ordering::SeqCst);
@@ -317,6 +336,15 @@ impl Player {
             self.is_playing = false;
         }
         Ok(())
+    }
+
+    /// Toggle between play and pause
+    pub fn toggle_playback(&mut self) -> Result<()> {
+        if self.is_playing {
+            self.pause()
+        } else {
+            self.play()
+        }
     }
 }
 

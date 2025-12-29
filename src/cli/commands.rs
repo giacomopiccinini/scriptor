@@ -8,14 +8,16 @@ use crate::stt::rec::Recorder;
 use crate::stt::text::create_file_if_not_exists;
 use crate::stt::vad::VADModel;
 use anyhow::{Context, Result};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::style::Stylize;
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use spinoff::{Color, Spinner, Streams, spinners};
-use sqlx::any;
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
+use std::time::Duration;
 use walkdir::WalkDir;
 
 /// Transcribe an existing WAV file
@@ -166,11 +168,11 @@ pub fn play(input: PathBuf) -> Result<()> {
         anyhow::bail!("Input needs to be have .wav file")
     };
 
-    let files: Vec<PathBuf> = if input.is_file() {
+    let mut files: Vec<PathBuf> = if input.is_file() {
         vec![input]
     } else {
         WalkDir::new(input)
-            .max_depth(0)
+            .max_depth(1)
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| e.path().extension().map_or(false, |ext| ext == "wav"))
@@ -178,12 +180,49 @@ pub fn play(input: PathBuf) -> Result<()> {
             .collect()
     };
 
-    if files.len() == 0 {
+    if files.is_empty() {
         anyhow::bail!("No .wav files found")
     };
 
+    // Sort files
+    files.sort();
+
     let mut player = Player::new(Some(files)).with_context(|| "Failed to create player")?;
     player.play().with_context(|| "Failed to play recordings")?;
+
+    eprintln!(
+        "{} {}",
+        "▶ Playing...".green().bold(),
+        "[Space] play/pause | [Enter/q] exit".italic()
+    );
+
+    // Enable raw mode for key capture
+    enable_raw_mode().with_context(|| "Failed to enable raw terminal mode")?;
+
+    loop {
+        // Check if playback finished naturally
+        if player.queue.is_finished() {
+            break;
+        }
+
+        // Poll for key events (non-blocking with timeout)
+        if event::poll(Duration::from_millis(100))? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    match key.code {
+                        KeyCode::Char(' ') => {
+                            player.toggle_playback()?;
+                        }
+                        KeyCode::Enter | KeyCode::Char('q') => break,
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    // Restore terminal
+    disable_raw_mode().with_context(|| "Failed to disable raw terminal mode")?;
 
     Ok(())
 }

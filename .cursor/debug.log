@@ -1,0 +1,11 @@
+{"hypothesisId":"H3","location":"commands.rs:play","message":"input_path","data":{"path":"audiotest/","is_file":false,"is_dir":true},"timestamp":1767014884008}
+{"hypothesisId":"H1","location":"commands.rs:walkdir","message":"walkdir_raw_count","data":{"count":1,"max_depth":0},"timestamp":1767014884008}
+{"hypothesisId":"H1,H2","location":"commands.rs:walkdir_entry","message":"entry","data":{"idx":0,"path":"audiotest/","ext":""},"timestamp":1767014884008}
+{"hypothesisId":"H4","location":"commands.rs:files_result","message":"filtered_files","data":{"count":0},"timestamp":1767014884008}
+{"hypothesisId":"H3","location":"commands.rs:play","message":"input_path","data":{"path":"audiotest/","is_file":false,"is_dir":true},"timestamp":1767014927927}
+{"hypothesisId":"H1","location":"commands.rs:walkdir","message":"walkdir_raw_count","data":{"count":4,"max_depth":1},"timestamp":1767014927927}
+{"hypothesisId":"H1,H2","location":"commands.rs:walkdir_entry","message":"entry","data":{"idx":0,"path":"audiotest/","ext":""},"timestamp":1767014927927}
+{"hypothesisId":"H1,H2","location":"commands.rs:walkdir_entry","message":"entry","data":{"idx":1,"path":"audiotest/2025-12-29@14:09:58_019b6a3a-d32f-774c-946c-440650715160.wav","ext":"wav"},"timestamp":1767014927927}
+{"hypothesisId":"H1,H2","location":"commands.rs:walkdir_entry","message":"entry","data":{"idx":2,"path":"audiotest/2025-12-29@14:09:18_019b6a3a-36a7-78f8-bd03-c5384c9c9e8a.wav","ext":"wav"},"timestamp":1767014927927}
+{"hypothesisId":"H1,H2","location":"commands.rs:walkdir_entry","message":"entry","data":{"idx":3,"path":"audiotest/2025-12-29@14:09:38_019b6a3a-84fe-76ad-b0e0-46b16999b361.wav","ext":"wav"},"timestamp":1767014927927}
+{"hypothesisId":"H4","location":"commands.rs:files_result","message":"filtered_files","data":{"count":3},"timestamp":1767014927927}
