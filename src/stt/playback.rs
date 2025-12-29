@@ -165,7 +165,7 @@ impl PlayerQueue {
 
     /// Load audio file and prepare it for queue matching the output sr and n channels.
     /// Bit depth will be handled when building the stream
-    pub fn load_file(path: &PathBuf, output_config: &WavSpec) -> Result<Vec<f32>> {
+    pub fn load_file(path: &Path, output_config: &WavSpec) -> Result<Vec<f32>> {
         // Load audio file as is
         let (mut samples, wav_config) =
             read_audio(path).with_context(|| "Unable to read audio file")?;

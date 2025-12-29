@@ -164,7 +164,7 @@ pub fn play(input: PathBuf) -> Result<()> {
     if !input.exists() {
         anyhow::bail!("Input path does not exist")
     };
-    if input.is_file() && !input.extension().is_some_and(|ext| ext == "wav") {
+    if input.is_file() && input.extension().is_none_or(|ext| ext != "wav") {
         anyhow::bail!("Input needs to be have .wav file")
     };
 
