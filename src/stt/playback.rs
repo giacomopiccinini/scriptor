@@ -4,7 +4,7 @@ use crate::stt::audio::{
 use anyhow::{Context, Result};
 use cpal::Stream;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, SampleFormat, StreamConfig, SupportedStreamConfig};
+use cpal::{Device, SampleFormat, SupportedStreamConfig};
 use hound::WavSpec;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -33,22 +33,24 @@ pub struct PlayerQueue {
 
 impl PlayerQueue {
     /// Create a queue, possibly with files
-    pub fn new(output_config: WavSpec, audio_files: Option<Vec<PathBuf>>) -> Self {
-        // The files are either a list of files (pathbufs) or an empty vector
-        let files = if let Some(audio_files) = audio_files {
-            audio_files
-        } else {
-            Vec::new()
-        };
+    pub fn new(output_config: WavSpec, audio_files: Option<Vec<PathBuf>>) -> Result<Self> {
+        let files = audio_files.unwrap_or_default();
 
-        Self {
-            files: files,
-            output_config: output_config,
+        let queue = Self {
+            files,
+            output_config,
             current_file_index: AtomicUsize::new(0),
             active_audio: Arc::new(RwLock::new(None)),
             next_audio: Arc::new(RwLock::new(None)),
             playback_position: Arc::new(AtomicUsize::new(0)),
+        };
+
+        // If we have files, load the first one and preload next
+        if !queue.files.is_empty() {
+            queue.load_current_and_preload()?;
         }
+
+        Ok(queue)
     }
 
     /// Add a file to the queue
@@ -69,6 +71,19 @@ impl PlayerQueue {
     /// Get current audio file index
     pub fn current(&self) -> usize {
         self.current_file_index.load(Ordering::SeqCst)
+    }
+
+    /// Load current file into active_audio and preload the next one
+    pub fn load_current_and_preload(&self) -> Result<()> {
+        let idx = self.current_file_index.load(Ordering::SeqCst);
+        let audio = Self::load_file(&self.files[idx], &self.output_config)
+            .with_context(|| "Unable to load current audio file")?;
+        *self
+            .active_audio
+            .write()
+            .map_err(|_| anyhow::anyhow!("Audio lock poisoned"))? = Some(audio);
+        self.preload_next()?;
+        Ok(())
     }
 
     /// Load audio file and prepare it for queue matching the output sr and n channels.
@@ -107,27 +122,9 @@ impl PlayerQueue {
         if index >= self.files.len() {
             anyhow::bail!("Audio file index for playback out of bounds");
         }
-
-        // Adjust the current file index
         self.current_file_index.store(index, Ordering::SeqCst);
-
-        // Load the selected audio file
-        let audio = Self::load_file(&self.files[index], &self.output_config)
-            .with_context(|| "Unable to load audio file after jump")?;
-
-        // Update the active audio
-        *self
-            .active_audio
-            .write()
-            .map_err(|_| anyhow::anyhow!("Audio lock poisoned"))? = Some(audio);
-
-        // Set the playback position back to zero
         self.playback_position.store(0, Ordering::SeqCst);
-
-        // Preload next track (spawn to avoid blocking)
-        self.preload_next();
-
-        Ok(())
+        self.load_current_and_preload()
     }
 
     /// Preload the next audio file in background
@@ -239,21 +236,29 @@ impl Player {
         // Call construct for player config
         let config = PlayerConfig::new().with_context(|| "Unable to create player config")?;
 
-        // Create the queue
-        let queue = PlayerQueue::new(config.wav_config, audio_files);
+        // Create the queue (will auto-load files if provided)
+        let queue = PlayerQueue::new(config.wav_config, audio_files)
+            .with_context(|| "Unable to create player queue")?;
 
-        // If we have files in the queue, we can set up the stream
-        let stream = if queue.len() > 0 {
-        } else {
-            None
-        };
-
-        Ok(Self {
-            stream,
+        // Create player first with no stream
+        let mut player = Self {
+            stream: None,
             config,
             queue,
             is_playing: false,
-        })
+        };
+
+        // Set up stream if we have files loaded
+        if !player.queue.is_empty() {
+            let stream = player.setup_output_stream(
+                player.config.output_config.sample_format(),
+                player.queue.active_audio.clone(),
+                player.queue.playback_position.clone(),
+            )?;
+            player.stream = Some(stream);
+        }
+
+        Ok(player)
     }
 
     pub fn setup_output_stream(
@@ -264,7 +269,7 @@ impl Player {
     ) -> Result<cpal::Stream> {
         match sample_format {
             SampleFormat::F32 => self.config.output_device.build_output_stream(
-                &self.config.output_config,
+                &self.config.output_config.config(),
                 move |data: &mut [f32], _| {
                     fill_buffer_f32(data, &samples, &position);
                 },
@@ -272,7 +277,7 @@ impl Player {
                 None,
             ),
             SampleFormat::I16 => self.config.output_device.build_output_stream(
-                &self.config.output_config,
+                &self.config.output_config.config(),
                 move |data: &mut [i16], _| {
                     fill_buffer_i16(data, &samples, &position);
                 },
@@ -280,7 +285,7 @@ impl Player {
                 None,
             ),
             SampleFormat::I32 => self.config.output_device.build_output_stream(
-                &self.config.output_config,
+                &self.config.output_config.config(),
                 move |data: &mut [i32], _| {
                     fill_buffer_i32(data, &samples, &position);
                 },
@@ -292,13 +297,27 @@ impl Player {
         .with_context(|| "Failed to build output stream")
     }
 
-    // /// Start player
-    // pub fn play(&self) -> Result<()> {
-    //     self.stream
-    //         .play()
-    //         .with_context(|| "Unable to start the stream")?;
-    //     Ok(())
-    // }
+    /// Start playback
+    pub fn play(&mut self) -> Result<()> {
+        if let Some(ref stream) = self.stream {
+            stream
+                .play()
+                .with_context(|| "Unable to start the stream")?;
+            self.is_playing = true;
+        }
+        Ok(())
+    }
+
+    /// Pause playback (keeps current position)
+    pub fn pause(&mut self) -> Result<()> {
+        if let Some(ref stream) = self.stream {
+            stream
+                .pause()
+                .with_context(|| "Unable to pause the stream")?;
+            self.is_playing = false;
+        }
+        Ok(())
+    }
 }
 
 fn fill_buffer_f32(

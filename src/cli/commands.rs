@@ -1,6 +1,7 @@
 use crate::configs::scriptor::ScriptorConfig;
 use crate::stt::fractor::Fractor;
 use crate::stt::model::STTModel;
+use crate::stt::playback::Player;
 use crate::stt::queue::FragmentumToTranscribe;
 use crate::stt::queue::{transcriber_to_file_worker, transcriber_to_stdout_worker};
 use crate::stt::rec::Recorder;
@@ -9,11 +10,13 @@ use crate::stt::vad::VADModel;
 use anyhow::{Context, Result};
 use crossterm::style::Stylize;
 use spinoff::{Color, Spinner, Streams, spinners};
+use sqlx::any;
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
+use walkdir::WalkDir;
 
 /// Transcribe an existing WAV file
 pub fn transcribe_from_file(file: &Path) -> Result<()> {
@@ -150,6 +153,37 @@ pub fn record_and_transcribe(
             )
         })?;
     }
+
+    Ok(())
+}
+
+/// Play single wav file or directory containing wav files
+pub fn play(input: PathBuf) -> Result<()> {
+    if !input.exists() {
+        anyhow::bail!("Input path does not exist")
+    };
+    if input.is_file() && !input.extension().map_or(false, |ext| ext == "wav") {
+        anyhow::bail!("Input needs to be have .wav file")
+    };
+
+    let files: Vec<PathBuf> = if input.is_file() {
+        vec![input]
+    } else {
+        WalkDir::new(input)
+            .max_depth(0)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map_or(false, |ext| ext == "wav"))
+            .map(|e| e.path().to_path_buf())
+            .collect()
+    };
+
+    if files.len() == 0 {
+        anyhow::bail!("No .wav files found")
+    };
+
+    let mut player = Player::new(Some(files)).with_context(|| "Failed to create player")?;
+    player.play().with_context(|| "Failed to play recordings")?;
 
     Ok(())
 }

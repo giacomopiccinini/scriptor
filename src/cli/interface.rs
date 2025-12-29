@@ -1,4 +1,4 @@
-use crate::cli::commands::{record_and_transcribe, transcribe_from_file};
+use crate::cli::commands::{play, record_and_transcribe, transcribe_from_file};
 use crate::tui::entrypoint::run_tui;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -12,14 +12,6 @@ pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
-
-// /// Swiss-army knife for media inspection and manipulation
-// #[derive(Debug, Parser)]
-// #[clap(name = "rush", version)]
-// pub struct App {
-//     #[clap(subcommand)]
-//     command: Command,
-// }
 
 #[derive(Subcommand)]
 pub enum Commands {
@@ -38,6 +30,12 @@ pub enum Commands {
         #[arg(short)]
         audio_dir: Option<PathBuf>,
     },
+    /// Record & transcribe
+    Play {
+        /// Path to .wav file or directory with .wav files
+        #[arg(required = true)]
+        input: PathBuf,
+    },
 }
 
 pub fn run_cli() -> Result<()> {
@@ -50,6 +48,7 @@ pub fn run_cli() -> Result<()> {
             transcription_file,
             audio_dir,
         }) => record_and_transcribe(transcription_file, audio_dir),
+        Some(Commands::Play { input }) => play(input),
         None => run_tui().map_err(|e| anyhow::anyhow!("{}", e)),
     }
 }
