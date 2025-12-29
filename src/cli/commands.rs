@@ -201,9 +201,12 @@ pub fn play(input: PathBuf) -> Result<()> {
 
     loop {
         // Check if playback finished naturally
-        if player.queue.is_finished() {
+        if player.queue.is_queue_finished() {
             break;
         }
+
+        // Trigger preloading of next file if needed
+        player.check_and_preload()?;
 
         // Poll for key events (non-blocking with timeout)
         if event::poll(Duration::from_millis(100))? {
