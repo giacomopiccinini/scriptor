@@ -173,7 +173,7 @@ impl PlayerQueue {
         // Clone needed objects because we'll need to pass them to a new thread which will take ownership
         let next_file_path = self.files[next_idx].clone();
         let next_audio = self.next_audio.clone();
-        let output_config = self.output_config.clone();
+        let output_config = self.output_config;
 
         // Spawn loading on a separate thread
         std::thread::spawn(move || {

@@ -164,7 +164,7 @@ pub fn play(input: PathBuf) -> Result<()> {
     if !input.exists() {
         anyhow::bail!("Input path does not exist")
     };
-    if input.is_file() && !input.extension().map_or(false, |ext| ext == "wav") {
+    if input.is_file() && !input.extension().is_some_and(|ext| ext == "wav") {
         anyhow::bail!("Input needs to be have .wav file")
     };
 
@@ -175,7 +175,7 @@ pub fn play(input: PathBuf) -> Result<()> {
             .max_depth(1)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map_or(false, |ext| ext == "wav"))
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "wav"))
             .map(|e| e.path().to_path_buf())
             .collect()
     };
@@ -209,9 +209,9 @@ pub fn play(input: PathBuf) -> Result<()> {
         player.check_and_preload()?;
 
         // Poll for key events (non-blocking with timeout)
-        if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
+        if event::poll(Duration::from_millis(100))?
+            && let Event::Key(key) = event::read()?
+                && key.kind == KeyEventKind::Press {
                     match key.code {
                         KeyCode::Char(' ') => {
                             player.toggle_playback()?;
@@ -220,8 +220,6 @@ pub fn play(input: PathBuf) -> Result<()> {
                         _ => {}
                     }
                 }
-            }
-        }
     }
 
     // Restore terminal

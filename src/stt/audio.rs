@@ -140,7 +140,7 @@ pub fn resample_stereo(
     let n_frames = samples.len() / n_channels;
 
     // Deinterleave into separate channel vectors
-    let mut channels: Vec<Vec<f32>> = (0..n_channels)
+    let channels: Vec<Vec<f32>> = (0..n_channels)
         .map(|ch| {
             samples
                 .iter()
