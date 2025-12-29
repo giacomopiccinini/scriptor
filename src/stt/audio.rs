@@ -222,8 +222,9 @@ pub fn write_wav(samples: Vec<f32>, wav_spec: hound::WavSpec, output_path: &Path
     let mut writer = WavWriter::create(output_path, wav_spec)
         .with_context(|| format!("Couldn't write wav to {:?}", output_path))?;
 
-    // Write to file
+    // Write to file (clamp samples to -1.0 to 1.0 to prevent clipping distortion)
     samples.iter().try_for_each(|&sample| {
+        let sample = sample.clamp(-1.0, 1.0);
         match wav_spec.sample_format {
             SampleFormat::Float => {
                 writer.write_sample(sample)?; // Write f32 directly

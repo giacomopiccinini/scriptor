@@ -9,3 +9,9 @@
 {"hypothesisId":"H1,H2","location":"commands.rs:walkdir_entry","message":"entry","data":{"idx":2,"path":"audiotest/2025-12-29@14:09:18_019b6a3a-36a7-78f8-bd03-c5384c9c9e8a.wav","ext":"wav"},"timestamp":1767014927927}
 {"hypothesisId":"H1,H2","location":"commands.rs:walkdir_entry","message":"entry","data":{"idx":3,"path":"audiotest/2025-12-29@14:09:38_019b6a3a-84fe-76ad-b0e0-46b16999b361.wav","ext":"wav"},"timestamp":1767014927927}
 {"hypothesisId":"H4","location":"commands.rs:files_result","message":"filtered_files","data":{"count":3},"timestamp":1767014927927}
+{"hypothesisId":"H1,H3","location":"rec.rs:RecorderConfig","message":"device_config","data":{"sample_format":"F32","sample_size":4,"channels":2,"sample_rate":44100},"timestamp":1767015566734}
+{"hypothesisId":"H1,H2,H3","location":"audio.rs:write_wav","message":"wav_spec_and_samples","data":{"format":"Float","bits":32,"channels":2,"sample_rate":44100,"sample_count":500448,"sample_min":-2.1616755,"sample_max":1.9318923},"timestamp":1767015572477}
+{"hypothesisId":"H4","location":"audio.rs:write_wav","message":"max_value","data":{"max_value":2147483648},"timestamp":1767015572477}
+{"hypothesisId":"H1,H3","location":"rec.rs:RecorderConfig","message":"device_config","data":{"sample_format":"F32","sample_size":4,"channels":2,"sample_rate":44100},"timestamp":1767015652518}
+{"hypothesisId":"H1,H2,H3","location":"audio.rs:write_wav","message":"wav_spec_and_samples","data":{"format":"Float","bits":32,"channels":2,"sample_rate":44100,"sample_count":357446,"sample_min":-1.9664052,"sample_max":1.9369267},"timestamp":1767015656648}
+{"hypothesisId":"H4","location":"audio.rs:write_wav","message":"max_value","data":{"max_value":2147483648},"timestamp":1767015656648}
