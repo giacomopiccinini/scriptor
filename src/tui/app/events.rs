@@ -474,15 +474,12 @@ impl EventHandler {
                 std::thread::sleep(std::time::Duration::from_millis(100));
 
                 // Refresh the folio's fragmenta from DB
-                if let Some(selected_codex) = app.codices_component.get_selected_codex_mut() {
-                    if let Some(folio_idx) = selected_codex.folio_state.selected() {
-                        if let Some(selected_folio) = selected_codex.folia.get_mut(folio_idx) {
-                            if let Err(e) = selected_folio.update_fragmenta(&app.pool).await {
+                if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
+                    && let Some(folio_idx) = selected_codex.folio_state.selected()
+                        && let Some(selected_folio) = selected_codex.folia.get_mut(folio_idx)
+                            && let Err(e) = selected_folio.update_fragmenta(&app.pool).await {
                                 eprintln!("Failed to refresh fragmenta: {}", e);
                             }
-                        }
-                    }
-                }
 
                 // Reinitialize STT tools for next recording
                 if let Err(e) = app.stt_tools.reinitialize(&app.config) {

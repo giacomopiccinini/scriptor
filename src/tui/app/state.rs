@@ -222,23 +222,19 @@ impl App {
             };
 
             // Poll for events with timeout
-            if event::poll(poll_timeout)? {
-                if let Some(key) = event::read()?.as_key_press_event() {
+            if event::poll(poll_timeout)?
+                && let Some(key) = event::read()?.as_key_press_event() {
                     self.handle_key_event(key).await;
                 }
-            }
 
             // Periodic refresh of fragmenta during recording
-            if self.is_recording {
-                if let Some(selected_codex) = self.codices_component.get_selected_codex_mut() {
-                    if let Some(folio_idx) = selected_codex.folio_state.selected() {
-                        if let Some(selected_folio) = selected_codex.folia.get_mut(folio_idx) {
+            if self.is_recording
+                && let Some(selected_codex) = self.codices_component.get_selected_codex_mut()
+                    && let Some(folio_idx) = selected_codex.folio_state.selected()
+                        && let Some(selected_folio) = selected_codex.folia.get_mut(folio_idx) {
                             // Refresh fragmenta from DB (ignore errors during recording)
                             let _ = selected_folio.update_fragmenta(&self.pool).await;
                         }
-                    }
-                }
-            }
         }
         Ok(())
     }
