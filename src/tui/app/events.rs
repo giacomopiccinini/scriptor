@@ -1,8 +1,12 @@
+use crate::stt::queue::{create_fragmentum_channel, transcriber_to_db_worker};
 use crate::tui::app::state::{App, CurrentRegion, CurrentScreen};
+use crate::tui::db::models::{Folio, NewFolio};
 use crate::tui::ui::components::{CodicesComponent, FoliaComponent, FragmentaComponent};
 use crate::tui::ui::cursor::CursorState;
 use arboard::{Clipboard, SetExtLinux};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 pub struct EventHandler;
 
@@ -188,10 +192,83 @@ impl EventHandler {
                 CurrentRegion::Fragmentum => {}
             },
 
-            // Start recording (placeholder)
+            // Start recording
             (KeyCode::Char('r'), KeyModifiers::NONE) => {
-                // TODO: Implement recording functionality
-                eprintln!("Recording not yet implemented");
+                // Need a codex selected to add the recording to
+                if let Some(selected_codex) = app.codices_component.get_selected_codex_mut() {
+                    // Create new folio with datetime name
+                    let folio_name = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+                    let new_folio = NewFolio {
+                        codex_id: selected_codex.codex.id,
+                        name: folio_name,
+                    };
+
+                    // Create folio in DB
+                    match Folio::create(&app.pool, new_folio).await {
+                        Ok(folio) => {
+                            let folio_id = folio.id;
+
+                            // Take ownership of fractor and stt_model for threads
+                            if let (Some(fractor), Some(stt_model)) =
+                                (app.stt_tools.fractor.take(), app.stt_tools.stt_model.take())
+                            {
+                                // Create stop and pause signals
+                                let stop_signal = Arc::new(AtomicBool::new(false));
+                                let pause_signal = Arc::new(AtomicBool::new(false));
+
+                                // Store signals in app state
+                                app.recording_stop_signal = Some(Arc::clone(&stop_signal));
+                                app.recording_pause_signal = Some(Arc::clone(&pause_signal));
+                                app.recording_folio_id = Some(folio_id);
+
+                                // Create channel for fragmenta
+                                let (tx, rx) =
+                                    create_fragmentum_channel(app.stt_tools.max_queue_elements);
+
+                                // Clone pool for transcriber thread
+                                let pool_clone = app.pool.clone();
+
+                                // Spawn fractor thread
+                                std::thread::spawn(move || {
+                                    if let Err(e) = fractor.run(None, stop_signal, pause_signal, tx)
+                                    {
+                                        eprintln!("Fractor error: {}", e);
+                                    }
+                                });
+
+                                // Spawn transcriber thread
+                                std::thread::spawn(move || {
+                                    if let Err(e) = transcriber_to_db_worker(
+                                        stt_model, folio_id, pool_clone, rx,
+                                    ) {
+                                        eprintln!("Transcriber error: {}", e);
+                                    }
+                                });
+
+                                // Update UI state
+                                app.is_recording = true;
+                                app.is_paused = false;
+
+                                // Refresh folia to include the new one
+                                if let Err(e) = selected_codex.update_folia(&app.pool).await {
+                                    eprintln!("Failed to update folia: {}", e);
+                                }
+
+                                // Select the newly created folio
+                                let folio_count = selected_codex.folia.len();
+                                if folio_count > 0 {
+                                    selected_codex.folio_state.select(Some(folio_count - 1));
+                                }
+
+                                // Switch to recording screen
+                                app.current_screen = CurrentScreen::RecordFolio;
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to create folio for recording: {}", e);
+                        }
+                    }
+                }
             }
 
             // Copy single fragmentum to clipboard
@@ -369,6 +446,60 @@ impl EventHandler {
                     }
                 }
             }
+            _ => {}
+        }
+    }
+
+    /// Handle key press from user in recording screen
+    pub async fn handle_record_folio_screen_key(app: &mut App, key: KeyEvent) {
+        match key.code {
+            // Toggle pause/resume
+            KeyCode::Char(' ') => {
+                if let Some(pause_signal) = &app.recording_pause_signal {
+                    let currently_paused = pause_signal.load(Ordering::Relaxed);
+                    pause_signal.store(!currently_paused, Ordering::Relaxed);
+                    app.is_paused = !currently_paused;
+                }
+            }
+
+            // Stop recording and return to main screen
+            KeyCode::Esc => {
+                // Signal fractor to stop
+                if let Some(stop_signal) = &app.recording_stop_signal {
+                    stop_signal.store(true, Ordering::Relaxed);
+                }
+
+                // Wait a bit for threads to finish processing
+                // (In production you might want to join the threads properly)
+                std::thread::sleep(std::time::Duration::from_millis(100));
+
+                // Refresh the folio's fragmenta from DB
+                if let Some(selected_codex) = app.codices_component.get_selected_codex_mut() {
+                    if let Some(folio_idx) = selected_codex.folio_state.selected() {
+                        if let Some(selected_folio) = selected_codex.folia.get_mut(folio_idx) {
+                            if let Err(e) = selected_folio.update_fragmenta(&app.pool).await {
+                                eprintln!("Failed to refresh fragmenta: {}", e);
+                            }
+                        }
+                    }
+                }
+
+                // Reinitialize STT tools for next recording
+                if let Err(e) = app.stt_tools.reinitialize(&app.config) {
+                    eprintln!("Failed to reinitialize STT tools: {}", e);
+                }
+
+                // Clear recording state
+                app.recording_stop_signal = None;
+                app.recording_pause_signal = None;
+                app.recording_folio_id = None;
+                app.is_recording = false;
+                app.is_paused = false;
+
+                // Return to main screen
+                app.current_screen = CurrentScreen::Main;
+            }
+
             _ => {}
         }
     }

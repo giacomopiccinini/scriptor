@@ -125,6 +125,49 @@ impl Fractor {
         self.recorder.is_recording = false;
     }
 
+    /// Flush the current buffer contents to a fragmentum and send for transcription
+    fn flush_current_buffer(
+        &mut self,
+        output_dir: &PathBuf,
+        tx: &SyncSender<FragmentumToTranscribe>,
+    ) -> Result<()> {
+        // Drain any remaining samples from the ring buffer into fragmentum_buffer
+        let remaining_in_ring = self.recorder.consumer.occupied_len();
+        if remaining_in_ring > 0 {
+            let mut drain_buffer = vec![0.0f32; remaining_in_ring];
+            let drained = self.recorder.consumer.pop_slice(&mut drain_buffer);
+            self.state
+                .fragmentum_buffer
+                .extend_from_slice(&drain_buffer[..drained]);
+        }
+
+        // Save and send the fragmentum if there's any content
+        if !self.state.fragmentum_buffer.is_empty() {
+            let samples_to_process = std::mem::take(&mut self.state.fragmentum_buffer);
+
+            // Save fragmentum
+            let fragmentum_path = self
+                .save_fragmentum(samples_to_process, self.state.start_datetime, output_dir)
+                .with_context(|| "Failed to save recording during flush")?;
+
+            // Create queue element
+            let fragmentum_queue_element = FragmentumToTranscribe {
+                path: fragmentum_path,
+                start_datetime: self.state.start_datetime,
+            };
+
+            // Add to queue
+            tx.send(fragmentum_queue_element)
+                .with_context(|| "Failed to send fragment to transcription queue during flush")?;
+
+            // Reset states for next fragmentum
+            self.state.reset();
+            self.vad.reset();
+        }
+
+        Ok(())
+    }
+
     /// Save fragmentum to audio file
     fn save_fragmentum(
         &self,
@@ -163,6 +206,7 @@ impl Fractor {
         mut self,
         output_dir: Option<PathBuf>,
         stop_signal: Arc<AtomicBool>,
+        pause_signal: Arc<AtomicBool>,
         tx: SyncSender<FragmentumToTranscribe>,
     ) -> Result<Option<PathBuf>> {
         // Change status of recorder
@@ -176,7 +220,35 @@ impl Fractor {
             (std::env::temp_dir().join("scriptor_audio"), true)
         };
 
+        // Track if we're currently paused
+        let mut is_paused = false;
+
         while self.recorder.is_recording && !stop_signal.load(Ordering::Relaxed) {
+            // Check for pause signal
+            let should_pause = pause_signal.load(Ordering::Relaxed);
+
+            if should_pause && !is_paused {
+                // Entering pause state: flush buffer and pause stream
+                self.flush_current_buffer(&output_dir, &tx)?;
+                self.recorder
+                    .pause()
+                    .with_context(|| "Failed to pause stream")?;
+                self.recorder.clear_buffer();
+                is_paused = true;
+                continue;
+            } else if !should_pause && is_paused {
+                // Exiting pause state: resume stream
+                self.recorder
+                    .play()
+                    .with_context(|| "Failed to resume stream")?;
+                is_paused = false;
+                continue;
+            } else if is_paused {
+                // Still paused, sleep briefly to avoid busy-waiting
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                continue;
+            }
+
             // Read available samples in small batches
             let available_samples_in_buffer = self.recorder.consumer.occupied_len();
 
@@ -273,35 +345,8 @@ impl Fractor {
             }
         }
 
-        // Drain any remaining samples from the ring buffer into fragmentum_buffer
-        let remaining_in_ring = self.recorder.consumer.occupied_len();
-        if remaining_in_ring > 0 {
-            let mut drain_buffer = vec![0.0f32; remaining_in_ring];
-            let drained = self.recorder.consumer.pop_slice(&mut drain_buffer);
-            self.state
-                .fragmentum_buffer
-                .extend_from_slice(&drain_buffer[..drained]);
-        }
-
-        // Save and send the final fragmentum if there's any content
-        if !self.state.fragmentum_buffer.is_empty() {
-            let samples_to_process = std::mem::take(&mut self.state.fragmentum_buffer);
-
-            // Save fragmentum
-            let fragmentum_path = self
-                .save_fragmentum(samples_to_process, self.state.start_datetime, &output_dir)
-                .with_context(|| "Failed to save final recording")?;
-
-            // Create queue element
-            let fragmentum_queue_element = FragmentumToTranscribe {
-                path: fragmentum_path,
-                start_datetime: self.state.start_datetime,
-            };
-
-            // Add to queue
-            tx.send(fragmentum_queue_element)
-                .with_context(|| "Failed to send final fragment to transcription queue")?;
-        }
+        // Flush any remaining buffer content before stopping
+        self.flush_current_buffer(&output_dir, &tx)?;
 
         // Stop the recording
         self.stop_recording();

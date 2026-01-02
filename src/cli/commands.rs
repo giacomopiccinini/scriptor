@@ -102,6 +102,9 @@ pub fn record_and_transcribe(
     let stop_signal = Arc::new(AtomicBool::new(false));
     let stop_signal_clone = Arc::clone(&stop_signal);
 
+    // Create pause signal (always false for CLI - pause is TUI-only)
+    let pause_signal = Arc::new(AtomicBool::new(false));
+
     // Create queue
     let (tx, rx) = std::sync::mpsc::sync_channel::<FragmentumToTranscribe>(
         config.default.queue.max_queue_elements,
@@ -116,7 +119,8 @@ pub fn record_and_transcribe(
     );
 
     // Run fractor in a separate thread
-    let fractor_handle = thread::spawn(move || fractor.run(audio_dir, stop_signal_clone, tx));
+    let fractor_handle =
+        thread::spawn(move || fractor.run(audio_dir, stop_signal_clone, pause_signal, tx));
     let transcriber_handle = thread::spawn(move || {
         if let Some(transcription_file) = transcription_file {
             transcriber_to_file_worker(stt_model, transcription_file, rx)

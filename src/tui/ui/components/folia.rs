@@ -50,11 +50,14 @@ impl FoliaComponent {
             anyhow::bail!("Folio is not a path to a wav file")
         };
 
-        // Load audio
-        let audio_samples = stt_tools.stt_model.load_audio(&folio_path)?;
+        // Load audio (requires STT model to be available)
+        let stt_model = stt_tools.stt_model.as_mut().ok_or_else(|| {
+            anyhow::anyhow!("STT model not available - recording may be in progress")
+        })?;
+        let audio_samples = stt_model.load_audio(&folio_path)?;
 
         // Transcribe
-        let transcription = stt_tools.stt_model.transcribe(audio_samples)?;
+        let transcription = stt_model.transcribe(audio_samples)?;
 
         // Split the transcription in chunks (fragmenta) of 500 chars
         let fragmenta = transcription.split_text(500);

@@ -6,7 +6,7 @@ use cpal::{Device, SupportedStreamConfig};
 use hound::WavSpec;
 use ringbuf::{
     HeapCons, HeapProd, HeapRb,
-    traits::{Producer, Split},
+    traits::{Consumer, Observer, Producer, Split},
 };
 
 pub struct Recorder {
@@ -77,6 +77,23 @@ impl Recorder {
             .play()
             .with_context(|| "Unable to start the stream")?;
         Ok(())
+    }
+
+    /// Pause recording
+    pub fn pause(&self) -> Result<()> {
+        self.stream
+            .pause()
+            .with_context(|| "Unable to pause the stream")?;
+        Ok(())
+    }
+
+    /// Clear any remaining samples from the ring buffer
+    pub fn clear_buffer(&mut self) {
+        // Drain all samples from the consumer
+        while self.consumer.occupied_len() > 0 {
+            let mut discard = vec![0.0f32; self.consumer.occupied_len().min(1024)];
+            self.consumer.pop_slice(&mut discard);
+        }
     }
 }
 

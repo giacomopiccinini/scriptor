@@ -3,14 +3,13 @@ use crate::configs::scriptor::ScriptorConfig;
 use crate::stt::fractor::Fractor;
 use crate::stt::model::STTModel;
 use crate::stt::playback::Player;
-use crate::stt::queue::FragmentumQueue;
 use crate::stt::rec::Recorder;
 use crate::stt::vad::VADModel;
 use crate::tui::app::events::EventHandler;
 use crate::tui::db::connections::init_db;
 use crate::tui::ui::components::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, CodicesComponent,
-    FragmentaComponent, InputState, ModifyCodexPopUp, ModifyFolioPopUp,
+    FragmentaComponent, InputState, ModifyCodexPopUp, ModifyFolioPopUp, RecordingScreen,
 };
 use crate::tui::ui::cursor::CursorState;
 use crate::tui::ui::layout::AppLayout;
@@ -23,6 +22,8 @@ use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
 use spinoff::{Color, Spinner, Streams, spinners};
 use sqlx::SqlitePool;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 /// Enum representing the different screens in the application
 #[derive(Debug, Clone, PartialEq)]
@@ -56,10 +57,11 @@ pub enum CurrentRegion {
 pub struct STTTools {
     // pub recorder: Recorder,
     // pub vad_model: VADModel,
-    pub fractor: Fractor,
-    pub queue: FragmentumQueue,
-    pub stt_model: STTModel,
+    pub fractor: Option<Fractor>,
+    pub stt_model: Option<STTModel>,
     pub player: Player,
+    /// Max queue elements for fragmentum channel
+    pub max_queue_elements: usize,
 }
 
 /// Main application state
@@ -78,12 +80,20 @@ pub struct App {
     pub codices_component: CodicesComponent,
     /// State of user-provided input
     pub input_state: InputState,
-    /// Flag to signal if user is recordinng
+    /// Flag to signal if user is recording
     pub is_recording: bool,
+    /// Flag to signal if recording is paused
+    pub is_paused: bool,
     /// Flag to signal if inference is running
     pub is_transcribing: bool,
     /// Selected archivum index for Archivum selector
     pub selected_archivum_index: usize,
+    /// ID of the folio being recorded to (when recording)
+    pub recording_folio_id: Option<i64>,
+    /// Stop signal for the recording thread
+    pub recording_stop_signal: Option<Arc<AtomicBool>>,
+    /// Pause signal for the recording thread
+    pub recording_pause_signal: Option<Arc<AtomicBool>>,
     /// Flag to indicate if the application should exit
     pub exit: bool,
 }
@@ -92,9 +102,6 @@ impl STTTools {
     pub fn new(config: &ScriptorConfig) -> anyhow::Result<Self> {
         // Load STT model
         let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
-
-        // Init queue of fragmenta
-        let queue = FragmentumQueue::new(config.default.queue.max_queue_elements);
 
         // Create recorder with max fragmentum duration from config
         let recorder = Recorder::new(config.default.fractor.max_fragmentum_duration_seconds)
@@ -111,11 +118,33 @@ impl STTTools {
         let player = Player::new(None).with_context(|| "Unable to setup player")?;
 
         Ok(Self {
-            fractor,
-            queue,
-            stt_model,
+            fractor: Some(fractor),
+            stt_model: Some(stt_model),
             player,
+            max_queue_elements: config.default.queue.max_queue_elements,
         })
+    }
+
+    /// Recreate the fractor and STT model (needed after recording completes)
+    pub fn reinitialize(&mut self, config: &ScriptorConfig) -> anyhow::Result<()> {
+        // Load STT model
+        let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
+
+        // Create recorder with max fragmentum duration from config
+        let recorder = Recorder::new(config.default.fractor.max_fragmentum_duration_seconds)
+            .with_context(|| "Failed to create recorder")?;
+
+        // Create VAD model
+        let vad_model = VADModel::new(&config.default.vad, config.default.inference.clone())
+            .with_context(|| "Failed to create voice activity detector")?;
+
+        // Create fractor
+        let fractor = Fractor::new(recorder, vad_model);
+
+        self.fractor = Some(fractor);
+        self.stt_model = Some(stt_model);
+
+        Ok(())
     }
 }
 
@@ -164,8 +193,12 @@ impl App {
             codices_component,
             input_state: InputState::new(),
             is_recording: false,
+            is_paused: false,
             is_transcribing: false,
             selected_archivum_index: 0,
+            recording_folio_id: None,
+            recording_stop_signal: None,
+            recording_pause_signal: None,
             exit: false,
         }
     }
@@ -175,13 +208,36 @@ impl App {
     /// Main event loop that handles terminal drawing and user input.
     /// Continues until the user exits the application.
     pub async fn run(mut self, terminal: &mut DefaultTerminal) -> Result<()> {
+        use std::time::Duration;
+
         while !self.exit {
             // Draw the current state of the application
             terminal.draw(|frame| frame.render_widget(&mut self, frame.area()))?;
 
-            // Handle keyboard input based on current screen
-            if let Some(key) = event::read()?.as_key_press_event() {
-                self.handle_key_event(key).await;
+            // Use non-blocking poll when recording to allow periodic DB refresh
+            let poll_timeout = if self.is_recording {
+                Duration::from_millis(500) // Refresh every 500ms during recording
+            } else {
+                Duration::from_secs(60) // Longer timeout when not recording
+            };
+
+            // Poll for events with timeout
+            if event::poll(poll_timeout)? {
+                if let Some(key) = event::read()?.as_key_press_event() {
+                    self.handle_key_event(key).await;
+                }
+            }
+
+            // Periodic refresh of fragmenta during recording
+            if self.is_recording {
+                if let Some(selected_codex) = self.codices_component.get_selected_codex_mut() {
+                    if let Some(folio_idx) = selected_codex.folio_state.selected() {
+                        if let Some(selected_folio) = selected_codex.folia.get_mut(folio_idx) {
+                            // Refresh fragmenta from DB (ignore errors during recording)
+                            let _ = selected_folio.update_fragmenta(&self.pool).await;
+                        }
+                    }
+                }
             }
         }
         Ok(())
@@ -254,7 +310,9 @@ impl App {
             CurrentScreen::AddFolio | CurrentScreen::ModifyFolio => {
                 EventHandler::handle_add_or_modify_folio_screen_key(self, key).await
             }
-            CurrentScreen::RecordFolio => todo!(), //TODO
+            CurrentScreen::RecordFolio => {
+                EventHandler::handle_record_folio_screen_key(self, key).await
+            }
             CurrentScreen::ChangeArchivum => {
                 EventHandler::handle_change_archivum_screen_key(self, key).await
             }
@@ -407,6 +465,24 @@ impl Widget for &mut App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Get theme reference
         let theme = &self.config.default.theme;
+
+        // RecordFolio is a full-screen mode
+        if self.current_screen == CurrentScreen::RecordFolio {
+            // Get the selected folio for displaying fragmenta
+            let selected_folio =
+                if let Some(codex) = self.codices_component.get_selected_codex_mut() {
+                    if let Some(folio_idx) = codex.folio_state.selected() {
+                        codex.folia.get(folio_idx)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+            RecordingScreen::render(self.is_paused, selected_folio, area, buf, theme);
+            return;
+        }
 
         // Render background
         AppLayout::render_background(area, buf, theme);
