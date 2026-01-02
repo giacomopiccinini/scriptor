@@ -81,7 +81,7 @@ impl FoliaComponent {
         let new_fragmenta: Vec<NewFragmentum> = fragmenta
             .into_iter()
             .map(|f| NewFragmentum {
-                folio_id: folio_id,
+                folio_id,
                 content: f,
             })
             .collect();
