@@ -3,7 +3,7 @@ use crate::configs::scriptor::ScriptorConfig;
 use crate::stt::fractor::Fractor;
 use crate::stt::model::STTModel;
 use crate::stt::playback::Player;
-use crate::stt::queue::{FragmentumQueue, FragmentumToTranscribe};
+use crate::stt::queue::FragmentumQueue;
 use crate::stt::rec::Recorder;
 use crate::stt::vad::VADModel;
 use crate::tui::app::events::EventHandler;
@@ -111,10 +111,10 @@ impl STTTools {
         let player = Player::new(None).with_context(|| "Unable to setup player")?;
 
         Ok(Self {
-            fractor: fractor,
-            queue: queue,
-            stt_model: stt_model,
-            player: player,
+            fractor,
+            queue,
+            stt_model,
+            player,
         })
     }
 }

@@ -21,7 +21,7 @@ impl FragmentumQueue {
         // Create queue
         let (tx, rx) = std::sync::mpsc::sync_channel::<FragmentumToTranscribe>(max_queue_elements);
 
-        Self { tx: tx, rx: rx }
+        Self { tx, rx }
     }
 }
 
