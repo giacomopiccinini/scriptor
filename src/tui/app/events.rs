@@ -259,8 +259,13 @@ impl EventHandler {
                             app.current_screen = CurrentScreen::Main;
                             app.input_state.clear();
                         }
-                    } else if let Err(e) =
-                        FoliaComponent::create_item(selected_codex, folio_name, &app.pool).await
+                    } else if let Err(e) = FoliaComponent::create_item(
+                        selected_codex,
+                        folio_name,
+                        &mut app.stt_tools,
+                        &app.pool,
+                    )
+                    .await
                     {
                         eprintln!("Failed to create item: {}", e);
                     } else {

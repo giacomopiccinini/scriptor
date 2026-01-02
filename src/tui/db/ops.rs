@@ -359,6 +359,46 @@ impl Fragmentum {
         Ok(row)
     }
 
+    /// Create batch of fragmenta
+    pub async fn create_batch(pool: &SqlitePool, new_fragmenta: Vec<NewFragmentum>) -> Result<()> {
+        // Early exit if necessary
+        if new_fragmenta.is_empty() {
+            return Ok(());
+        }
+
+        let now = Utc::now();
+        let placeholders: Vec<String> = new_fragmenta
+            .iter()
+            .enumerate()
+            .map(|(i, _)| {
+                let base = i * 3;
+                format!(
+                    "(?{}, ?{}, '', ?{}, ?{})",
+                    base + 1,
+                    base + 2,
+                    base + 3,
+                    base + 3
+                )
+            })
+            .collect();
+
+        let sql = format!(
+            "INSERT INTO fragmentum (folio_id, content, audio_path, created_at, updated_at) VALUES {}",
+            placeholders.join(", ")
+        );
+
+        let mut query = sqlx::query(&sql);
+        for new_fragmentum in &new_fragmenta {
+            query = query
+                .bind(new_fragmentum.folio_id)
+                .bind(&new_fragmentum.content)
+                .bind(now);
+        }
+
+        query.execute(pool).await?;
+        Ok(())
+    }
+
     /// Get all fragmenta for a specific folio
     pub async fn get_by_folio_id(pool: &SqlitePool, folio_id: i64) -> Result<Vec<Fragmentum>> {
         let fragmenta = sqlx::query_as::<_, Fragmentum>(

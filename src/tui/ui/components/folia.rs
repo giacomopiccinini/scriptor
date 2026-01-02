@@ -1,6 +1,8 @@
-use crate::tui::db::models::{Folio, NewFolio, UICodex};
+use crate::tui::app::state::STTTools;
+use crate::tui::db::models::{Folio, Fragmentum, NewFolio, NewFragmentum, UICodex};
 use anyhow::Result;
 use sqlx::SqlitePool;
+use std::path::PathBuf;
 
 pub struct FoliaComponent;
 
@@ -31,15 +33,62 @@ impl FoliaComponent {
     pub async fn create_item(
         ui_codex: &mut UICodex,
         name: String,
+        stt_tools: &mut STTTools,
         pool: &SqlitePool,
     ) -> Result<()> {
-        let new_folio = NewFolio {
-            name,
-            codex_id: ui_codex.codex.id,
+        // Convert the name into a path
+        let folio_path = PathBuf::from(name);
+
+        // Sanity checks on input
+        if !folio_path.exists() {
+            anyhow::bail!("Audio file does not exist")
+        };
+        if !folio_path.is_file() {
+            anyhow::bail!("Folio is not a path to a file")
+        };
+        if folio_path.extension().and_then(|s| s.to_str()) != Some("wav") {
+            anyhow::bail!("Folio is not a path to a wav file")
         };
 
-        Folio::create(pool, new_folio).await?;
+        // Load audio
+        let audio_samples = stt_tools.stt_model.load_audio(&folio_path)?;
+
+        // Transcribe
+        let transcription = stt_tools.stt_model.transcribe(audio_samples)?;
+
+        // Split the transcription in chunks (fragmenta) of 500 chars
+        let fragmenta = transcription.split_text(500);
+
+        // The default folio name is just the name of the target file, not the full path
+        let folio_name = folio_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(&chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string())
+            .to_string();
+
+        // Create new folio in DB
+        let new_folio = NewFolio {
+            codex_id: ui_codex.codex.id,
+            name: folio_name,
+        };
+
+        let folio_db = Folio::create(pool, new_folio).await?;
+
+        // Add all the fragmenta we have created
+        let folio_id = folio_db.id;
+
+        // Convert fragmenta into db-aware fragmenta and add to db in batch
+        let new_fragmenta: Vec<NewFragmentum> = fragmenta
+            .into_iter()
+            .map(|f| NewFragmentum {
+                folio_id: folio_id,
+                content: f,
+            })
+            .collect();
+        Fragmentum::create_batch(pool, new_fragmenta).await?;
+
         ui_codex.update_folia(pool).await?;
+
         Ok(())
     }
 

@@ -97,3 +97,22 @@ impl STTModel {
         self.transcriber.transcribe(audio_samples)
     }
 }
+
+impl Transcription {
+    pub fn split_text(&self, target_size: usize) -> Vec<String> {
+        let mut chunks = Vec::new();
+        let mut current = String::new();
+
+        for sentence in self.text.split_inclusive(['.', '!', '?']) {
+            if current.len() + sentence.len() > target_size && !current.is_empty() {
+                chunks.push(current.trim().to_string());
+                current = String::new();
+            }
+            current.push_str(sentence);
+        }
+        if !current.is_empty() {
+            chunks.push(current.trim().to_string());
+        }
+        chunks
+    }
+}
