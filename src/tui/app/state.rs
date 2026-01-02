@@ -127,9 +127,6 @@ impl STTTools {
 
     /// Recreate the fractor and STT model (needed after recording completes)
     pub fn reinitialize(&mut self, config: &ScriptorConfig) -> anyhow::Result<()> {
-        // Load STT model
-        let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
-
         // Create recorder with max fragmentum duration from config
         let recorder = Recorder::new(config.default.fractor.max_fragmentum_duration_seconds)
             .with_context(|| "Failed to create recorder")?;
@@ -142,7 +139,6 @@ impl STTTools {
         let fractor = Fractor::new(recorder, vad_model);
 
         self.fractor = Some(fractor);
-        self.stt_model = Some(stt_model);
 
         Ok(())
     }
@@ -223,18 +219,20 @@ impl App {
 
             // Poll for events with timeout
             if event::poll(poll_timeout)?
-                && let Some(key) = event::read()?.as_key_press_event() {
-                    self.handle_key_event(key).await;
-                }
+                && let Some(key) = event::read()?.as_key_press_event()
+            {
+                self.handle_key_event(key).await;
+            }
 
             // Periodic refresh of fragmenta during recording
             if self.is_recording
                 && let Some(selected_codex) = self.codices_component.get_selected_codex_mut()
-                    && let Some(folio_idx) = selected_codex.folio_state.selected()
-                        && let Some(selected_folio) = selected_codex.folia.get_mut(folio_idx) {
-                            // Refresh fragmenta from DB (ignore errors during recording)
-                            let _ = selected_folio.update_fragmenta(&self.pool).await;
-                        }
+                && let Some(folio_idx) = selected_codex.folio_state.selected()
+                && let Some(selected_folio) = selected_codex.folia.get_mut(folio_idx)
+            {
+                // Refresh fragmenta from DB (ignore errors during recording)
+                let _ = selected_folio.update_fragmenta(&self.pool).await;
+            }
         }
         Ok(())
     }

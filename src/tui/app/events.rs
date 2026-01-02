@@ -258,6 +258,8 @@ impl EventHandler {
                                 let folio_count = selected_codex.folia.len();
                                 if folio_count > 0 {
                                     selected_codex.folio_state.select(Some(folio_count - 1));
+                                    // FIX
+                                    app.codices_component.list_state.scroll_down_by(folio_count as u16);
                                 }
 
                                 // Switch to recording screen
@@ -476,10 +478,11 @@ impl EventHandler {
                 // Refresh the folio's fragmenta from DB
                 if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
                     && let Some(folio_idx) = selected_codex.folio_state.selected()
-                        && let Some(selected_folio) = selected_codex.folia.get_mut(folio_idx)
-                            && let Err(e) = selected_folio.update_fragmenta(&app.pool).await {
-                                eprintln!("Failed to refresh fragmenta: {}", e);
-                            }
+                    && let Some(selected_folio) = selected_codex.folia.get_mut(folio_idx)
+                    && let Err(e) = selected_folio.update_fragmenta(&app.pool).await
+                {
+                    eprintln!("Failed to refresh fragmenta: {}", e);
+                }
 
                 // Reinitialize STT tools for next recording
                 if let Err(e) = app.stt_tools.reinitialize(&app.config) {

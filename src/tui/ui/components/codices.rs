@@ -314,14 +314,16 @@ impl CodicesComponent {
                 let folio_idx = self.codices[codex_idx].folio_state.selected().unwrap();
 
                 // Remove from list and database
+                self.select_previous();
                 self.codices[codex_idx].folia.remove(folio_idx);
                 folio.delete(pool).await?;
             } else if let Some(codex) = codex_to_delete {
+                self.select_previous();
                 self.codices.remove(codex_idx);
                 codex.delete(pool).await?;
             }
 
-            self.select_previous();
+            // self.select_previous();
         }
 
         Ok(())
