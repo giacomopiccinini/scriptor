@@ -1,6 +1,7 @@
 use crate::tui::app::state::{App, CurrentRegion, CurrentScreen};
 use crate::tui::ui::components::{CodicesComponent, FoliaComponent, FragmentaComponent};
 use crate::tui::ui::cursor::CursorState;
+use arboard::{Clipboard, SetExtLinux};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 pub struct EventHandler;
@@ -158,6 +159,14 @@ impl EventHandler {
                 match app.current_region {
                     CurrentRegion::CodexAndFolio => {} // Already at leftmost
                     CurrentRegion::Fragmentum => {
+                        // Deselect fragmentum when leaving the region
+                        if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
+                            && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
+                            && let Some(selected_folio) =
+                                selected_codex.folia.get_mut(selected_folio_idx)
+                        {
+                            FragmentaComponent::remove_fragmentum_selection(selected_folio);
+                        }
                         app.current_region = CurrentRegion::CodexAndFolio;
                     }
                 }
@@ -166,6 +175,14 @@ impl EventHandler {
             // Navigate right between regions (Codex -> Fragmentum)
             (KeyCode::Right, KeyModifiers::NONE) => match app.current_region {
                 CurrentRegion::CodexAndFolio => {
+                    // Auto-select first fragmentum when entering the region
+                    if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
+                        && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
+                        && let Some(selected_folio) =
+                            selected_codex.folia.get_mut(selected_folio_idx)
+                    {
+                        FragmentaComponent::select_first_fragmentum(selected_folio);
+                    }
                     app.current_region = CurrentRegion::Fragmentum;
                 }
                 CurrentRegion::Fragmentum => {}
@@ -177,16 +194,48 @@ impl EventHandler {
                 eprintln!("Recording not yet implemented");
             }
 
-            // Copy single fragmentum (placeholder)
+            // Copy single fragmentum to clipboard
             (KeyCode::Char('c'), KeyModifiers::NONE) => {
-                // TODO: Implement copy fragmentum to clipboard
-                eprintln!("Copy fragmentum not yet implemented");
+                if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
+                    && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
+                    && let Some(selected_folio) = selected_codex.folia.get(selected_folio_idx)
+                    && let Some(fragmentum_idx) = selected_folio.fragmentum_state.selected()
+                    && let Some(ui_fragmentum) = selected_folio.fragmenta.get(fragmentum_idx)
+                {
+                    // Clone content for the thread
+                    let content = ui_fragmentum.fragmentum.content.clone();
+                    // Spawn thread to keep clipboard alive until content is read
+                    std::thread::spawn(move || {
+                        if let Ok(mut clipboard) = Clipboard::new() {
+                            // Use Linux extension to wait until clipboard is read
+                            let _ = clipboard.set().wait().text(content);
+                        }
+                    });
+                }
             }
 
-            // Copy all fragmenta from selected folio (placeholder)
+            // Copy all fragmenta from selected folio to clipboard
             (KeyCode::Char('C'), KeyModifiers::SHIFT) => {
-                // TODO: Implement copy all fragmenta to clipboard
-                eprintln!("Copy all fragmenta not yet implemented");
+                if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
+                    && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
+                    && let Some(selected_folio) = selected_codex.folia.get(selected_folio_idx)
+                {
+                    // Concatenate all fragmenta content with newlines
+                    let all_content: String = selected_folio
+                        .fragmenta
+                        .iter()
+                        .map(|f| f.fragmentum.content.as_str())
+                        .collect::<Vec<_>>()
+                        .join("\n\n");
+
+                    // Spawn thread to keep clipboard alive until content is read
+                    std::thread::spawn(move || {
+                        if let Ok(mut clipboard) = Clipboard::new() {
+                            // Use Linux extension to wait until clipboard is read
+                            let _ = clipboard.set().wait().text(all_content);
+                        }
+                    });
+                }
             }
             _ => {}
         }

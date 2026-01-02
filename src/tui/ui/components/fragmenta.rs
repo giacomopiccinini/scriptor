@@ -4,9 +4,10 @@ use anyhow::Result;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::Style;
-use ratatui::text::{Line, Span};
+use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, HighlightSpacing, List, ListItem, StatefulWidget, Widget};
 use sqlx::SqlitePool;
+use textwrap::wrap;
 
 pub struct FragmentaComponent;
 
@@ -79,24 +80,40 @@ impl FragmentaComponent {
             .title_alignment(Alignment::Center);
 
         if let Some(ui_folio) = selected_folio {
-            // Extract the fragmenta and display the first few characters of content
+            // Calculate available width for text wrapping
+            // Account for: highlight symbol " ▸ " (4 chars) + some margin
+            let highlight_symbol = "  ";
+            let highlight_width = highlight_symbol.chars().count();
+            let available_width = area.width.saturating_sub(highlight_width as u16 + 2) as usize;
+
+            // Wrap each fragmentum's content to fit the available width
             let items: Vec<ListItem> = ui_folio
                 .fragmenta
                 .iter()
                 .map(|ui_fragmentum| {
-                    // Show first 50 characters of content as preview
-                    let preview = if ui_fragmentum.fragmentum.content.len() > 50 {
-                        format!("{}...", &ui_fragmentum.fragmentum.content[..50])
+                    let content = &ui_fragmentum.fragmentum.content;
+
+                    // Use textwrap to wrap the content into multiple lines
+                    let wrapped_lines: Vec<Line> = if available_width > 0 {
+                        wrap(content, available_width)
+                            .iter()
+                            .map(|line| Line::from(line.to_string()))
+                            .collect()
                     } else {
-                        ui_fragmentum.fragmentum.content.clone()
+                        vec![Line::from(content.clone())]
                     };
-                    ListItem::from(preview)
+
+                    // Add empty line separator between fragmenta for visual clarity
+                    let mut lines = wrapped_lines;
+                    lines.push(Line::from(""));
+
+                    ListItem::new(Text::from(lines))
                 })
                 .collect();
 
             let list: List = List::new(items)
                 .block(block)
-                .highlight_symbol(" ▸ ")
+                .highlight_symbol(highlight_symbol)
                 .highlight_style(
                     // Swap foreground and background for selected item
                     Style::default().bg(theme.foreground).fg(theme.background),

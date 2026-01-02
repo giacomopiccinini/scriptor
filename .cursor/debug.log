@@ -94,3 +94,12 @@
 {"hypothesisId":"A","location":"rec.rs:Recorder::new","message":"Recorder created, stream built","data":{"buffer_capacity":3528000},"timestamp":1767368299148}
 {"hypothesisId":"C","location":"folia.rs:create_item","message":"Starting transcription","data":{"is_recording":false,"buffer_occupied":0},"timestamp":1767368308222}
 {"hypothesisId":"C","location":"folia.rs:create_item","message":"Transcription complete","data":{"buffer_occupied":0},"timestamp":1767368309469}
+{"hypothesisId":"H1","location":"events.rs:copy_c","message":"copy_single_start","timestamp":1767369703221}
+{"hypothesisId":"H1","location":"events.rs:copy_c","message":"content_found","data":{"content_len":216},"timestamp":1767369703221}
+{"hypothesisId":"H1","location":"events.rs:copy_c","message":"clipboard_created","timestamp":1767369703222}
+{"hypothesisId":"H4","location":"events.rs:copy_c","message":"set_text_result","data":{"success":true},"timestamp":1767369703222}
+{"hypothesisId":"H1","location":"events.rs:copy_c","message":"clipboard_about_to_drop","timestamp":1767369703222}
+{"hypothesisId":"H1","location":"events.rs:copy_c","message":"copy_single_start","timestamp":1767369812574}
+{"hypothesisId":"H1","location":"events.rs:copy_c","message":"content_found","data":{"content_len":216},"timestamp":1767369812574}
+{"hypothesisId":"FIX","location":"events.rs:copy_c","message":"thread_started","timestamp":1767369812575}
+{"hypothesisId":"FIX","location":"events.rs:copy_c","message":"clipboard_created_in_thread","timestamp":1767369812576}
