@@ -147,5 +147,11 @@ fn setup_audio_stream(
         None,                                   // Timeout
     )?;
 
+    // Explicitly pause the stream after creation.
+    // On some Linux audio backends (PipeWire/PulseAudio), cpal's build_input_stream()
+    // may auto-start the stream instead of creating it in a paused state.
+    // This ensures the stream only runs when explicitly started via play().
+    stream.pause()?;
+
     Ok((stream, consumer))
 }
