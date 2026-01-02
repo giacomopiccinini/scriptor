@@ -3,12 +3,26 @@ use crate::stt::text::append_text;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local};
 use std::path::PathBuf;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, SyncSender};
 
 #[derive(Debug, Clone)]
 pub struct FragmentumToTranscribe {
     pub path: PathBuf,
     pub start_datetime: DateTime<Local>,
+}
+
+pub struct FragmentumQueue {
+    tx: SyncSender<FragmentumToTranscribe>,
+    rx: Receiver<FragmentumToTranscribe>,
+}
+
+impl FragmentumQueue {
+    pub fn new(max_queue_elements: usize) -> Self {
+        // Create queue
+        let (tx, rx) = std::sync::mpsc::sync_channel::<FragmentumToTranscribe>(max_queue_elements);
+
+        Self { tx: tx, rx: rx }
+    }
 }
 
 pub fn transcriber_to_file_worker(

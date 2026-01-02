@@ -1,9 +1,9 @@
 use crate::configs::db::DBConfig;
 use crate::configs::scriptor::ScriptorConfig;
-use crate::configs::stt;
 use crate::stt::fractor::Fractor;
 use crate::stt::model::STTModel;
 use crate::stt::playback::Player;
+use crate::stt::queue::{FragmentumQueue, FragmentumToTranscribe};
 use crate::stt::rec::Recorder;
 use crate::stt::vad::VADModel;
 use crate::tui::app::events::EventHandler;
@@ -57,6 +57,7 @@ pub struct STTTools {
     // pub recorder: Recorder,
     // pub vad_model: VADModel,
     pub fractor: Fractor,
+    pub queue: FragmentumQueue,
     pub stt_model: STTModel,
     pub player: Player,
 }
@@ -92,6 +93,9 @@ impl STTTools {
         // Load STT model
         let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
 
+        // Init queue of fragmenta
+        let queue = FragmentumQueue::new(config.default.queue.max_queue_elements);
+
         // Create recorder with max fragmentum duration from config
         let recorder = Recorder::new(config.default.fractor.max_fragmentum_duration_seconds)
             .with_context(|| "Failed to create recorder")?;
@@ -108,6 +112,7 @@ impl STTTools {
 
         Ok(Self {
             fractor: fractor,
+            queue: queue,
             stt_model: stt_model,
             player: player,
         })
