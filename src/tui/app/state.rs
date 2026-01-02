@@ -1,5 +1,11 @@
 use crate::configs::db::DBConfig;
 use crate::configs::scriptor::ScriptorConfig;
+use crate::configs::stt;
+use crate::stt::fractor::Fractor;
+use crate::stt::model::STTModel;
+use crate::stt::playback::Player;
+use crate::stt::rec::Recorder;
+use crate::stt::vad::VADModel;
 use crate::tui::app::events::EventHandler;
 use crate::tui::db::connections::init_db;
 use crate::tui::ui::components::{
@@ -8,12 +14,14 @@ use crate::tui::ui::components::{
 };
 use crate::tui::ui::cursor::CursorState;
 use crate::tui::ui::layout::AppLayout;
+use anyhow::Context;
 use color_eyre::Result;
 use crossterm::event::{self, KeyEvent};
 use ratatui::DefaultTerminal;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
+use spinoff::{Color, Spinner, Streams, spinners};
 use sqlx::SqlitePool;
 
 /// Enum representing the different screens in the application
@@ -44,10 +52,21 @@ pub enum CurrentRegion {
     Fragmentum,
 }
 
+/// All necessary tools to handle Speech to Text
+pub struct STTTools {
+    // pub recorder: Recorder,
+    // pub vad_model: VADModel,
+    pub fractor: Fractor,
+    pub stt_model: STTModel,
+    pub player: Player,
+}
+
 /// Main application state
 pub struct App {
     /// App configuration (db, stt inference parameters, theme)
     pub config: ScriptorConfig,
+    // Collection of tools to perform speech to text
+    pub stt_tools: STTTools,
     /// Current active screen
     pub current_screen: CurrentScreen,
     /// Current active region
@@ -68,6 +87,33 @@ pub struct App {
     pub exit: bool,
 }
 
+impl STTTools {
+    pub fn new(config: &ScriptorConfig) -> anyhow::Result<Self> {
+        // Load STT model
+        let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
+
+        // Create recorder with max fragmentum duration from config
+        let recorder = Recorder::new(config.default.fractor.max_fragmentum_duration_seconds)
+            .with_context(|| "Failed to create recorder")?;
+
+        // Create VAD model
+        let vad_model = VADModel::new(&config.default.vad, config.default.inference.clone())
+            .with_context(|| "Failed to create voice activity detector")?;
+
+        // Create fractor
+        let fractor = Fractor::new(recorder, vad_model);
+
+        // Create the player with no files in the queue
+        let player = Player::new(None).with_context(|| "Unable to setup player")?;
+
+        Ok(Self {
+            fractor: fractor,
+            stt_model: stt_model,
+            player: player,
+        })
+    }
+}
+
 impl App {
     /// Create new app instance
     ///
@@ -76,6 +122,17 @@ impl App {
     pub async fn new() -> Self {
         // Read the config (creates default if missing)
         let config = ScriptorConfig::read().expect("Failed to read config file");
+
+        // Create STT tools. Add a spinner first, as it might take a while and we want the user to be aware.
+        // Create spinner
+        let mut spinner = Spinner::new_with_stream(
+            spinners::Dots,
+            "Loading models...",
+            Color::Blue,
+            Streams::Stderr,
+        );
+        let stt_tools = STTTools::new(&config).expect("Failed to setup STT tools");
+        spinner.success("STT tools loaded!");
 
         // Connect to default archivum (db)
         let pool = init_db(&config.default.db.connection_str)
@@ -95,6 +152,7 @@ impl App {
         // Return initial state of the app
         Self {
             config,
+            stt_tools,
             current_screen,
             current_region: CurrentRegion::CodexAndFolio,
             pool,
