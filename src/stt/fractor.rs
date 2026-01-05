@@ -115,14 +115,16 @@ impl Fractor {
 
     /// Start recording and fragmenting
     fn start_recording(&mut self) -> Result<()> {
-        self.recorder.is_recording = true;
+        self.recorder.is_recording = Arc::new(AtomicBool::new(true));
         self.recorder.play().with_context(|| "Unable to play")?;
         Ok(())
     }
 
     /// Stop recording and fragmenting
-    fn stop_recording(&mut self) {
-        self.recorder.is_recording = false;
+    fn stop_recording(&mut self) -> Result<()> {
+        self.recorder.is_recording = Arc::new(AtomicBool::new(false));
+        self.recorder.pause().with_context(|| "Unable to stop")?;
+        Ok(())
     }
 
     /// Flush the current buffer contents to a fragmentum and send for transcription
@@ -223,9 +225,11 @@ impl Fractor {
         // Track if we're currently paused
         let mut is_paused = false;
 
-        while self.recorder.is_recording && !stop_signal.load(Ordering::Relaxed) {
+        while self.recorder.is_recording.load(Ordering::SeqCst)
+            && !stop_signal.load(Ordering::SeqCst)
+        {
             // Check for pause signal
-            let should_pause = pause_signal.load(Ordering::Relaxed);
+            let should_pause = pause_signal.load(Ordering::SeqCst);
 
             if should_pause && !is_paused {
                 // Entering pause state: flush buffer and pause stream

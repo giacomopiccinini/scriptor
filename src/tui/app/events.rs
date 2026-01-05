@@ -233,14 +233,18 @@ impl EventHandler {
                         let pool_clone = app.pool.clone();
 
                         // Spawn fractor thread
-                        std::thread::spawn(move || {
+                        let fractor_handle = std::thread::spawn(move || {
                             fractor.run(None, stop_signal, pause_signal, tx)
                         });
 
                         // Spawn transcriber thread
-                        std::thread::spawn(move || {
+                        let transcriber_handle = std::thread::spawn(move || {
                             transcriber_to_db_worker(stt_model, folio_id, pool_clone, rx)
                         });
+
+                        // Update thread state
+                        app.fractor_handle = Some(fractor_handle);
+                        app.transcriber_handle = Some(transcriber_handle);
 
                         // Update UI state
                         app.is_recording = true;
@@ -267,6 +271,7 @@ impl EventHandler {
 
                         // Switch to recording screen
                         app.current_screen = CurrentScreen::RecordFolio;
+                    } else {
                     }
                 }
             }
@@ -454,10 +459,11 @@ impl EventHandler {
     pub async fn handle_record_folio_screen_key(app: &mut App, key: KeyEvent) {
         match key.code {
             // Toggle pause/resume
+            // TODO: Fix this as currently it is not working properly
             KeyCode::Char(' ') => {
                 if let Some(pause_signal) = &app.recording_pause_signal {
-                    let currently_paused = pause_signal.load(Ordering::Relaxed);
-                    pause_signal.store(!currently_paused, Ordering::Relaxed);
+                    let currently_paused = pause_signal.load(Ordering::SeqCst);
+                    pause_signal.store(!currently_paused, Ordering::SeqCst);
                     app.is_paused = !currently_paused;
                 }
             }
@@ -466,12 +472,18 @@ impl EventHandler {
             KeyCode::Esc => {
                 // Signal fractor to stop
                 if let Some(stop_signal) = &app.recording_stop_signal {
-                    stop_signal.store(true, Ordering::Relaxed);
+                    stop_signal.store(true, Ordering::SeqCst);
                 }
 
-                // Wait a bit for threads to finish processing
-                // (In production you might want to join the threads properly)
-                std::thread::sleep(std::time::Duration::from_millis(100));
+                // Wait for threads to finish processing
+                if let Some(fractor_handle) = app.fractor_handle.take() {
+                    fractor_handle.join().expect("Recording thread panicked");
+                };
+                if let Some(transcriber_handle) = app.transcriber_handle.take() {
+                    transcriber_handle
+                        .join()
+                        .expect("Transcribing thread panicked");
+                };
 
                 // Refresh the folio's fragmenta from DB
                 if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
@@ -493,6 +505,8 @@ impl EventHandler {
                 app.recording_folio_id = None;
                 app.is_recording = false;
                 app.is_paused = false;
+                app.fractor_handle = None;
+                app.transcriber_handle = None;
 
                 // Return to main screen
                 app.current_screen = CurrentScreen::Main;

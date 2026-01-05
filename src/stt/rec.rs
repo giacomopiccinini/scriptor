@@ -8,12 +8,14 @@ use ringbuf::{
     HeapCons, HeapProd, HeapRb,
     traits::{Consumer, Observer, Producer, Split},
 };
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 pub struct Recorder {
     pub stream: Stream,
     pub consumer: HeapCons<f32>,
     pub config: RecorderConfig,
-    pub is_recording: bool,
+    pub is_recording: Arc<AtomicBool>,
 }
 
 pub struct RecorderConfig {
@@ -67,7 +69,7 @@ impl Recorder {
             stream,
             consumer,
             config,
-            is_recording: false,
+            is_recording: Arc::new(AtomicBool::new(false)),
         })
     }
 
