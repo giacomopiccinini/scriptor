@@ -28,10 +28,6 @@ use std::sync::atomic::AtomicBool;
 
 use crate::stt::queue::{create_fragmentum_channel, transcriber_to_db_worker};
 use crate::tui::db::models::{Folio, NewFolio};
-use crate::tui::ui::components::FoliaComponent;
-use arboard::{Clipboard, SetExtLinux};
-use crossterm::event::{KeyCode, KeyModifiers};
-use std::sync::atomic::Ordering;
 
 /// Enum representing the different screens in the application
 #[derive(Debug, Clone, PartialEq)]

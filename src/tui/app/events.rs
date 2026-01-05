@@ -3,7 +3,6 @@ use crate::tui::app::state::{App, CurrentRegion, CurrentScreen};
 use crate::tui::db::models::{Folio, NewFolio};
 use crate::tui::ui::components::{CodicesComponent, FoliaComponent, FragmentaComponent};
 use crate::tui::ui::cursor::CursorState;
-use anyhow::{Context, Result};
 use arboard::{Clipboard, SetExtLinux};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::sync::Arc;
