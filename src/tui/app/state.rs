@@ -1,6 +1,5 @@
 use crate::configs::db::DBConfig;
 use crate::configs::scriptor::ScriptorConfig;
-use crate::configs::stt;
 use crate::stt::fractor::Fractor;
 use crate::stt::model::STTModel;
 use crate::stt::playback::Player;
@@ -8,7 +7,6 @@ use crate::stt::rec::Recorder;
 use crate::stt::vad::VADModel;
 use crate::tui::app::events::EventHandler;
 use crate::tui::db::connections::init_db;
-use crate::tui::db::models::UICodex;
 use crate::tui::ui::components::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, CodicesComponent,
     FragmentaComponent, InputState, ModifyCodexPopUp, ModifyFolioPopUp, RecordingScreen,
@@ -29,8 +27,6 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::thread::JoinHandle;
 
-use crate::stt::queue::{create_fragmentum_channel, transcriber_to_db_worker};
-use crate::tui::db::models::{Folio, NewFolio};
 
 /// Enum representing the different screens in the application
 #[derive(Debug, Clone, PartialEq)]

@@ -9,7 +9,7 @@ use ringbuf::{
     traits::{Consumer, Observer, Producer, Split},
 };
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 
 pub struct Recorder {
     pub stream: Stream,
