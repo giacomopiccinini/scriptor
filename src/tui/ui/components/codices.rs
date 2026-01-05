@@ -82,6 +82,24 @@ impl CodicesComponent {
             .unwrap_or((None, None))
     }
 
+    pub fn check_codex_folio_selection(&self) -> (bool, bool) {
+        let Some(codex_idx) = self.codex_state.selected() else {
+            return (false, false);
+        };
+
+        let Some(codex) = self.codices.get(codex_idx) else {
+            return (false, false);
+        };
+
+        let folio_selected = codex
+            .folio_state
+            .selected()
+            .and_then(|i| codex.folia.get(i))
+            .is_some();
+
+        (true, folio_selected)
+    }
+
     ///  Scroll down in the component, moving between codices and folia
     pub fn select_next(&mut self) {
         if let Some(selected_codex_idx) = self.codex_state.selected() {

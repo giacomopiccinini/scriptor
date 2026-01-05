@@ -7,6 +7,7 @@ use crate::stt::rec::Recorder;
 use crate::stt::vad::VADModel;
 use crate::tui::app::events::EventHandler;
 use crate::tui::db::connections::init_db;
+use crate::tui::db::models::UICodex;
 use crate::tui::ui::components::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, CodicesComponent,
     FragmentaComponent, InputState, ModifyCodexPopUp, ModifyFolioPopUp, RecordingScreen,
@@ -24,6 +25,13 @@ use spinoff::{Color, Spinner, Streams, spinners};
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+
+use crate::stt::queue::{create_fragmentum_channel, transcriber_to_db_worker};
+use crate::tui::db::models::{Folio, NewFolio};
+use crate::tui::ui::components::FoliaComponent;
+use arboard::{Clipboard, SetExtLinux};
+use crossterm::event::{KeyCode, KeyModifiers};
+use std::sync::atomic::Ordering;
 
 /// Enum representing the different screens in the application
 #[derive(Debug, Clone, PartialEq)]
@@ -450,6 +458,79 @@ impl App {
             self.config
                 .write(&config_path)
                 .map_err(|e| color_eyre::eyre::eyre!("Failed to save config: {}", e))?;
+        }
+        Ok(())
+    }
+
+    pub async fn launch_recording(&mut self, codex: &mut UICodex) -> anyhow::Result<()> {
+        // Create new folio with datetime name. This is the default in the TUI.
+        let folio_name = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+        // Create ibject to be added to db
+        let new_folio = NewFolio {
+            codex_id: codex.codex.id,
+            name: folio_name,
+        };
+
+        // Create new folio in db
+        let folio = Folio::create(&self.pool, new_folio)
+            .await
+            .with_context(|| "Unable to add folio to archivum")?;
+        let folio_id = folio.id;
+
+        // Take ownership of fractor and stt_model for threads
+        if let (Some(fractor), Some(stt_model)) = (
+            self.stt_tools.fractor.take(),
+            self.stt_tools.stt_model.take(),
+        ) {
+            // Create stop and pause signals
+            let stop_signal = Arc::new(AtomicBool::new(false));
+            let pause_signal = Arc::new(AtomicBool::new(false));
+
+            // Store signals in app state
+            self.recording_stop_signal = Some(Arc::clone(&stop_signal));
+            self.recording_pause_signal = Some(Arc::clone(&pause_signal));
+            self.recording_folio_id = Some(folio_id);
+
+            // Create channel for fragmenta
+            let (tx, rx) = create_fragmentum_channel(self.stt_tools.max_queue_elements);
+
+            // Clone pool for transcriber thread
+            let pool_clone = self.pool.clone();
+
+            // Spawn fractor thread
+            std::thread::spawn(move || fractor.run(None, stop_signal, pause_signal, tx));
+
+            // Spawn transcriber thread
+            std::thread::spawn(move || {
+                transcriber_to_db_worker(stt_model, folio_id, pool_clone, rx)
+            });
+
+            // Update UI state
+            self.is_recording = true;
+            self.is_paused = false;
+
+            // Refresh folia to include the new one
+            codex
+                .update_folia(&self.pool)
+                .await
+                .with_context(|| "Unable to update folia")?;
+
+            // Select the newly created folio
+            let folio_count = codex.folia.len();
+
+            // Open up codex
+            codex.is_expanded = true;
+            if folio_count > 0 {
+                codex.folio_state.select(Some(folio_count - 1));
+                // FIX
+                self.codices_component
+                    .list_state
+                    .scroll_down_by(folio_count as u16);
+            }
+
+            // Switch to recording screen
+            self.current_screen = CurrentScreen::RecordFolio;
         }
         Ok(())
     }

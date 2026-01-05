@@ -70,3 +70,9 @@ pub struct UIFragmentum {
     pub fragmentum: Fragmentum,
     pub state: ListState,
 }
+
+impl UICodex {
+    pub fn expand(&mut self) {
+        self.is_expanded = true
+    }
+}

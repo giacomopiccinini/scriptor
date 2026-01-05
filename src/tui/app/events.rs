@@ -3,6 +3,7 @@ use crate::tui::app::state::{App, CurrentRegion, CurrentScreen};
 use crate::tui::db::models::{Folio, NewFolio};
 use crate::tui::ui::components::{CodicesComponent, FoliaComponent, FragmentaComponent};
 use crate::tui::ui::cursor::CursorState;
+use anyhow::{Context, Result};
 use arboard::{Clipboard, SetExtLinux};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::sync::Arc;
@@ -59,7 +60,6 @@ impl EventHandler {
             (KeyCode::Char('n'), KeyModifiers::NONE) => app.enter_add_codex_screen(),
 
             // Add new item
-            // TODO
             (KeyCode::Char('a'), KeyModifiers::NONE) => app.enter_add_folio_screen(),
 
             // Change archivum
@@ -194,81 +194,80 @@ impl EventHandler {
 
             // Start recording
             (KeyCode::Char('r'), KeyModifiers::NONE) => {
-                // Need a codex selected to add the recording to
-                if let Some(selected_codex) = app.codices_component.get_selected_codex_mut() {
-                    // Create new folio with datetime name
+                if let (true, false) = app.codices_component.check_codex_folio_selection() {
+                    let codex = app
+                        .codices_component
+                        .get_selected_codex_mut()
+                        .expect("Codex should exist but can't be reached");
+                    // Create new folio with datetime name. This is the default in the TUI.
                     let folio_name = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+                    // Create ibject to be added to db
                     let new_folio = NewFolio {
-                        codex_id: selected_codex.codex.id,
+                        codex_id: codex.codex.id,
                         name: folio_name,
                     };
 
-                    // Create folio in DB
-                    match Folio::create(&app.pool, new_folio).await {
-                        Ok(folio) => {
-                            let folio_id = folio.id;
+                    // Create new folio in db
+                    let folio = Folio::create(&app.pool, new_folio)
+                        .await
+                        .expect("Unable to add folio to archivum");
+                    let folio_id = folio.id;
 
-                            // Take ownership of fractor and stt_model for threads
-                            if let (Some(fractor), Some(stt_model)) =
-                                (app.stt_tools.fractor.take(), app.stt_tools.stt_model.take())
-                            {
-                                // Create stop and pause signals
-                                let stop_signal = Arc::new(AtomicBool::new(false));
-                                let pause_signal = Arc::new(AtomicBool::new(false));
+                    // Take ownership of fractor and stt_model for threads
+                    if let (Some(fractor), Some(stt_model)) =
+                        (app.stt_tools.fractor.take(), app.stt_tools.stt_model.take())
+                    {
+                        // Create stop and pause signals
+                        let stop_signal = Arc::new(AtomicBool::new(false));
+                        let pause_signal = Arc::new(AtomicBool::new(false));
 
-                                // Store signals in app state
-                                app.recording_stop_signal = Some(Arc::clone(&stop_signal));
-                                app.recording_pause_signal = Some(Arc::clone(&pause_signal));
-                                app.recording_folio_id = Some(folio_id);
+                        // Store signals in app state
+                        app.recording_stop_signal = Some(Arc::clone(&stop_signal));
+                        app.recording_pause_signal = Some(Arc::clone(&pause_signal));
+                        app.recording_folio_id = Some(folio_id);
 
-                                // Create channel for fragmenta
-                                let (tx, rx) =
-                                    create_fragmentum_channel(app.stt_tools.max_queue_elements);
+                        // Create channel for fragmenta
+                        let (tx, rx) = create_fragmentum_channel(app.stt_tools.max_queue_elements);
 
-                                // Clone pool for transcriber thread
-                                let pool_clone = app.pool.clone();
+                        // Clone pool for transcriber thread
+                        let pool_clone = app.pool.clone();
 
-                                // Spawn fractor thread
-                                std::thread::spawn(move || {
-                                    if let Err(e) = fractor.run(None, stop_signal, pause_signal, tx)
-                                    {
-                                        eprintln!("Fractor error: {}", e);
-                                    }
-                                });
+                        // Spawn fractor thread
+                        std::thread::spawn(move || {
+                            fractor.run(None, stop_signal, pause_signal, tx)
+                        });
 
-                                // Spawn transcriber thread
-                                std::thread::spawn(move || {
-                                    if let Err(e) = transcriber_to_db_worker(
-                                        stt_model, folio_id, pool_clone, rx,
-                                    ) {
-                                        eprintln!("Transcriber error: {}", e);
-                                    }
-                                });
+                        // Spawn transcriber thread
+                        std::thread::spawn(move || {
+                            transcriber_to_db_worker(stt_model, folio_id, pool_clone, rx)
+                        });
 
-                                // Update UI state
-                                app.is_recording = true;
-                                app.is_paused = false;
+                        // Update UI state
+                        app.is_recording = true;
+                        app.is_paused = false;
 
-                                // Refresh folia to include the new one
-                                if let Err(e) = selected_codex.update_folia(&app.pool).await {
-                                    eprintln!("Failed to update folia: {}", e);
-                                }
+                        // Refresh folia to include the new one
+                        codex
+                            .update_folia(&app.pool)
+                            .await
+                            .expect("Unable to update folia");
 
-                                // Select the newly created folio
-                                let folio_count = selected_codex.folia.len();
-                                if folio_count > 0 {
-                                    selected_codex.folio_state.select(Some(folio_count - 1));
-                                    // FIX
-                                    app.codices_component.list_state.scroll_down_by(folio_count as u16);
-                                }
+                        // Select the newly created folio
+                        let folio_count = codex.folia.len();
 
-                                // Switch to recording screen
-                                app.current_screen = CurrentScreen::RecordFolio;
-                            }
+                        // Open up codex
+                        codex.expand();
+                        if folio_count > 0 {
+                            codex.folio_state.select(Some(folio_count - 1));
+                            // FIX
+                            app.codices_component
+                                .list_state
+                                .scroll_down_by(folio_count as u16);
                         }
-                        Err(e) => {
-                            eprintln!("Failed to create folio for recording: {}", e);
-                        }
+
+                        // Switch to recording screen
+                        app.current_screen = CurrentScreen::RecordFolio;
                     }
                 }
             }
