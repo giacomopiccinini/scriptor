@@ -271,7 +271,7 @@ impl EventHandler {
 
                         // Switch to recording screen
                         app.current_screen = CurrentScreen::RecordFolio;
-                    } 
+                    }
                 }
             }
 

@@ -21,7 +21,7 @@ pub enum Commands {
         #[arg(required = true)]
         file: PathBuf,
     },
-    /// Record & transcribe
+    /// Record & transcribe on the fly
     Record {
         /// File .txt where transcription is saved
         #[arg(short)]
@@ -30,7 +30,7 @@ pub enum Commands {
         #[arg(short)]
         audio_dir: Option<PathBuf>,
     },
-    /// Record & transcribe
+    /// Playback a .wav file or a directory of .wav files
     Play {
         /// Path to .wav file or directory with .wav files
         #[arg(required = true)]

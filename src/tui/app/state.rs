@@ -27,7 +27,6 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::thread::JoinHandle;
 
-
 /// Enum representing the different screens in the application
 #[derive(Debug, Clone, PartialEq)]
 pub enum CurrentScreen {

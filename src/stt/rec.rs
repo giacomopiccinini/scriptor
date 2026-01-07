@@ -170,7 +170,9 @@ fn setup_audio_stream(
     // On some Linux audio backends (PipeWire/PulseAudio), cpal's build_input_stream()
     // may auto-start the stream instead of creating it in a paused state.
     // This ensures the stream only runs when explicitly started via play().
-    stream.pause()?;
+    stream
+        .pause()
+        .with_context(|| "Unable to stop streaming during setup")?;
 
     Ok((stream, consumer))
 }
