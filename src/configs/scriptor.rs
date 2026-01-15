@@ -5,6 +5,7 @@ use crate::configs::queue::QueueConfig;
 use crate::configs::stt::STTConfig;
 use crate::configs::theme::ThemeConfig;
 use crate::configs::vad::VADConfig;
+use crate::utils::aws::ModelsConfig;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -99,5 +100,41 @@ impl ScriptorConfig {
     /// Get scriptor default config
     pub fn get_default(&self) -> Result<DefaultConfig> {
         Ok(self.default.clone())
+    }
+
+    /// Check for missing model files based on the selected STT and VAD models
+    pub fn check_missing(&self, available_models: &ModelsConfig) -> Option<Vec<PathBuf>> {
+        let scriptor_dir = dirs::data_dir().unwrap().join("scriptor");
+        let mut missing = Vec::new();
+
+        // Check STT model files
+        let stt_key = self.default.stt.model.as_key();
+        if let Some(files) = available_models.get_stt_files(stt_key) {
+            for file in files {
+                let relative_path = PathBuf::from("models").join("stt").join(stt_key).join(file);
+                let path = scriptor_dir.join(&relative_path);
+                if !path.exists() {
+                    missing.push(relative_path);
+                }
+            }
+        }
+
+        // Check VAD model files
+        let vad_key = self.default.vad.model.as_key();
+        if let Some(files) = available_models.get_vad_files(vad_key) {
+            for file in files {
+                let relative_path = PathBuf::from("models").join("vad").join(vad_key).join(file);
+                let path = scriptor_dir.join(&relative_path);
+                if !path.exists() {
+                    missing.push(relative_path);
+                }
+            }
+        }
+
+        if missing.is_empty() {
+            None
+        } else {
+            Some(missing)
+        }
     }
 }

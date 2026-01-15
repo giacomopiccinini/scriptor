@@ -5,7 +5,6 @@ use color_eyre::Result;
 ///
 /// Initializes the terminal, creates the application instance, runs the main loop,
 /// and properly restores the terminal on exit.
-#[tokio::main]
 pub async fn run_tui() -> Result<()> {
     // Set the terminal up
     let mut terminal = ratatui::init();

@@ -13,6 +13,7 @@ use crate::tui::ui::components::{
 };
 use crate::tui::ui::cursor::CursorState;
 use crate::tui::ui::layout::AppLayout;
+use crate::utils::aws::{ModelsConfig, download_missing_files, download_models_list};
 use anyhow::Context;
 use color_eyre::Result;
 use crossterm::event::{self, KeyEvent};
@@ -160,6 +161,29 @@ impl App {
     pub async fn new() -> Self {
         // Read the config (creates default if missing)
         let config = ScriptorConfig::read().expect("Failed to read config file");
+
+        // Fetch the list of available models
+        let available_models = match ModelsConfig::read() {
+            Ok(config) => config,
+            Err(_) => {
+                download_models_list()
+                    .await
+                    .expect("Failed to download available models list");
+                ModelsConfig::read().expect("Failed to read models config after download")
+            }
+        };
+
+        // Check if files are missing and, if so, download them
+        if let Some(missing_files) = config.check_missing(&available_models) {
+            let mut spinner = Spinner::new_with_stream(
+                spinners::Dots,
+                "Downloading models...",
+                Color::Blue,
+                Streams::Stderr,
+            );
+            download_missing_files(&missing_files).await;
+            spinner.success("Models downloaded!");
+        };
 
         // Create STT tools. Add a spinner first, as it might take a while and we want the user to be aware.
         // Create spinner

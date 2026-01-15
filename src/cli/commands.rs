@@ -7,6 +7,7 @@ use crate::stt::queue::{transcriber_to_file_worker, transcriber_to_stdout_worker
 use crate::stt::rec::Recorder;
 use crate::stt::text::create_file_if_not_exists;
 use crate::stt::vad::VADModel;
+use crate::utils::aws::{ModelsConfig, download_missing_files, download_models_list};
 use anyhow::{Context, Result};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::style::Stylize;
@@ -21,7 +22,7 @@ use std::time::Duration;
 use walkdir::WalkDir;
 
 /// Transcribe an existing WAV file
-pub fn transcribe_from_file(file: &Path) -> Result<()> {
+pub async fn transcribe_from_file(file: &Path) -> Result<()> {
     // Validate file
     if !file.exists() {
         anyhow::bail!("Input file {} does not exist.", file.display());
@@ -33,8 +34,31 @@ pub fn transcribe_from_file(file: &Path) -> Result<()> {
         anyhow::bail!("Input {} is not a .wav file.", file.display());
     }
 
-    // Read config
-    let config = ScriptorConfig::read().with_context(|| "Failed to read config file")?;
+    // Read the config (creates default if missing)
+    let config = ScriptorConfig::read().expect("Failed to read config file");
+
+    // Fetch the list of available models
+    let available_models = match ModelsConfig::read() {
+        Ok(config) => config,
+        Err(_) => {
+            download_models_list()
+                .await
+                .expect("Failed to download available models list");
+            ModelsConfig::read().expect("Failed to read models config after download")
+        }
+    };
+
+    // Check if files are missing and, if so, download them
+    if let Some(missing_files) = config.check_missing(&available_models) {
+        let mut spinner = Spinner::new_with_stream(
+            spinners::Dots,
+            "Downloading models...",
+            Color::Blue,
+            Streams::Stderr,
+        );
+        download_missing_files(&missing_files).await;
+        spinner.success("Models downloaded!");
+    };
 
     // Load STT model
     let mut stt_model = STTModel::new(&config.default.stt, config.default.inference)?;
@@ -52,7 +76,7 @@ pub fn transcribe_from_file(file: &Path) -> Result<()> {
 }
 
 /// Record and transcribe
-pub fn record_and_transcribe(
+pub async fn record_and_transcribe(
     transcription_file: Option<PathBuf>,
     audio_dir: Option<PathBuf>,
 ) -> Result<()> {
@@ -73,6 +97,32 @@ pub fn record_and_transcribe(
         None
     };
 
+    // Read the config (creates default if missing)
+    let config = ScriptorConfig::read().expect("Failed to read config file");
+
+    // Fetch the list of available models
+    let available_models = match ModelsConfig::read() {
+        Ok(config) => config,
+        Err(_) => {
+            download_models_list()
+                .await
+                .expect("Failed to download available models list");
+            ModelsConfig::read().expect("Failed to read models config after download")
+        }
+    };
+
+    // Check if files are missing and, if so, download them
+    if let Some(missing_files) = config.check_missing(&available_models) {
+        let mut spinner = Spinner::new_with_stream(
+            spinners::Dots,
+            "Downloading models...",
+            Color::Blue,
+            Streams::Stderr,
+        );
+        download_missing_files(&missing_files).await;
+        spinner.success("Models downloaded!");
+    };
+
     // Create spinner
     let mut spinner = Spinner::new_with_stream(
         spinners::Dots,
@@ -81,8 +131,8 @@ pub fn record_and_transcribe(
         Streams::Stderr,
     );
 
-    // Read config
-    let config = ScriptorConfig::read().with_context(|| "Failed to read config file")?;
+    // // Read config
+    // let config = ScriptorConfig::read().with_context(|| "Failed to read config file")?;
 
     // Load STT model
     let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;

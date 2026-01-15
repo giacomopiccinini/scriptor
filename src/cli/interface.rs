@@ -38,17 +38,17 @@ pub enum Commands {
     },
 }
 
-pub fn run_cli() -> Result<()> {
+pub async fn run_cli() -> Result<()> {
     // Parse the arguments
     let args = Cli::parse();
 
     match args.command {
-        Some(Commands::FromFile { file }) => transcribe_from_file(&file),
+        Some(Commands::FromFile { file }) => transcribe_from_file(&file).await,
         Some(Commands::Record {
             transcription_file,
             audio_dir,
-        }) => record_and_transcribe(transcription_file, audio_dir),
+        }) => record_and_transcribe(transcription_file, audio_dir).await,
         Some(Commands::Play { input }) => play(input),
-        None => run_tui().map_err(|e| anyhow::anyhow!("{}", e)),
+        None => run_tui().await.map_err(|e| anyhow::anyhow!("{}", e)),
     }
 }

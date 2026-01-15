@@ -6,8 +6,17 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AvailableVADModel {
     #[default]
-    #[serde(rename = "silero")]
+    #[serde(rename = "silero-v5")]
     Silero,
+}
+
+impl AvailableVADModel {
+    /// Returns the TOML key string for this model
+    pub fn as_key(&self) -> &'static str {
+        match self {
+            Self::Silero => "silero-v5",
+        }
+    }
 }
 
 /// Wrapper for model-specific configurations

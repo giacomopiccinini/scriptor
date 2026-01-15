@@ -15,7 +15,7 @@ impl ParakeetConfig {
     /// version or the full-precision (fp32) version.
     pub fn new(quantized: bool) -> Result<Self> {
         if quantized {
-            let model_name = "parakeet-tdt-0.6b-v3-int8".to_string();
+            let model_name = "parakeet-tdt-0_6b-v3-int8".to_string();
             let model_dir_path = dirs::data_dir()
                 .with_context(|| "Failed to find data dir")?
                 .join("scriptor")
@@ -35,7 +35,7 @@ impl ParakeetConfig {
                 vocab_path,
             })
         } else {
-            let model_name = "parakeet-tdt-0.6b-v3-fp32".to_string();
+            let model_name = "parakeet-tdt-0_6b-v3-fp32".to_string();
             let model_dir_path = dirs::data_dir()
                 .with_context(|| "Failed to find data dir")?
                 .join("scriptor")
