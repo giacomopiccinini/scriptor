@@ -57,8 +57,6 @@ pub enum CurrentRegion {
 
 /// All necessary tools to handle Speech to Text
 pub struct STTTools {
-    // pub recorder: Recorder,
-    // pub vad_model: VADModel,
     pub fractor: Option<Fractor>,
     pub stt_model: Option<STTModel>,
     pub player: Player,
