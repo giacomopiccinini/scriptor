@@ -21,7 +21,8 @@ impl Default for SileroConfig {
             .join("scriptor")
             .join("models")
             .join("vad")
-            .join("silero-vad.onnx");
+            .join("silero-v5")
+            .join("silero.onnx");
 
         Self {
             model_path,

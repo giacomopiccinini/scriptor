@@ -94,9 +94,9 @@ pub struct App {
     pub recording_stop_signal: Option<Arc<AtomicBool>>,
     /// Pause signal for the recording thread
     pub recording_pause_signal: Option<Arc<AtomicBool>>,
-    ///
+    /// Handle for fractor thread
     pub fractor_handle: Option<JoinHandle<anyhow::Result<Option<PathBuf>>>>,
-    ///
+    /// Handle for transcriber thread
     pub transcriber_handle: Option<JoinHandle<anyhow::Result<()>>>,
     /// Flag to indicate if the application should exit
     pub exit: bool,
