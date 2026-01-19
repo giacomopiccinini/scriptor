@@ -66,53 +66,16 @@ pub fn transcriber_to_stdout_worker(
     Ok(())
 }
 
-// /// Transcription worker that writes results to the database
-// /// Uses a tokio runtime to perform async DB operations from within a sync thread
-// pub fn transcriber_to_db_worker(
-//     mut stt_model: STTModel,
-//     folio_id: i64,
-//     pool: SqlitePool,
-//     rx: Receiver<FragmentumToTranscribe>,
-// ) -> Result<()> {
-//     // Create a tokio runtime for async DB operations
-//     let rt = tokio::runtime::Runtime::new()
-//         .with_context(|| "Failed to create tokio runtime for transcription worker")?;
-
-//     // Loop until channel is closed (sender dropped)
-//     while let Ok(item) = rx.recv() {
-//         // Load and transcribe
-//         let audio = stt_model
-//             .load_audio(&item.path)
-//             .with_context(|| "Failed to load fragmentum")?;
-//         let result = stt_model
-//             .transcribe(audio)
-//             .with_context(|| "Failed to transcribe fragmentum")?;
-
-//         // Create fragmentum in DB
-//         let new_fragmentum = NewFragmentum {
-//             folio_id,
-//             content: result.text,
-//         };
-
-//         // Run async DB operation
-//         rt.block_on(async {
-//             Fragmentum::create(&pool, new_fragmentum)
-//                 .await
-//                 .with_context(|| "Failed to save fragmentum to database")
-//         })?;
-//     }
-//     Ok(())
-// }
-
 /// Uses a tokio runtime to perform async DB operations from within a sync thread
 pub fn transcriber_to_db_worker(
     mut stt_model: STTModel,
     folio_id: i64,
     pool: SqlitePool,
     rx: Receiver<FragmentumToTranscribe>,
+    runtime_handle: tokio::runtime::Handle,
 ) -> Result<()> {
-    // Get handle to the existing runtime instead of creating a new one
-    let handle = tokio::runtime::Handle::current();
+    // Use the passed handle instead of trying to get current (which fails in std::thread)
+    let handle = runtime_handle;
 
     // Loop until channel is closed (sender dropped)
     while let Ok(item) = rx.recv() {
