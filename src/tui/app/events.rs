@@ -5,6 +5,7 @@ use crate::tui::ui::components::{CodicesComponent, FoliaComponent, FragmentaComp
 use crate::tui::ui::cursor::CursorState;
 use arboard::{Clipboard, SetExtLinux};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use std::fs;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -217,6 +218,16 @@ impl EventHandler {
                     if let (Some(fractor), Some(stt_model)) =
                         (app.stt_tools.fractor.take(), app.stt_tools.stt_model.take())
                     {
+                        // Create path to output directory for audio files
+                        let output_dir = dirs::data_dir()
+                            .expect("Unable to get data directory")
+                            .join("scriptor")
+                            .join("audios")
+                            .join(format!("{:04}", codex.codex.id))
+                            .join(format!("{:04}", folio_id));
+
+                        fs::create_dir_all(&output_dir).expect("Unable to create audio directory");
+
                         // Create stop and pause signals
                         let stop_signal = Arc::new(AtomicBool::new(false));
                         let pause_signal = Arc::new(AtomicBool::new(false));
@@ -232,14 +243,23 @@ impl EventHandler {
                         // Clone pool for transcriber thread
                         let pool_clone = app.pool.clone();
 
+                        // Capture runtime handle BEFORE spawning std::thread
+                        let runtime_handle = tokio::runtime::Handle::current();
+
                         // Spawn fractor thread
                         let fractor_handle = std::thread::spawn(move || {
-                            fractor.run(None, stop_signal, pause_signal, tx)
+                            fractor.run(Some(output_dir), stop_signal, pause_signal, tx)
                         });
 
                         // Spawn transcriber thread
                         let transcriber_handle = std::thread::spawn(move || {
-                            transcriber_to_db_worker(stt_model, folio_id, pool_clone, rx)
+                            transcriber_to_db_worker(
+                                stt_model,
+                                folio_id,
+                                pool_clone,
+                                rx,
+                                runtime_handle,
+                            )
                         });
 
                         // Update thread state
@@ -476,12 +496,16 @@ impl EventHandler {
 
                 // Wait for threads to finish processing
                 if let Some(fractor_handle) = app.fractor_handle.take() {
-                    fractor_handle.join().expect("Recording thread panicked");
+                    fractor_handle
+                        .join()
+                        .expect("Recording thread panicked")
+                        .expect("Recording failed");
                 };
                 if let Some(transcriber_handle) = app.transcriber_handle.take() {
                     transcriber_handle
                         .join()
-                        .expect("Transcribing thread panicked");
+                        .expect("Transcribing thread panicked")
+                        .expect("Transcribing failed");
                 };
 
                 // Refresh the folio's fragmenta from DB

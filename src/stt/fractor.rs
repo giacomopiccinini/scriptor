@@ -350,10 +350,12 @@ impl Fractor {
         }
 
         // Flush any remaining buffer content before stopping
-        self.flush_current_buffer(&output_dir, &tx)?;
+        self.flush_current_buffer(&output_dir, &tx)
+            .with_context(|| "Failed to flush buffer")?;
 
         // Stop the recording
-        self.stop_recording();
+        self.stop_recording()
+            .with_context(|| "Failed to stop recording")?;
 
         // Return the temp directory to clean up after transcription completes (if any)
         if erase {
