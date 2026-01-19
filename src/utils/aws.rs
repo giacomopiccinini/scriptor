@@ -60,7 +60,7 @@ pub async fn download_models_list() -> Result<()> {
     let config_path = config_dir.join("models.toml");
 
     // Compose path to models.toml
-    let url = format!("https://www.scriptor.giacomopiccinini.xyz/models/models.toml");
+    let url = "https://www.scriptor.giacomopiccinini.xyz/models/models.toml".to_string();
 
     // Download file
     download_file(&url, config_path)
@@ -71,13 +71,13 @@ pub async fn download_models_list() -> Result<()> {
 }
 
 /// Download all the missing files in parallel
-pub async fn download_missing_files(missing_files: &Vec<PathBuf>) {
+pub async fn download_missing_files(missing_files: &[PathBuf]) {
     // Set up source and directory
     let base_url = PathBuf::from("https://www.scriptor.giacomopiccinini.xyz");
     let scriptor_dir = dirs::data_dir().unwrap().join("scriptor");
 
     let download_tasks: Vec<_> = missing_files
-        .into_iter()
+        .iter()
         .map(|missing_file| {
             // Construct the specific url and local path
             let url = base_url.join(missing_file);
@@ -88,7 +88,7 @@ pub async fn download_missing_files(missing_files: &Vec<PathBuf>) {
                 if let Some(parent) = local_path.parent() {
                     tokio::fs::create_dir_all(parent).await?;
                 }
-                download_file(&url.to_str().unwrap(), local_path).await
+                download_file(url.to_str().unwrap(), local_path).await
             }
         })
         .collect();
