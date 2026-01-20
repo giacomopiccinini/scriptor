@@ -16,14 +16,15 @@ impl Default for DBConfig {
         // Use data directory to standardize storage
         let data_dir = dirs::data_dir().unwrap().join("scriptor");
 
-        // Create directory
-        std::fs::create_dir_all(&data_dir).unwrap();
-
         // Create path to db
-        let path = data_dir.join(DEFAULT_DB_FILE);
+        let db_dir_path = data_dir.join("databases");
+        let db_path = db_dir_path.join(DEFAULT_DB_FILE);
+
+        // Create directory
+        std::fs::create_dir_all(&db_dir_path).unwrap();
 
         // Create connection string (only SQLite is admissible)
-        let connection_str = format!("sqlite:{}", path.display());
+        let connection_str = format!("sqlite:{}", db_path.display());
 
         Self {
             name: DEFAULT_DB_NAME.to_string(),
