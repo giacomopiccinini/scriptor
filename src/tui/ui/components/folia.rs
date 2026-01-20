@@ -85,6 +85,7 @@ impl FoliaComponent {
             .into_iter()
             .map(|f| NewFragmentum {
                 folio_id,
+                path: folio_path.display().to_string(),
                 content: f,
             })
             .collect();

@@ -90,6 +90,7 @@ pub fn transcriber_to_db_worker(
         // Create fragmentum in DB
         let new_fragmentum = NewFragmentum {
             folio_id,
+            path: item.path.display().to_string(),
             content: result.text,
         };
 

@@ -349,7 +349,7 @@ impl Fragmentum {
         )
         .bind(new_fragmentum.folio_id)
         .bind(&new_fragmentum.content)
-        .bind("") // Default empty audio_path, can be updated later
+        .bind(&new_fragmentum.path) // Default empty audio_path, can be updated later
         .bind(now)
         .bind(now)
         .fetch_one(pool)
@@ -371,13 +371,14 @@ impl Fragmentum {
             .iter()
             .enumerate()
             .map(|(i, _)| {
-                let base = i * 3;
+                let base = i * 4;
                 format!(
-                    "(?{}, ?{}, '', ?{}, ?{})",
+                    "(?{}, ?{}, ?{}, ?{}, ?{})",
                     base + 1,
                     base + 2,
                     base + 3,
-                    base + 3
+                    base + 4,
+                    base + 4
                 )
             })
             .collect();
@@ -392,6 +393,7 @@ impl Fragmentum {
             query = query
                 .bind(new_fragmentum.folio_id)
                 .bind(&new_fragmentum.content)
+                .bind(&new_fragmentum.path)
                 .bind(now);
         }
 

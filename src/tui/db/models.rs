@@ -46,6 +46,7 @@ pub struct NewFolio {
 #[derive(Debug)]
 pub struct NewFragmentum {
     pub folio_id: i64,
+    pub path: String,
     pub content: String,
 }
 
