@@ -478,7 +478,6 @@ impl EventHandler {
     pub async fn handle_record_folio_screen_key(app: &mut App, key: KeyEvent) {
         match key.code {
             // Toggle pause/resume
-            // TODO: Fix this as currently it is not working properly
             KeyCode::Char(' ') => {
                 if let Some(pause_signal) = &app.recording_pause_signal {
                     let currently_paused = pause_signal.load(Ordering::SeqCst);
