@@ -544,7 +544,13 @@ impl Widget for &mut App {
         } else {
             None
         };
-        FragmentaComponent::render(selected_folio, fragmenta_area, buf, theme);
+        FragmentaComponent::render(
+            selected_folio,
+            self.stt_tools.player.is_playing,
+            fragmenta_area,
+            buf,
+            theme,
+        );
 
         // Render popup screens if active
         match self.current_screen {

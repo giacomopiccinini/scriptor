@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use chrono::Utc;
 use sqlx::SqlitePool;
+use std::path::PathBuf;
 
 use crate::tui::db::models::{
     Codex, Folio, Fragmentum, NewCodex, NewFolio, NewFragmentum, UICodex, UIFolio, UIFragmentum,
@@ -485,6 +486,35 @@ impl Fragmentum {
             .with_context(|| "Failed to delete fragmentum")?;
 
         Ok(())
+    }
+
+    /// Find fragmenta coming after the one currently selected
+    pub async fn get_subsequent_fragmenta_audio_paths(
+        pool: &SqlitePool,
+        folio_id: i64,
+        fragmentum_id: i64,
+    ) -> Result<Option<Vec<PathBuf>>> {
+        let rows: Vec<(String,)> = sqlx::query_as(
+            r#"
+            SELECT audio_path
+            FROM fragmentum 
+            WHERE folio_id = ?1 
+            AND id >= ?2
+            ORDER BY id
+            "#,
+        )
+        .bind(folio_id)
+        .bind(fragmentum_id)
+        .fetch_all(pool)
+        .await
+        .with_context(|| "Failed to fetch audio_paths")?;
+
+        if rows.is_empty() {
+            Ok(None)
+        } else {
+            let paths: Vec<PathBuf> = rows.into_iter().map(|(p,)| PathBuf::from(p)).collect();
+            Ok(Some(paths))
+        }
     }
 }
 

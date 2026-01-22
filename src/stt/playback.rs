@@ -394,6 +394,39 @@ impl Player {
     pub fn check_and_preload(&self) -> Result<()> {
         self.queue.trigger_preload_if_needed()
     }
+
+    /// Replace the current queue with new audio files
+    /// Stops playback, clears the existing queue and stream, then loads new files
+    pub fn load_files(&mut self, audio_files: Option<Vec<PathBuf>>) -> Result<()> {
+        // Stop playback if currently playing
+        if self.is_playing {
+            self.pause().with_context(|| "Unable to stop player")?;
+        }
+
+        // Drop the old stream (this stops any audio callback)
+        self.stream = None;
+
+        // Create a new queue with the new files
+        self.queue = PlayerQueue::new(self.config.wav_config, audio_files)
+            .with_context(|| "Unable to create new player queue")?;
+
+        // Set up a new stream if we have files
+        if !self.queue.is_empty() {
+            let state = PlaybackState {
+                active_audio: self.queue.active_audio.clone(),
+                next_audio: self.queue.next_audio.clone(),
+                position: self.queue.playback_position.clone(),
+                file_index: self.queue.current_file_index.clone(),
+                total_files: self.queue.total_files.clone(),
+                preload_flag: self.queue.preload_needed.clone(),
+            };
+            let stream =
+                self.setup_output_stream(self.config.output_config.sample_format(), state)?;
+            self.stream = Some(stream);
+        }
+
+        Ok(())
+    }
 }
 
 /// Generic buffer filling function for all sample types

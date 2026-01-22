@@ -1,6 +1,6 @@
 use crate::stt::queue::{create_fragmentum_channel, transcriber_to_db_worker};
 use crate::tui::app::state::{App, CurrentRegion, CurrentScreen};
-use crate::tui::db::models::{Folio, NewFolio};
+use crate::tui::db::models::{Folio, Fragmentum, NewFolio};
 use crate::tui::ui::components::{CodicesComponent, FoliaComponent, FragmentaComponent};
 use crate::tui::ui::cursor::CursorState;
 use arboard::{Clipboard, SetExtLinux};
@@ -291,6 +291,41 @@ impl EventHandler {
 
                         // Switch to recording screen
                         app.current_screen = CurrentScreen::RecordFolio;
+                    }
+                }
+            }
+
+            // Play fragmenta
+            (KeyCode::Char('p'), KeyModifiers::NONE) => {
+                if app.stt_tools.player.is_playing {
+                    app.stt_tools
+                        .player
+                        .pause()
+                        .expect("Unable to pause player");
+                } else {
+                    if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
+                        && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
+                        && let Some(selected_folio) = selected_codex.folia.get(selected_folio_idx)
+                        && let Some(fragmentum_idx) = selected_folio.fragmentum_state.selected()
+                        && let Some(ui_fragmentum) = selected_folio.fragmenta.get(fragmentum_idx)
+                    {
+                        // Find all audio files that come after the one corresponding to the selected fragmentum
+                        let audio_paths = Fragmentum::get_subsequent_fragmenta_audio_paths(
+                            &app.pool,
+                            selected_folio.folio.id,
+                            ui_fragmentum.fragmentum.id,
+                        )
+                        .await
+                        .expect("Unable to fetch audio paths");
+
+                        // Add files to player queue
+                        app.stt_tools
+                            .player
+                            .load_files(audio_paths)
+                            .expect("Unable to enqueue fragmenta to player queue");
+
+                        // Play audio
+                        app.stt_tools.player.play().expect("Unable to play");
                     }
                 }
             }
