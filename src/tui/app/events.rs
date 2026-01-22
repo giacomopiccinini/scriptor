@@ -305,7 +305,8 @@ impl EventHandler {
                 } else {
                     if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
                         && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
-                        && let Some(selected_folio) = selected_codex.folia.get(selected_folio_idx)
+                        && let Some(selected_folio) =
+                            selected_codex.folia.get_mut(selected_folio_idx)
                         && let Some(fragmentum_idx) = selected_folio.fragmentum_state.selected()
                         && let Some(ui_fragmentum) = selected_folio.fragmenta.get(fragmentum_idx)
                     {
@@ -323,6 +324,9 @@ impl EventHandler {
                             .player
                             .load_files(audio_paths)
                             .expect("Unable to enqueue fragmenta to player queue");
+
+                        // Reset playback file index tracker
+                        app.last_playback_file_index = 0;
 
                         // Play audio
                         app.stt_tools.player.play().expect("Unable to play");

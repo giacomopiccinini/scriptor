@@ -99,6 +99,8 @@ pub struct App {
     pub fractor_handle: Option<JoinHandle<anyhow::Result<Option<PathBuf>>>>,
     /// Handle for transcriber thread
     pub transcriber_handle: Option<JoinHandle<anyhow::Result<()>>>,
+    /// Last observed playback file index (for tracking when to advance selection)
+    pub last_playback_file_index: usize,
     /// Flag to indicate if the application should exit
     pub exit: bool,
 }
@@ -229,6 +231,7 @@ impl App {
             recording_pause_signal: None,
             fractor_handle: None,
             transcriber_handle: None,
+            last_playback_file_index: 0,
             exit: false,
         }
     }
@@ -244,11 +247,11 @@ impl App {
             // Draw the current state of the application
             terminal.draw(|frame| frame.render_widget(&mut self, frame.area()))?;
 
-            // Use non-blocking poll when recording to allow periodic DB refresh
-            let poll_timeout = if self.is_recording {
-                Duration::from_millis(500) // Refresh every 500ms during recording
+            // Use non-blocking poll when recording or playing to allow periodic updates
+            let poll_timeout = if self.is_recording || self.stt_tools.player.is_playing {
+                Duration::from_millis(100) // Fast refresh during recording or playback
             } else {
-                Duration::from_secs(60) // Longer timeout when not recording
+                Duration::from_secs(60) // Longer timeout when idle
             };
 
             // Poll for events with timeout
@@ -266,6 +269,32 @@ impl App {
             {
                 // Refresh fragmenta from DB (ignore errors during recording)
                 let _ = selected_folio.update_fragmenta(&self.pool).await;
+            }
+
+            // Sync UI with playback progress
+            if self.stt_tools.player.is_playing {
+                // Check if file index advanced
+                let current_idx = self.stt_tools.player.queue.current();
+                if current_idx > self.last_playback_file_index {
+                    // Advance fragmentum selection
+                    if let Some(selected_codex) = self.codices_component.get_selected_codex_mut()
+                        && let Some(folio_idx) = selected_codex.folio_state.selected()
+                        && let Some(selected_folio) = selected_codex.folia.get_mut(folio_idx)
+                    {
+                        // Jump to the current file idx. This prevents that moving up/down with the arrows
+                        // renders the selected fragmentum out of sync with the player
+                        FragmentaComponent::jump_to_fragmentum(selected_folio, current_idx);
+                    }
+                    self.last_playback_file_index = current_idx;
+                }
+
+                // Auto-stop when queue finishes
+                if self.stt_tools.player.queue.is_queue_finished() {
+                    let _ = self.stt_tools.player.pause();
+                }
+
+                // Trigger preload if needed
+                let _ = self.stt_tools.player.check_and_preload();
             }
         }
         Ok(())

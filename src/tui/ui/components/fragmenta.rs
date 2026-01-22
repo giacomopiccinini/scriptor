@@ -34,6 +34,11 @@ impl FragmentaComponent {
         }
     }
 
+    /// Select fragmentum at given index
+    pub fn jump_to_fragmentum(ui_folio: &mut UIFolio, fragmentum_idx: usize) {
+        ui_folio.fragmentum_state.select(Some(fragmentum_idx))
+    }
+
     /// Delete the currently selected fragmentum
     pub async fn delete_selected_fragmentum(
         ui_folio: &mut UIFolio,
