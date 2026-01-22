@@ -61,12 +61,23 @@ impl FragmentaComponent {
     /// Render the list of fragmenta for the selected folio
     pub fn render(
         selected_folio: Option<&mut UIFolio>,
+        is_playing: bool,
         area: Rect,
         buf: &mut Buffer,
         theme: &ThemeConfig,
     ) {
+        // Create play/pause text based on status
+        let play_text = if is_playing {
+            Span::styled("ause ", Style::default().fg(theme.foreground))
+        } else {
+            Span::styled("lay ", Style::default().fg(theme.foreground))
+        };
+
         // Command hints for fragmenta
         let fragmentum_command_hints = Line::from(vec![
+            Span::styled("[p]", Style::default().fg(theme.highlight)),
+            play_text,
+            Span::raw("   "),
             Span::styled("[c]", Style::default().fg(theme.highlight)),
             Span::styled("opy ", Style::default().fg(theme.foreground)),
             Span::raw("   "),
