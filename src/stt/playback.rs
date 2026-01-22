@@ -237,11 +237,14 @@ impl PlayerQueue {
 
     /// Check if preloading is needed and trigger it
     /// This should be called periodically from the main thread (not audio callback)
-    pub fn trigger_preload_if_needed(&self) -> Result<()> {
+    pub fn trigger_preload_if_needed(&self) -> Result<bool> {
         if self.preload_needed.swap(false, Ordering::SeqCst) {
-            self.preload_next()?;
+            self.preload_next()
+                .with_context(|| "Unable to preload next queue element")?;
+            Ok(true)
+        } else {
+            Ok(false)
         }
-        Ok(())
     }
 }
 
@@ -391,7 +394,7 @@ impl Player {
 
     /// Check if preloading is needed and trigger it
     /// This should be called periodically from the main event loop
-    pub fn check_and_preload(&self) -> Result<()> {
+    pub fn check_and_preload(&self) -> Result<bool> {
         self.queue.trigger_preload_if_needed()
     }
 
