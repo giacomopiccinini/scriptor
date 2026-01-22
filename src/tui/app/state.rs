@@ -87,8 +87,6 @@ pub struct App {
     pub is_paused: bool,
     /// Flag to signal if inference is running
     pub is_transcribing: bool,
-    /// Flag to signal if user is playing back fragmenta
-    pub is_playing: bool,
     /// Selected archivum index for Archivum selector
     pub selected_archivum_index: usize,
     /// ID of the folio being recorded to (when recording)
@@ -225,7 +223,6 @@ impl App {
             is_recording: false,
             is_paused: false,
             is_transcribing: false,
-            is_playing: false,
             selected_archivum_index: 0,
             recording_folio_id: None,
             recording_stop_signal: None,
@@ -547,7 +544,13 @@ impl Widget for &mut App {
         } else {
             None
         };
-        FragmentaComponent::render(selected_folio, self.is_playing, fragmenta_area, buf, theme);
+        FragmentaComponent::render(
+            selected_folio,
+            self.stt_tools.player.is_playing,
+            fragmenta_area,
+            buf,
+            theme,
+        );
 
         // Render popup screens if active
         match self.current_screen {
