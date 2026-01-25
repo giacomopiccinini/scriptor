@@ -231,14 +231,15 @@ impl Fractor {
         Ok(output_path)
     }
 
-    /// Run the fractor. Returns the temp directory to clean up (if any) after transcription completes.
+    /// Run the fractor. Returns the temp directory to clean up (if any) after transcription completes,
+    /// along with the VADModel so it can be reused for subsequent recordings.
     pub fn run(
         self,
         output_dir: Option<PathBuf>,
         stop_signal: Arc<AtomicBool>,
         pause_signal: Arc<AtomicBool>,
         tx: SyncSender<FragmentumToTranscribe>,
-    ) -> Result<Option<PathBuf>> {
+    ) -> Result<(Option<PathBuf>, VADModel)> {
         // Destructure self to avoid partial move issues after moving recorder_config
         let Self {
             recorder_config,
@@ -402,11 +403,12 @@ impl Fractor {
         // Stop the recording
         Self::stop_recording(&mut recorder).with_context(|| "Failed to stop recording")?;
 
-        // Return the temp directory to clean up after transcription completes (if any)
+        // Return the temp directory to clean up after transcription completes (if any),
+        // along with the VAD model for reuse
         if erase {
-            Ok(Some(output_dir))
+            Ok((Some(output_dir), vad))
         } else {
-            Ok(None)
+            Ok((None, vad))
         }
     }
 }

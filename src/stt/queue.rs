@@ -23,11 +23,12 @@ pub fn create_fragmentum_channel(
     std::sync::mpsc::sync_channel::<FragmentumToTranscribe>(max_queue_elements)
 }
 
+/// Transcribe audio fragments to a file. Returns the STTModel for reuse.
 pub fn transcriber_to_file_worker(
     mut stt_model: STTModel,
     transcription_file: PathBuf,
     rx: Receiver<FragmentumToTranscribe>,
-) -> Result<()> {
+) -> Result<STTModel> {
     // Loop until channel is closed (sender dropped)
     while let Ok(item) = rx.recv() {
         // Load and transcribe
@@ -42,13 +43,14 @@ pub fn transcriber_to_file_worker(
         append_text(&transcription_file, &result.text)
             .with_context(|| "Failed to append transcription to file")?;
     }
-    Ok(())
+    Ok(stt_model)
 }
 
+/// Transcribe audio fragments to stdout. Returns the STTModel for reuse.
 pub fn transcriber_to_stdout_worker(
     mut stt_model: STTModel,
     rx: Receiver<FragmentumToTranscribe>,
-) -> Result<()> {
+) -> Result<STTModel> {
     println!();
     // Loop until channel is closed (sender dropped)
     while let Ok(item) = rx.recv() {
@@ -63,17 +65,18 @@ pub fn transcriber_to_stdout_worker(
         // Print to stdout
         println!("{}", result.text);
     }
-    Ok(())
+    Ok(stt_model)
 }
 
-/// Uses a tokio runtime to perform async DB operations from within a sync thread
+/// Uses a tokio runtime to perform async DB operations from within a sync thread.
+/// Returns the STTModel for reuse.
 pub fn transcriber_to_db_worker(
     mut stt_model: STTModel,
     folio_id: i64,
     pool: SqlitePool,
     rx: Receiver<FragmentumToTranscribe>,
     runtime_handle: tokio::runtime::Handle,
-) -> Result<()> {
+) -> Result<STTModel> {
     // Use the passed handle instead of trying to get current (which fails in std::thread)
     let handle = runtime_handle;
 
@@ -101,5 +104,5 @@ pub fn transcriber_to_db_worker(
                 .with_context(|| "Failed to save fragmentum to database")
         })?;
     }
-    Ok(())
+    Ok(stt_model)
 }

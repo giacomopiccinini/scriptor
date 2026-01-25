@@ -188,14 +188,21 @@ pub async fn record_and_transcribe(
     stop_signal.store(true, Ordering::Relaxed);
 
     // Wait for fractor thread to complete and get temp dir to clean up (if any)
+    // We ignore the returned VADModel since the CLI exits after this command
     let temp_dir_to_erase = match fractor_handle.join() {
-        Ok(result) => result?,
+        Ok(result) => {
+            let (temp_dir, _vad_model) = result?;
+            temp_dir
+        }
         Err(_) => anyhow::bail!("Recording thread panicked"),
     };
 
     // Wait for transcriber to finish processing all items
+    // We ignore the returned STTModel since the CLI exits after this command
     match transcriber_handle.join() {
-        Ok(result) => result?,
+        Ok(result) => {
+            let _stt_model = result?;
+        }
         Err(_) => anyhow::bail!("Transcribing thread panicked"),
     }
 

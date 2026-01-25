@@ -95,10 +95,10 @@ pub struct App {
     pub recording_stop_signal: Option<Arc<AtomicBool>>,
     /// Pause signal for the recording thread
     pub recording_pause_signal: Option<Arc<AtomicBool>>,
-    /// Handle for fractor thread
-    pub fractor_handle: Option<JoinHandle<anyhow::Result<Option<PathBuf>>>>,
-    /// Handle for transcriber thread
-    pub transcriber_handle: Option<JoinHandle<anyhow::Result<()>>>,
+    /// Handle for fractor thread (returns temp dir path and VADModel for reuse)
+    pub fractor_handle: Option<JoinHandle<anyhow::Result<(Option<PathBuf>, VADModel)>>>,
+    /// Handle for transcriber thread (returns STTModel for reuse)
+    pub transcriber_handle: Option<JoinHandle<anyhow::Result<STTModel>>>,
     /// Last observed playback file index (for tracking when to advance selection)
     pub last_playback_file_index: usize,
     /// Flag to indicate if the application should exit
@@ -133,23 +133,24 @@ impl STTTools {
         })
     }
 
-    /// Recreate the fractor and STT model (needed after recording completes)
-    pub fn reinitialize(&mut self, config: &ScriptorConfig) -> anyhow::Result<()> {
+    /// Restore models after recording completes by reusing the existing VAD and STT models.
+    /// Only recreates the cheap RecorderConfig and Fractor wrapper.
+    pub fn restore_from_recording(
+        &mut self,
+        config: &ScriptorConfig,
+        vad_model: VADModel,
+        stt_model: STTModel,
+    ) -> anyhow::Result<()> {
         // Create recorder config (actual stream created inside thread for macOS compatibility)
+        // This is cheap - just configuration, no model loading
         let recorder_config =
             RecorderConfig::new(config.default.fractor.max_fragmentum_duration_seconds)
                 .with_context(|| "Failed to create recorder config")?;
 
-        // Create VAD model
-        let vad_model = VADModel::new(&config.default.vad, config.default.inference.clone())
-            .with_context(|| "Failed to create voice activity detector")?;
-
-        // Create fractor
+        // Create fractor with the existing VAD model (no model reloading!)
         let fractor = Fractor::new(recorder_config, vad_model);
 
-        // Reload stt
-        let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
-
+        // Restore models
         self.fractor = Some(fractor);
         self.stt_model = Some(stt_model);
 
