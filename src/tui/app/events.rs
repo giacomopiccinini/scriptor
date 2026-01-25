@@ -3,7 +3,9 @@ use crate::tui::app::state::{App, CurrentRegion, CurrentScreen};
 use crate::tui::db::models::{Folio, Fragmentum, NewFolio};
 use crate::tui::ui::components::{CodicesComponent, FoliaComponent, FragmentaComponent};
 use crate::tui::ui::cursor::CursorState;
-use arboard::{Clipboard, SetExtLinux};
+use arboard::Clipboard;
+#[cfg(target_os = "linux")]
+use arboard::SetExtLinux;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::fs;
 use std::sync::Arc;
@@ -345,10 +347,17 @@ impl EventHandler {
                     // Clone content for the thread
                     let content = ui_fragmentum.fragmentum.content.clone();
                     // Spawn thread to keep clipboard alive until content is read
+                    #[cfg(target_os = "linux")]
                     std::thread::spawn(move || {
                         if let Ok(mut clipboard) = Clipboard::new() {
                             // Use Linux extension to wait until clipboard is read
                             let _ = clipboard.set().wait().text(content);
+                        }
+                    });
+                    #[cfg(not(target_os = "linux"))]
+                    std::thread::spawn(move || {
+                        if let Ok(mut clipboard) = Clipboard::new() {
+                            let _ = clipboard.set_text(content);
                         }
                     });
                 }
@@ -369,10 +378,17 @@ impl EventHandler {
                         .join("\n\n");
 
                     // Spawn thread to keep clipboard alive until content is read
+                    #[cfg(target_os = "linux")]
                     std::thread::spawn(move || {
                         if let Ok(mut clipboard) = Clipboard::new() {
                             // Use Linux extension to wait until clipboard is read
                             let _ = clipboard.set().wait().text(all_content);
+                        }
+                    });
+                    #[cfg(not(target_os = "linux"))]
+                    std::thread::spawn(move || {
+                        if let Ok(mut clipboard) = Clipboard::new() {
+                            let _ = clipboard.set_text(all_content);
                         }
                     });
                 }
