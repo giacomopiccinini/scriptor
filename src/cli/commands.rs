@@ -131,9 +131,6 @@ pub async fn record_and_transcribe(
         Streams::Stderr,
     );
 
-    // // Read config
-    // let config = ScriptorConfig::read().with_context(|| "Failed to read config file")?;
-
     // Load STT model
     let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
 
@@ -166,7 +163,7 @@ pub async fn record_and_transcribe(
     eprintln!(
         "{} {}",
         "● [ON AIR]".red().bold(),
-        "Press Enter to stop recording.".italic()
+        "Press Esc or q to stop recording.".italic()
     );
 
     // Run fractor in a separate thread
@@ -180,9 +177,24 @@ pub async fn record_and_transcribe(
         }
     });
 
-    // Wait for Enter key
-    let stdin = io::stdin();
-    let _ = stdin.lock().lines().next();
+    // Enable raw mode for key capture
+    enable_raw_mode().with_context(|| "Failed to enable raw terminal mode")?;
+
+    loop {
+        // Poll for key events (non-blocking with timeout)
+        if event::poll(Duration::from_millis(100))?
+            && let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+        {
+            match key.code {
+                KeyCode::Esc | KeyCode::Char('q') => break,
+                _ => {}
+            }
+        }
+    }
+
+    // Restore terminal
+    disable_raw_mode().with_context(|| "Failed to disable raw terminal mode")?;
 
     // Signal stop and wait for fractor to finish
     stop_signal.store(true, Ordering::Relaxed);
@@ -255,7 +267,7 @@ pub fn play(input: PathBuf) -> Result<()> {
     eprintln!(
         "{} {}",
         "▶ Playing...".green().bold(),
-        "[Space] play/pause | [Enter/q] exit".italic()
+        "[Space] play/pause | [Esc/q] exit".italic()
     );
 
     // Enable raw mode for key capture
@@ -279,7 +291,7 @@ pub fn play(input: PathBuf) -> Result<()> {
                 KeyCode::Char(' ') => {
                     player.toggle_playback()?;
                 }
-                KeyCode::Enter | KeyCode::Char('q') => break,
+                KeyCode::Esc | KeyCode::Char('q') => break,
                 _ => {}
             }
         }
