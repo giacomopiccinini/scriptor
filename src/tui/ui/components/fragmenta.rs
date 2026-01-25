@@ -10,7 +10,7 @@ use sqlx::SqlitePool;
 use textwrap::wrap;
 
 /// Convert seconds to hh:mm:ss format
-fn format_timestamp(seconds: f32) -> String {
+pub fn format_timestamp(seconds: f32) -> String {
     let total_seconds = seconds as u32;
     let hours = total_seconds / 3600;
     let minutes = (total_seconds % 3600) / 60;

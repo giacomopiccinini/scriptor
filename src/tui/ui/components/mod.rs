@@ -10,7 +10,7 @@ pub mod recording;
 pub use archivum_selector::ArchivumSelector;
 pub use codices::CodicesComponent;
 pub use folia::FoliaComponent;
-pub use fragmenta::FragmentaComponent;
+pub use fragmenta::{FragmentaComponent, format_timestamp};
 pub use input_states::InputState;
 pub use overlay_window::OverlayWindow;
 pub use popups::{
