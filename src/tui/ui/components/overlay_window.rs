@@ -16,7 +16,8 @@ impl OverlayWindow {
     /// Render an overlay window and return the inner content area.
     ///
     /// # Arguments
-    /// * `footer_hints` - Command hints displayed at the bottom of the window
+    /// * `footer_hints_left` - Command hints displayed at the bottom left of the window
+    /// * `footer_hints_right` - Command hints displayed at the bottom right of the window
     /// * `window_width_percentage` - The width of the window as a percentage of the terminal width
     /// * `window_height_percentage` - The height of the window as a percentage of the terminal height
     /// * `area` - The full terminal area to center the window within
@@ -26,7 +27,8 @@ impl OverlayWindow {
     /// # Returns
     /// The inner `Rect` area where content should be rendered
     pub fn render(
-        footer_hints: Line<'_>,
+        footer_hints_left: Line<'_>,
+        footer_hints_right: Line<'_>,
         window_width_percentage: Option<usize>,
         window_height_percentage: Option<usize>,
         area: Rect,
@@ -66,8 +68,10 @@ impl OverlayWindow {
             .render(window_area, buf);
 
         // Define the window block with styling
+        // Use left-aligned and right-aligned lines for footer hints
         let window_block = Block::new()
-            .title_bottom(footer_hints)
+            .title_bottom(footer_hints_left.left_aligned())
+            .title_bottom(footer_hints_right.right_aligned())
             .borders(Borders::ALL)
             .border_style(Style::new().fg(theme.foreground))
             .border_type(BorderType::Rounded)

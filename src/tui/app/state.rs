@@ -3,13 +3,14 @@ use crate::configs::scriptor::ScriptorConfig;
 use crate::stt::fractor::Fractor;
 use crate::stt::model::STTModel;
 use crate::stt::playback::Player;
-use crate::stt::rec::RecorderConfig;
+use crate::stt::rec::{RecorderConfig, enumerate_input_devices};
 use crate::stt::vad::VADModel;
 use crate::tui::app::events::EventHandler;
 use crate::tui::db::connections::init_db;
 use crate::tui::ui::components::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, CodicesComponent,
     FragmentaComponent, InputState, ModifyCodexPopUp, ModifyFolioPopUp, RecordingScreen,
+    SettingsScreen,
 };
 use crate::tui::ui::cursor::CursorState;
 use crate::tui::ui::layout::AppLayout;
@@ -47,6 +48,117 @@ pub enum CurrentScreen {
     ChangeArchivum,
     /// Pop-up for adding a new archivum
     AddArchivum,
+    /// Settings screen for configuring input device and VAD threshold
+    Settings,
+}
+
+/// Which field is currently focused in the settings screen
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum SettingsField {
+    #[default]
+    InputDevice,
+    VadThreshold,
+}
+
+/// State for the settings screen
+#[derive(Debug, Clone)]
+pub struct SettingsState {
+    /// List of available input device names
+    pub available_devices: Vec<String>,
+    /// Currently selected device index (0 = system default, 1+ = specific devices)
+    pub selected_device_index: usize,
+    /// Current VAD threshold value (0.0 to 1.0)
+    pub vad_threshold: f32,
+    /// Which field is currently focused
+    pub active_field: SettingsField,
+}
+
+impl SettingsState {
+    /// Create a new SettingsState by enumerating devices and loading current config values
+    pub fn new(
+        available_devices: Vec<String>,
+        current_device: Option<&str>,
+        vad_threshold: f32,
+    ) -> Self {
+        // Find the index of the current device, defaulting to 0 (system default)
+        let selected_device_index = if let Some(device_name) = current_device {
+            // Index 0 is "System Default", so actual devices start at index 1
+            available_devices
+                .iter()
+                .position(|d| d == device_name)
+                .map(|idx| idx + 1)
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
+        Self {
+            available_devices,
+            selected_device_index,
+            vad_threshold,
+            active_field: SettingsField::default(),
+        }
+    }
+
+    /// Get the currently selected device name (None means system default)
+    pub fn selected_device_name(&self) -> Option<&str> {
+        if self.selected_device_index == 0 {
+            None
+        } else {
+            self.available_devices
+                .get(self.selected_device_index - 1)
+                .map(|s| s.as_str())
+        }
+    }
+
+    /// Get display name for the currently selected device
+    pub fn selected_device_display(&self) -> &str {
+        if self.selected_device_index == 0 {
+            "System Default"
+        } else {
+            self.available_devices
+                .get(self.selected_device_index - 1)
+                .map(|s| s.as_str())
+                .unwrap_or("Unknown")
+        }
+    }
+
+    /// Total number of device options (system default + all enumerated devices)
+    pub fn device_count(&self) -> usize {
+        self.available_devices.len() + 1
+    }
+
+    /// Select the next device
+    pub fn next_device(&mut self) {
+        self.selected_device_index = (self.selected_device_index + 1) % self.device_count();
+    }
+
+    /// Select the previous device
+    pub fn previous_device(&mut self) {
+        if self.selected_device_index == 0 {
+            self.selected_device_index = self.device_count() - 1;
+        } else {
+            self.selected_device_index -= 1;
+        }
+    }
+
+    /// Increase VAD threshold by 0.05, capped at 1.0
+    pub fn increase_threshold(&mut self) {
+        self.vad_threshold = (self.vad_threshold + 0.05).min(1.0);
+    }
+
+    /// Decrease VAD threshold by 0.05, capped at 0.0
+    pub fn decrease_threshold(&mut self) {
+        self.vad_threshold = (self.vad_threshold - 0.05).max(0.0);
+    }
+
+    /// Toggle between fields
+    pub fn toggle_field(&mut self) {
+        self.active_field = match self.active_field {
+            SettingsField::InputDevice => SettingsField::VadThreshold,
+            SettingsField::VadThreshold => SettingsField::InputDevice,
+        };
+    }
 }
 
 /// Current region to signal where the cursor is
@@ -105,6 +217,8 @@ pub struct App {
     pub exit: bool,
     /// Flag to toggle timestamp display on fragmenta
     pub show_timestamp: bool,
+    /// State for the settings screen (populated when settings is opened)
+    pub settings_state: Option<SettingsState>,
 }
 
 impl STTTools {
@@ -113,9 +227,11 @@ impl STTTools {
         let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
 
         // Create recorder config (actual stream created inside thread for macOS compatibility)
-        let recorder_config =
-            RecorderConfig::new(config.default.fractor.max_fragmentum_duration_seconds)
-                .with_context(|| "Failed to create recorder config")?;
+        let recorder_config = RecorderConfig::new(
+            config.default.fractor.max_fragmentum_duration_seconds,
+            config.default.input_device.as_deref(),
+        )
+        .with_context(|| "Failed to create recorder config")?;
 
         // Create VAD model
         let vad_model = VADModel::new(&config.default.vad, config.default.inference.clone())
@@ -145,9 +261,11 @@ impl STTTools {
     ) -> anyhow::Result<()> {
         // Create recorder config (actual stream created inside thread for macOS compatibility)
         // This is cheap, just configuration, no model loading
-        let recorder_config =
-            RecorderConfig::new(config.default.fractor.max_fragmentum_duration_seconds)
-                .with_context(|| "Failed to create recorder config")?;
+        let recorder_config = RecorderConfig::new(
+            config.default.fractor.max_fragmentum_duration_seconds,
+            config.default.input_device.as_deref(),
+        )
+        .with_context(|| "Failed to create recorder config")?;
 
         // Create fractor with the existing VAD model (no model reloading!)
         let fractor = Fractor::new(recorder_config, vad_model);
@@ -239,6 +357,7 @@ impl App {
             last_playback_file_index: 0,
             exit: false,
             show_timestamp: false,
+            settings_state: None,
         }
     }
 
@@ -382,6 +501,7 @@ impl App {
             CurrentScreen::AddArchivum => {
                 EventHandler::handle_add_archivum_screen_key(self, key).await
             }
+            CurrentScreen::Settings => EventHandler::handle_settings_screen_key(self, key).await,
         }
     }
 
@@ -522,6 +642,67 @@ impl App {
         }
         Ok(())
     }
+
+    /// Enter the "Settings" screen by opening the settings overlay
+    pub fn enter_settings_screen(&mut self) {
+        // Enumerate available input devices
+        let available_devices = enumerate_input_devices();
+
+        // Create settings state with current config values
+        self.settings_state = Some(SettingsState::new(
+            available_devices,
+            self.config.default.input_device.as_deref(),
+            self.config.default.vad.threshold,
+        ));
+
+        self.current_screen = CurrentScreen::Settings;
+    }
+
+    /// Exit the Settings screen without saving (discard changes)
+    pub fn exit_settings_without_saving(&mut self) {
+        self.settings_state = None;
+        self.current_screen = CurrentScreen::Main;
+    }
+
+    /// Save settings to current session only (don't write to file)
+    pub fn save_settings_to_session(&mut self) {
+        if let Some(settings) = &self.settings_state {
+            // Update VAD threshold in config
+            self.config.default.vad.threshold = settings.vad_threshold;
+
+            // Update input device in config
+            self.config.default.input_device =
+                settings.selected_device_name().map(|s| s.to_string());
+        }
+
+        self.settings_state = None;
+        self.current_screen = CurrentScreen::Main;
+    }
+
+    /// Save settings to session and write to scriptor.toml file
+    pub fn save_settings_as_default(&mut self) -> Result<()> {
+        // First save to session
+        if let Some(settings) = &self.settings_state {
+            self.config.default.vad.threshold = settings.vad_threshold;
+            self.config.default.input_device =
+                settings.selected_device_name().map(|s| s.to_string());
+        }
+
+        // Write updated config to file
+        let config_dir = dirs::config_dir()
+            .ok_or_else(|| color_eyre::eyre::eyre!("Could not find config directory"))?
+            .join("scriptor");
+        let config_path = config_dir.join("scriptor.toml");
+
+        self.config
+            .write(&config_path)
+            .map_err(|e| color_eyre::eyre::eyre!("Failed to save config: {}", e))?;
+
+        self.settings_state = None;
+        self.current_screen = CurrentScreen::Main;
+
+        Ok(())
+    }
 }
 
 impl Widget for &mut App {
@@ -539,6 +720,7 @@ impl Widget for &mut App {
             bookmark_area,
             fragmenta_header_area,
             fragmenta_area,
+            footer_area,
         ) = AppLayout::calculate_main_layout(area);
 
         // Render column headers
@@ -547,6 +729,11 @@ impl Widget for &mut App {
 
         // Render bookmark area (archivum selector in the middle)
         AppLayout::render_bookmark(bookmark_area, buf, "   A R C H I V U M", theme);
+
+        // Render footer hints (only on main screen)
+        if self.current_screen == CurrentScreen::Main {
+            AppLayout::render_footer_hints(footer_area, buf, theme);
+        }
 
         // Render the main areas
         self.codices_component.render(codices_area, buf, theme);
@@ -609,6 +796,12 @@ impl Widget for &mut App {
 
                 // Render recording overlay on top of the main UI
                 RecordingScreen::render(self.is_paused, selected_folio, area, buf, theme);
+            }
+            CurrentScreen::Settings => {
+                // Render settings overlay on top of the main UI
+                if let Some(settings_state) = &self.settings_state {
+                    SettingsScreen::render(settings_state, area, buf, theme);
+                }
             }
             _ => {}
         }

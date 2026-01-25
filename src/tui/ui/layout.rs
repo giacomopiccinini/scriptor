@@ -11,8 +11,22 @@ pub struct AppLayout;
 
 impl AppLayout {
     /// Calculate responsive layout areas
-    /// Returns: (codices_header_area, codices_area, bookmark_area, fragmenta_header_area, fragmenta_area)
-    pub fn calculate_main_layout(area: Rect) -> (Rect, Rect, Rect, Rect, Rect) {
+    /// Returns: (codices_header_area, codices_area, bookmark_area, fragmenta_header_area, fragmenta_area, codex_footer_area)
+    pub fn calculate_main_layout(area: Rect) -> (Rect, Rect, Rect, Rect, Rect, Rect) {
+        // First split vertically to create footer area
+        let main_layout = Layout::vertical([
+            Constraint::Min(10),   // Main content area
+            Constraint::Length(1), // Footer hints area
+        ]);
+        let [content_area, footer_area] = main_layout.areas(area);
+
+        // Split footer horizontally to match codex column width
+        let footer_layout = Layout::horizontal([
+            Constraint::Percentage(48), // Codex footer (where hints go)
+            Constraint::Percentage(52), // Rest of footer (unused)
+        ]);
+        let [codex_footer_area, _] = footer_layout.areas(footer_area);
+
         // Subdivide the content area into three columns: codex, folio, fragmentum
         let content_layout = Layout::horizontal([
             Constraint::Percentage(48), // Codex column
@@ -25,7 +39,7 @@ impl AppLayout {
             codices_and_header_area,
             bookmark_area,
             fragmenta_and_header_area,
-        ] = content_layout.areas(area);
+        ] = content_layout.areas(content_area);
 
         // Page layout for both codex and fragment
         let page_layout =
@@ -39,6 +53,7 @@ impl AppLayout {
             bookmark_area,
             fragmenta_header_area,
             fragmenta_area,
+            codex_footer_area,
         )
     }
 
@@ -81,6 +96,21 @@ impl AppLayout {
 
         let paragraph =
             Paragraph::new(chars).style(Style::default().bg(theme.highlight).fg(theme.background));
+
+        paragraph.render(area, buf);
+    }
+
+    /// Render the footer hints area with command shortcuts
+    pub fn render_footer_hints(area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
+        let hints = Line::from(vec![
+            Span::raw(" "),
+            Span::styled("[s]", Style::default().fg(theme.highlight)),
+            Span::styled("ettings ", Style::default().fg(theme.foreground)),
+            Span::styled("[q]", Style::default().fg(theme.highlight)),
+            Span::styled("uit ", Style::default().fg(theme.foreground)),
+        ]);
+
+        let paragraph = Paragraph::new(hints).style(Style::default().bg(theme.background));
 
         paragraph.render(area, buf);
     }

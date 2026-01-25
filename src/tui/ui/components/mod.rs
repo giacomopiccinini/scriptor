@@ -6,6 +6,7 @@ pub mod input_states;
 pub mod overlay_window;
 pub mod popups;
 pub mod recording;
+pub mod settings;
 
 pub use archivum_selector::ArchivumSelector;
 pub use codices::CodicesComponent;
@@ -18,3 +19,4 @@ pub use popups::{
     ModifyFolioPopUp,
 };
 pub use recording::RecordingScreen;
+pub use settings::SettingsScreen;

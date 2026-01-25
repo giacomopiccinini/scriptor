@@ -20,29 +20,35 @@ impl RecordingScreen {
         buf: &mut Buffer,
         theme: &ThemeConfig,
     ) {
-        // Build footer command hints
-        let footer_hints = Self::build_footer_hints(is_paused, theme);
+        // Build footer command hints (empty left, commands on right)
+        let footer_hints_left = Line::from("");
+        let footer_hints_right = Self::build_footer_hints(is_paused, theme);
 
         // Render the overlay window and get the inner content area
-        let content_area =
-            OverlayWindow::render(footer_hints, Some(60), Some(80), area, buf, theme);
+        let content_area = OverlayWindow::render(
+            footer_hints_left,
+            footer_hints_right,
+            Some(60),
+            Some(80),
+            area,
+            buf,
+            theme,
+        );
 
         // Render the recording content inside the overlay
         Self::render_content(is_paused, selected_folio, content_area, buf, theme);
     }
 
-    /// Build the footer command hints line
+    /// Build the footer command hints line (for right side)
     fn build_footer_hints(is_paused: bool, theme: &ThemeConfig) -> Line<'static> {
         let pause_text = if is_paused { "resume" } else { "pause" };
 
         Line::from(vec![
-            Span::raw(" "),
             Span::styled("[Space]", Style::default().fg(theme.highlight)),
             Span::styled(
                 format!(" {} ", pause_text),
                 Style::default().fg(theme.foreground),
             ),
-            Span::raw("  "),
             Span::styled("[Esc]", Style::default().fg(theme.highlight)),
             Span::styled(" stop ", Style::default().fg(theme.foreground)),
         ])

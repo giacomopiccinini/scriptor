@@ -29,10 +29,13 @@ impl RecorderConfig {
     /// Create a new RecorderConfig with the given max fragmentum duration.
     /// This only sets up the configuration and doesn't create the audio stream yet,
     /// allowing the config to be safely sent across threads.
-    pub fn new(max_fragmentum_duration_seconds: f32) -> Result<Self> {
+    ///
+    /// If `device_name` is provided, attempts to find that device. Falls back to
+    /// system default if not found.
+    pub fn new(max_fragmentum_duration_seconds: f32, device_name: Option<&str>) -> Result<Self> {
         // Set up recording device
         let (input_device, input_config) =
-            setup_recording().with_context(|| "Unable to set up recording")?;
+            setup_recording(device_name).with_context(|| "Unable to set up recording")?;
 
         // Convert the input config (cpal-style) into wav config (hound-style)
         let wav_config = wav_spec_from_config(&input_config);
@@ -78,8 +81,8 @@ impl Recorder {
     /// Convenience constructor that creates both config and stream.
     /// Note: On macOS, the returned Recorder cannot be sent across threads.
     /// Use RecorderConfig::new() + Recorder::from_config() for cross-thread scenarios.
-    pub fn new(max_fragmentum_duration_seconds: f32) -> Result<Self> {
-        let config = RecorderConfig::new(max_fragmentum_duration_seconds)
+    pub fn new(max_fragmentum_duration_seconds: f32, device_name: Option<&str>) -> Result<Self> {
+        let config = RecorderConfig::new(max_fragmentum_duration_seconds, device_name)
             .with_context(|| "Unable to create recorder config")?;
         Self::from_config(config)
     }
@@ -110,13 +113,36 @@ impl Recorder {
     }
 }
 
-/// Setup the recording by finding the default device with the corresponding config
-fn setup_recording() -> Result<(Device, SupportedStreamConfig)> {
-    // Get default audio host and input device
+/// Setup the recording by finding the specified device (or default) with its config.
+/// If `device_name` is provided, attempts to find that device by name.
+/// Falls back to system default if the named device is not found.
+fn setup_recording(device_name: Option<&str>) -> Result<(Device, SupportedStreamConfig)> {
+    // Get default audio host
     let host = cpal::default_host();
-    let input_device = host
-        .default_input_device()
-        .with_context(|| "Unable to find default input device")?;
+
+    // Find the input device - either by name or use default
+    let input_device = if let Some(name) = device_name {
+        // Try to find the device by name
+        let found_device = host
+            .input_devices()
+            .ok()
+            .and_then(|mut devices| devices.find(|d| d.name().ok().as_deref() == Some(name)));
+
+        match found_device {
+            Some(device) => device,
+            None => {
+                eprintln!(
+                    "Warning: Configured device '{}' not found, using system default",
+                    name
+                );
+                host.default_input_device()
+                    .with_context(|| "Unable to find default input device")?
+            }
+        }
+    } else {
+        host.default_input_device()
+            .with_context(|| "Unable to find default input device")?
+    };
 
     // Use default configuration for audio input. If this doesn't match the requirements from
     // STT model, we fix it down the line, not here.
@@ -125,6 +151,15 @@ fn setup_recording() -> Result<(Device, SupportedStreamConfig)> {
         .with_context(|| "Unable to find default input config")?;
 
     Ok((input_device, input_config))
+}
+
+/// Enumerate all available input devices and return their names.
+/// Returns a list of device names that can be used with `RecorderConfig::new()`.
+pub fn enumerate_input_devices() -> Vec<String> {
+    let host = cpal::default_host();
+    host.input_devices()
+        .map(|devices| devices.filter_map(|d| d.name().ok()).collect())
+        .unwrap_or_default()
 }
 
 /// Estimate the capacity of the buffer by assuming it can store
