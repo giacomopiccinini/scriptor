@@ -390,6 +390,13 @@ impl EventHandler {
                     });
                 }
             }
+
+            // Toggle timestamp display on fragmenta
+            (KeyCode::Char('t'), KeyModifiers::NONE) => {
+                if app.current_region == CurrentRegion::Fragmentum {
+                    app.show_timestamp = !app.show_timestamp;
+                }
+            }
             _ => {}
         }
     }

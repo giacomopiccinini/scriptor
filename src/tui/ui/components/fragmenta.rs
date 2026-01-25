@@ -9,6 +9,15 @@ use ratatui::widgets::{Block, HighlightSpacing, List, ListItem, StatefulWidget, 
 use sqlx::SqlitePool;
 use textwrap::wrap;
 
+/// Convert seconds to hh:mm:ss format
+fn format_timestamp(seconds: f32) -> String {
+    let total_seconds = seconds as u32;
+    let hours = total_seconds / 3600;
+    let minutes = (total_seconds % 3600) / 60;
+    let secs = total_seconds % 60;
+    format!("{:02}:{:02}:{:02}", hours, minutes, secs)
+}
+
 pub struct FragmentaComponent;
 
 impl FragmentaComponent {
@@ -67,6 +76,7 @@ impl FragmentaComponent {
     pub fn render(
         selected_folio: Option<&mut UIFolio>,
         is_playing: bool,
+        show_timestamp: bool,
         area: Rect,
         buf: &mut Buffer,
         theme: &ThemeConfig,
@@ -76,6 +86,13 @@ impl FragmentaComponent {
             Span::styled("ause ", Style::default().fg(theme.foreground))
         } else {
             Span::styled("lay ", Style::default().fg(theme.foreground))
+        };
+
+        // Create timestamp toggle text based on status
+        let timestamp_text = if show_timestamp {
+            Span::styled("imestamp off ", Style::default().fg(theme.foreground))
+        } else {
+            Span::styled("imestamp on ", Style::default().fg(theme.foreground))
         };
 
         // Command hints for fragmenta
@@ -88,6 +105,9 @@ impl FragmentaComponent {
             Span::raw("   "),
             Span::styled("[C]", Style::default().fg(theme.highlight)),
             Span::styled("opy all ", Style::default().fg(theme.foreground)),
+            Span::raw("   "),
+            Span::styled("[t]", Style::default().fg(theme.highlight)),
+            timestamp_text,
         ])
         .centered();
 
@@ -109,12 +129,42 @@ impl FragmentaComponent {
                 .map(|ui_fragmentum| {
                     let content = &ui_fragmentum.fragmentum.content;
 
+                    // Build the first line with optional timestamp prefix
+                    let first_line_spans: Vec<Span> = if show_timestamp {
+                        if let Some(timestamp_start) = ui_fragmentum.fragmentum.timestamp_start {
+                            let timestamp_str = format!("[{}] ", format_timestamp(timestamp_start));
+                            vec![Span::styled(
+                                timestamp_str,
+                                Style::default().fg(theme.highlight),
+                            )]
+                        } else {
+                            vec![]
+                        }
+                    } else {
+                        vec![]
+                    };
+
                     // Use textwrap to wrap the content into multiple lines
                     let wrapped_lines: Vec<Line> = if available_width > 0 {
-                        wrap(content, available_width)
+                        let wrapped = wrap(content, available_width);
+                        wrapped
                             .iter()
-                            .map(|line| Line::from(line.to_string()))
+                            .enumerate()
+                            .map(|(i, line)| {
+                                if i == 0 && !first_line_spans.is_empty() {
+                                    // First line: prepend timestamp spans
+                                    let mut spans = first_line_spans.clone();
+                                    spans.push(Span::raw(line.to_string()));
+                                    Line::from(spans)
+                                } else {
+                                    Line::from(line.to_string())
+                                }
+                            })
                             .collect()
+                    } else if !first_line_spans.is_empty() {
+                        let mut spans = first_line_spans.clone();
+                        spans.push(Span::raw(content.clone()));
+                        vec![Line::from(spans)]
                     } else {
                         vec![Line::from(content.clone())]
                     };

@@ -103,6 +103,8 @@ pub struct App {
     pub last_playback_file_index: usize,
     /// Flag to indicate if the application should exit
     pub exit: bool,
+    /// Flag to toggle timestamp display on fragmenta
+    pub show_timestamp: bool,
 }
 
 impl STTTools {
@@ -236,6 +238,7 @@ impl App {
             transcriber_handle: None,
             last_playback_file_index: 0,
             exit: false,
+            show_timestamp: false,
         }
     }
 
@@ -561,6 +564,7 @@ impl Widget for &mut App {
         FragmentaComponent::render(
             selected_folio,
             self.stt_tools.player.is_playing,
+            self.show_timestamp,
             fragmenta_area,
             buf,
             theme,
