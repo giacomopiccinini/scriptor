@@ -29,6 +29,8 @@ pub struct Fragmentum {
     pub audio_path: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub timestamp_start: Option<f32>,
+    pub timestamp_end: Option<f32>,
 }
 
 // Structs for creating new records (without id and timestamps)
@@ -48,6 +50,8 @@ pub struct NewFragmentum {
     pub folio_id: i64,
     pub path: String,
     pub content: String,
+    pub timestamp_start: Option<f32>,
+    pub timestamp_end: Option<f32>,
 }
 
 // Convenient repackaging of DB items to cache reads from DB

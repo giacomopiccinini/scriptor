@@ -343,16 +343,18 @@ impl Fragmentum {
 
         let row = sqlx::query_as::<_, Fragmentum>(
             r#"
-            INSERT INTO fragmentum (folio_id, content, audio_path, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5)
-            RETURNING id, folio_id, content, audio_path, created_at, updated_at
+            INSERT INTO fragmentum (folio_id, content, audio_path, created_at, updated_at, timestamp_start, timestamp_end)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            RETURNING id, folio_id, content, audio_path, created_at, updated_at, timestamp_start, timestamp_end
             "#,
         )
         .bind(new_fragmentum.folio_id)
         .bind(&new_fragmentum.content)
-        .bind(&new_fragmentum.path) // Default empty audio_path, can be updated later
+        .bind(&new_fragmentum.path)
         .bind(now)
         .bind(now)
+        .bind(new_fragmentum.timestamp_start)
+        .bind(new_fragmentum.timestamp_end)
         .fetch_one(pool)
         .await
         .with_context(|| "Failed to create fragmentum")?;
@@ -372,20 +374,22 @@ impl Fragmentum {
             .iter()
             .enumerate()
             .map(|(i, _)| {
-                let base = i * 4;
+                let base = i * 6;
                 format!(
-                    "(?{}, ?{}, ?{}, ?{}, ?{})",
+                    "(?{}, ?{}, ?{}, ?{}, ?{}, ?{}, ?{})",
                     base + 1,
                     base + 2,
                     base + 3,
                     base + 4,
-                    base + 4
+                    base + 4,
+                    base + 5,
+                    base + 6
                 )
             })
             .collect();
 
         let sql = format!(
-            "INSERT INTO fragmentum (folio_id, content, audio_path, created_at, updated_at) VALUES {}",
+            "INSERT INTO fragmentum (folio_id, content, audio_path, created_at, updated_at, timestamp_start, timestamp_end) VALUES {}",
             placeholders.join(", ")
         );
 
@@ -395,7 +399,9 @@ impl Fragmentum {
                 .bind(new_fragmentum.folio_id)
                 .bind(&new_fragmentum.content)
                 .bind(&new_fragmentum.path)
-                .bind(now);
+                .bind(now)
+                .bind(new_fragmentum.timestamp_start)
+                .bind(new_fragmentum.timestamp_end);
         }
 
         query.execute(pool).await?;
@@ -406,7 +412,7 @@ impl Fragmentum {
     pub async fn get_by_folio_id(pool: &SqlitePool, folio_id: i64) -> Result<Vec<Fragmentum>> {
         let fragmenta = sqlx::query_as::<_, Fragmentum>(
             r#"
-            SELECT id, folio_id, content, audio_path, created_at, updated_at
+            SELECT id, folio_id, content, audio_path, created_at, updated_at, timestamp_start, timestamp_end
             FROM fragmentum 
             WHERE folio_id = ?1 
             ORDER BY id
@@ -424,7 +430,7 @@ impl Fragmentum {
     pub async fn get_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Fragmentum>> {
         let fragmentum = sqlx::query_as::<_, Fragmentum>(
             r#"
-            SELECT id, folio_id, content, audio_path, created_at, updated_at
+            SELECT id, folio_id, content, audio_path, created_at, updated_at, timestamp_start, timestamp_end
             FROM fragmentum 
             WHERE id = ?1 
             "#,
