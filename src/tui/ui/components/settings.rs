@@ -1,5 +1,5 @@
+use crate::configs::settings::{SettingsField, SettingsState};
 use crate::configs::theme::ThemeConfig;
-use crate::tui::app::state::{SettingsField, SettingsState};
 use crate::tui::ui::components::overlay_window::OverlayWindow;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -27,7 +27,7 @@ impl SettingsScreen {
             footer_hints_left,
             footer_hints_right,
             Some(50),
-            Some(60),
+            Some(70),
             area,
             buf,
             theme,
@@ -67,14 +67,23 @@ impl SettingsScreen {
         buf: &mut Buffer,
         theme: &ThemeConfig,
     ) {
-        // Calculate layout: header, device field, vad field
+        // Calculate layout: header + 4 fields
         let layout = Layout::vertical([
             Constraint::Length(3), // Header
             Constraint::Length(3), // Input Device field
             Constraint::Length(3), // VAD Threshold field
+            Constraint::Length(3), // STT Model field
+            Constraint::Length(3), // VAD Model field
             Constraint::Min(1),    // Spacing
         ]);
-        let [header_area, device_area, vad_area, _] = layout.areas(area);
+        let [
+            header_area,
+            device_area,
+            vad_threshold_area,
+            stt_model_area,
+            vad_model_area,
+            _,
+        ] = layout.areas(area);
 
         // Render header
         Self::render_header(header_area, buf, theme);
@@ -89,12 +98,30 @@ impl SettingsScreen {
         );
 
         // Render VAD threshold slider
-        Self::render_vad_field(
+        Self::render_vad_threshold_field(
             settings_state,
-            vad_area,
+            vad_threshold_area,
             buf,
             theme,
             settings_state.active_field == SettingsField::VadThreshold,
+        );
+
+        // Render STT model selector
+        Self::render_stt_model_field(
+            settings_state,
+            stt_model_area,
+            buf,
+            theme,
+            settings_state.active_field == SettingsField::STTModel,
+        );
+
+        // Render VAD model selector
+        Self::render_vad_model_field(
+            settings_state,
+            vad_model_area,
+            buf,
+            theme,
+            settings_state.active_field == SettingsField::VADModel,
         );
     }
 
@@ -155,7 +182,7 @@ impl SettingsScreen {
         paragraph.render(area, buf);
     }
 
-    fn render_vad_field(
+    fn render_vad_threshold_field(
         settings_state: &SettingsState,
         area: Rect,
         buf: &mut Buffer,
@@ -201,6 +228,88 @@ impl SettingsScreen {
         ]);
 
         let lines = vec![gauge_line];
+
+        let paragraph = Paragraph::new(lines).block(block).style(base_style);
+
+        paragraph.render(area, buf);
+    }
+
+    fn render_stt_model_field(
+        settings_state: &SettingsState,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &ThemeConfig,
+        is_active: bool,
+    ) {
+        let block = Block::default().padding(Padding::new(2, 2, 1, 0));
+
+        let model_name = settings_state.selected_stt_model_display();
+
+        // When active, swap colors (bg = highlight, fg = background)
+        let (base_style, text_style, accent_style) = if is_active {
+            (
+                Style::default().bg(theme.highlight),
+                Style::default().fg(theme.background),
+                Style::default().fg(theme.background),
+            )
+        } else {
+            (
+                Style::default().bg(theme.background),
+                Style::default().fg(theme.foreground),
+                Style::default().fg(theme.highlight),
+            )
+        };
+
+        // Build the selector line: < Model Name >
+        let selector_line = Line::from(vec![
+            Span::styled("STT Model:    ", text_style),
+            Span::styled("< ", text_style),
+            Span::styled(model_name, accent_style),
+            Span::styled(" >", text_style),
+        ]);
+
+        let lines = vec![selector_line];
+
+        let paragraph = Paragraph::new(lines).block(block).style(base_style);
+
+        paragraph.render(area, buf);
+    }
+
+    fn render_vad_model_field(
+        settings_state: &SettingsState,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &ThemeConfig,
+        is_active: bool,
+    ) {
+        let block = Block::default().padding(Padding::new(2, 2, 1, 0));
+
+        let model_name = settings_state.selected_vad_model_display();
+
+        // When active, swap colors (bg = highlight, fg = background)
+        let (base_style, text_style, accent_style) = if is_active {
+            (
+                Style::default().bg(theme.highlight),
+                Style::default().fg(theme.background),
+                Style::default().fg(theme.background),
+            )
+        } else {
+            (
+                Style::default().bg(theme.background),
+                Style::default().fg(theme.foreground),
+                Style::default().fg(theme.highlight),
+            )
+        };
+
+        // Build the selector line: < Model Name >
+        let selector_line = Line::from(vec![
+            Span::styled("VAD Model:    ", text_style),
+            Span::styled("< ", text_style),
+            Span::styled(model_name, accent_style),
+            Span::styled(" >", text_style),
+        ]);
+
+        let lines = vec![selector_line];
 
         let paragraph = Paragraph::new(lines).block(block).style(base_style);
 

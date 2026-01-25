@@ -129,4 +129,14 @@ impl ModelsConfig {
     pub fn get_vad_files(&self, model: &str) -> Option<&Vec<String>> {
         self.vad.get(model).map(|m| &m.files)
     }
+
+    /// Get all available STT model keys
+    pub fn available_stt_models(&self) -> Vec<String> {
+        self.stt.keys().cloned().collect()
+    }
+
+    /// Get all available VAD model keys
+    pub fn available_vad_models(&self) -> Vec<String> {
+        self.vad.keys().cloned().collect()
+    }
 }

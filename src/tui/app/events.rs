@@ -1,5 +1,6 @@
+use crate::configs::settings::SettingsField;
 use crate::stt::queue::{create_fragmentum_channel, transcriber_to_db_worker};
-use crate::tui::app::state::{App, CurrentRegion, CurrentScreen, SettingsField};
+use crate::tui::app::state::{App, CurrentRegion, CurrentScreen};
 use crate::tui::db::models::{Folio, Fragmentum, NewFolio};
 use crate::tui::ui::components::{
     CodicesComponent, FoliaComponent, FragmentaComponent, format_timestamp,
@@ -645,38 +646,52 @@ impl EventHandler {
 
             // Save to session only (don't write to file)
             (KeyCode::Char('s'), KeyModifiers::NONE) => {
-                app.save_settings_to_session();
+                if let Err(e) = app.save_settings_to_session().await {
+                    eprintln!("Failed to save settings to session: {}", e);
+                }
             }
 
             // Save as default (write to file)
             (KeyCode::Char('S'), KeyModifiers::SHIFT) => {
-                if let Err(e) = app.save_settings_as_default() {
+                if let Err(e) = app.save_settings_as_default().await {
                     eprintln!("Failed to save settings as default: {}", e);
                 }
             }
 
-            // Switch between fields (Up/Down)
-            (KeyCode::Up, KeyModifiers::NONE) | (KeyCode::Down, KeyModifiers::NONE) => {
+            // Move to previous field
+            (KeyCode::Up, KeyModifiers::NONE) => {
                 if let Some(settings) = &mut app.settings_state {
-                    settings.toggle_field();
+                    settings.previous_field();
                 }
             }
 
-            // Adjust value (Left/Right)
+            // Move to next field
+            (KeyCode::Down, KeyModifiers::NONE) => {
+                if let Some(settings) = &mut app.settings_state {
+                    settings.next_field();
+                }
+            }
+
+            // Adjust value (Left)
             (KeyCode::Left, KeyModifiers::NONE) => {
                 if let Some(settings) = &mut app.settings_state {
                     match settings.active_field {
                         SettingsField::InputDevice => settings.previous_device(),
                         SettingsField::VadThreshold => settings.decrease_threshold(),
+                        SettingsField::STTModel => settings.previous_stt_model(),
+                        SettingsField::VADModel => settings.previous_vad_model(),
                     }
                 }
             }
 
+            // Adjust value (Right)
             (KeyCode::Right, KeyModifiers::NONE) => {
                 if let Some(settings) = &mut app.settings_state {
                     match settings.active_field {
                         SettingsField::InputDevice => settings.next_device(),
                         SettingsField::VadThreshold => settings.increase_threshold(),
+                        SettingsField::STTModel => settings.next_stt_model(),
+                        SettingsField::VADModel => settings.next_vad_model(),
                     }
                 }
             }

@@ -1,5 +1,8 @@
 use crate::configs::db::DBConfig;
 use crate::configs::scriptor::ScriptorConfig;
+use crate::configs::settings::SettingsState;
+use crate::configs::stt::AvailableSTTModel;
+use crate::configs::vad::AvailableVADModel;
 use crate::stt::fractor::Fractor;
 use crate::stt::model::STTModel;
 use crate::stt::playback::Player;
@@ -52,115 +55,6 @@ pub enum CurrentScreen {
     Settings,
 }
 
-/// Which field is currently focused in the settings screen
-#[derive(Debug, Clone, PartialEq, Default)]
-pub enum SettingsField {
-    #[default]
-    InputDevice,
-    VadThreshold,
-}
-
-/// State for the settings screen
-#[derive(Debug, Clone)]
-pub struct SettingsState {
-    /// List of available input device names
-    pub available_devices: Vec<String>,
-    /// Currently selected device index (0 = system default, 1+ = specific devices)
-    pub selected_device_index: usize,
-    /// Current VAD threshold value (0.0 to 1.0)
-    pub vad_threshold: f32,
-    /// Which field is currently focused
-    pub active_field: SettingsField,
-}
-
-impl SettingsState {
-    /// Create a new SettingsState by enumerating devices and loading current config values
-    pub fn new(
-        available_devices: Vec<String>,
-        current_device: Option<&str>,
-        vad_threshold: f32,
-    ) -> Self {
-        // Find the index of the current device, defaulting to 0 (system default)
-        let selected_device_index = if let Some(device_name) = current_device {
-            // Index 0 is "System Default", so actual devices start at index 1
-            available_devices
-                .iter()
-                .position(|d| d == device_name)
-                .map(|idx| idx + 1)
-                .unwrap_or(0)
-        } else {
-            0
-        };
-
-        Self {
-            available_devices,
-            selected_device_index,
-            vad_threshold,
-            active_field: SettingsField::default(),
-        }
-    }
-
-    /// Get the currently selected device name (None means system default)
-    pub fn selected_device_name(&self) -> Option<&str> {
-        if self.selected_device_index == 0 {
-            None
-        } else {
-            self.available_devices
-                .get(self.selected_device_index - 1)
-                .map(|s| s.as_str())
-        }
-    }
-
-    /// Get display name for the currently selected device
-    pub fn selected_device_display(&self) -> &str {
-        if self.selected_device_index == 0 {
-            "System Default"
-        } else {
-            self.available_devices
-                .get(self.selected_device_index - 1)
-                .map(|s| s.as_str())
-                .unwrap_or("Unknown")
-        }
-    }
-
-    /// Total number of device options (system default + all enumerated devices)
-    pub fn device_count(&self) -> usize {
-        self.available_devices.len() + 1
-    }
-
-    /// Select the next device
-    pub fn next_device(&mut self) {
-        self.selected_device_index = (self.selected_device_index + 1) % self.device_count();
-    }
-
-    /// Select the previous device
-    pub fn previous_device(&mut self) {
-        if self.selected_device_index == 0 {
-            self.selected_device_index = self.device_count() - 1;
-        } else {
-            self.selected_device_index -= 1;
-        }
-    }
-
-    /// Increase VAD threshold by 0.05, capped at 1.0
-    pub fn increase_threshold(&mut self) {
-        self.vad_threshold = (self.vad_threshold + 0.05).min(1.0);
-    }
-
-    /// Decrease VAD threshold by 0.05, capped at 0.0
-    pub fn decrease_threshold(&mut self) {
-        self.vad_threshold = (self.vad_threshold - 0.05).max(0.0);
-    }
-
-    /// Toggle between fields
-    pub fn toggle_field(&mut self) {
-        self.active_field = match self.active_field {
-            SettingsField::InputDevice => SettingsField::VadThreshold,
-            SettingsField::VadThreshold => SettingsField::InputDevice,
-        };
-    }
-}
-
 /// Current region to signal where the cursor is
 #[derive(Debug, Clone, PartialEq)]
 pub enum CurrentRegion {
@@ -173,7 +67,6 @@ pub struct STTTools {
     pub fractor: Option<Fractor>,
     pub stt_model: Option<STTModel>,
     pub player: Player,
-    /// Max queue elements for fragmentum channel
     pub max_queue_elements: usize,
 }
 
@@ -181,6 +74,8 @@ pub struct STTTools {
 pub struct App {
     /// App configuration (db, stt inference parameters, theme)
     pub config: ScriptorConfig,
+    /// Available models from models.toml (cached at startup)
+    pub available_models: ModelsConfig,
     // Collection of tools to perform speech to text
     pub stt_tools: STTTools,
     /// Current active screen
@@ -339,6 +234,7 @@ impl App {
         // Return initial state of the app
         Self {
             config,
+            available_models,
             stt_tools,
             current_screen,
             current_region: CurrentRegion::CodexAndFolio,
@@ -648,11 +544,19 @@ impl App {
         // Enumerate available input devices
         let available_devices = enumerate_input_devices();
 
+        // Get available models from cached config
+        let available_stt_models = self.available_models.available_stt_models();
+        let available_vad_models = self.available_models.available_vad_models();
+
         // Create settings state with current config values
         self.settings_state = Some(SettingsState::new(
             available_devices,
             self.config.default.input_device.as_deref(),
             self.config.default.vad.threshold,
+            available_stt_models,
+            &self.config.default.stt.model,
+            available_vad_models,
+            &self.config.default.vad.model,
         ));
 
         self.current_screen = CurrentScreen::Settings;
@@ -665,38 +569,131 @@ impl App {
     }
 
     /// Save settings to current session only (don't write to file)
-    pub fn save_settings_to_session(&mut self) {
-        if let Some(settings) = &self.settings_state {
-            // Update VAD threshold in config
-            self.config.default.vad.threshold = settings.vad_threshold;
-
-            // Update input device in config
-            self.config.default.input_device =
-                settings.selected_device_name().map(|s| s.to_string());
-        }
-
-        self.settings_state = None;
-        self.current_screen = CurrentScreen::Main;
+    pub async fn save_settings_to_session(&mut self) -> Result<()> {
+        self.apply_settings_changes(false).await
     }
 
     /// Save settings to session and write to scriptor.toml file
-    pub fn save_settings_as_default(&mut self) -> Result<()> {
-        // First save to session
-        if let Some(settings) = &self.settings_state {
-            self.config.default.vad.threshold = settings.vad_threshold;
-            self.config.default.input_device =
-                settings.selected_device_name().map(|s| s.to_string());
+    pub async fn save_settings_as_default(&mut self) -> Result<()> {
+        self.apply_settings_changes(true).await
+    }
+
+    /// Apply settings changes, optionally writing to file
+    async fn apply_settings_changes(&mut self, write_to_file: bool) -> Result<()> {
+        let settings = match &self.settings_state {
+            Some(s) => s.clone(),
+            None => {
+                self.current_screen = CurrentScreen::Main;
+                return Ok(());
+            }
+        };
+
+        // Check if STT model changed
+        let stt_model_changed = settings
+            .selected_stt_model_key()
+            .map(|key| key != self.config.default.stt.model.as_key())
+            .unwrap_or(false);
+
+        // Check if VAD model changed
+        let vad_model_changed = settings
+            .selected_vad_model_key()
+            .map(|key| key != self.config.default.vad.model.as_key())
+            .unwrap_or(false);
+
+        // Check if VAD threshold changed
+        let vad_threshold_changed =
+            (settings.vad_threshold - self.config.default.vad.threshold).abs() > 0.001;
+
+        // Update config values
+        self.config.default.vad.threshold = settings.vad_threshold;
+        self.config.default.input_device = settings.selected_device_name().map(|s| s.to_string());
+
+        // Update STT model in config if changed
+        if stt_model_changed {
+            if let Some(key) = settings.selected_stt_model_key() {
+                self.config.default.stt.model = AvailableSTTModel::from_key(key);
+            }
         }
 
-        // Write updated config to file
-        let config_dir = dirs::config_dir()
-            .ok_or_else(|| color_eyre::eyre::eyre!("Could not find config directory"))?
-            .join("scriptor");
-        let config_path = config_dir.join("scriptor.toml");
+        // Update VAD model in config if changed
+        if vad_model_changed {
+            if let Some(key) = settings.selected_vad_model_key() {
+                self.config.default.vad.model = AvailableVADModel::from_key(key);
+            }
+        }
 
-        self.config
-            .write(&config_path)
-            .map_err(|e| color_eyre::eyre::eyre!("Failed to save config: {}", e))?;
+        // Write to file if requested
+        if write_to_file {
+            let config_dir = dirs::config_dir()
+                .ok_or_else(|| color_eyre::eyre::eyre!("Could not find config directory"))?
+                .join("scriptor");
+            let config_path = config_dir.join("scriptor.toml");
+
+            self.config
+                .write(&config_path)
+                .map_err(|e| color_eyre::eyre::eyre!("Failed to save config: {}", e))?;
+        }
+
+        // If any model changed, check for missing files and download
+        if stt_model_changed || vad_model_changed {
+            if let Some(missing_files) = self.config.check_missing(&self.available_models) {
+                let mut spinner = Spinner::new_with_stream(
+                    spinners::Dots,
+                    "Downloading models...",
+                    Color::Blue,
+                    Streams::Stderr,
+                );
+                download_missing_files(&missing_files).await;
+                spinner.success("Models downloaded!");
+            }
+        }
+
+        // Reload STT model if changed
+        if stt_model_changed {
+            let mut spinner = Spinner::new_with_stream(
+                spinners::Dots,
+                "Loading STT model...",
+                Color::Blue,
+                Streams::Stderr,
+            );
+            let stt_model = STTModel::new(
+                &self.config.default.stt,
+                self.config.default.inference.clone(),
+            )
+            .map_err(|e| color_eyre::eyre::eyre!("Failed to load STT model: {}", e))?;
+            self.stt_tools.stt_model = Some(stt_model);
+            spinner.success("STT model loaded!");
+        }
+
+        // Rebuild Fractor if VAD model or threshold changed (VAD is inside Fractor)
+        if vad_model_changed || vad_threshold_changed {
+            let mut spinner = Spinner::new_with_stream(
+                spinners::Dots,
+                "Loading VAD model...",
+                Color::Blue,
+                Streams::Stderr,
+            );
+
+            // Create new VAD model with updated config
+            let vad_model = VADModel::new(
+                &self.config.default.vad,
+                self.config.default.inference.clone(),
+            )
+            .map_err(|e| color_eyre::eyre::eyre!("Failed to load VAD model: {}", e))?;
+
+            // Create new recorder config
+            let recorder_config = RecorderConfig::new(
+                self.config.default.fractor.max_fragmentum_duration_seconds,
+                self.config.default.input_device.as_deref(),
+            )
+            .map_err(|e| color_eyre::eyre::eyre!("Failed to create recorder config: {}", e))?;
+
+            // Rebuild Fractor with new VAD model
+            let fractor = Fractor::new(recorder_config, vad_model);
+            self.stt_tools.fractor = Some(fractor);
+
+            spinner.success("VAD model loaded!");
+        }
 
         self.settings_state = None;
         self.current_screen = CurrentScreen::Main;

@@ -202,7 +202,12 @@ fn suppress_stderr() -> StderrSuppressor {
     }
 
     // Open /dev/null and redirect stderr to it
-    let dev_null = unsafe { libc::open(b"/dev/null\0".as_ptr() as *const libc::c_char, libc::O_WRONLY) };
+    let dev_null = unsafe {
+        libc::open(
+            b"/dev/null\0".as_ptr() as *const libc::c_char,
+            libc::O_WRONLY,
+        )
+    };
     if dev_null != -1 {
         unsafe {
             libc::dup2(dev_null, stderr_fd);

@@ -17,6 +17,14 @@ impl AvailableVADModel {
             Self::Silero => "silero-v5",
         }
     }
+
+    /// Convert a key string to the corresponding enum variant
+    pub fn from_key(key: &str) -> Self {
+        match key {
+            "silero-v5" => Self::Silero,
+            _ => Self::default(),
+        }
+    }
 }
 
 /// Wrapper for model-specific configurations
