@@ -22,6 +22,8 @@ pub struct FractorState {
     consecutive_silence_chunks: u32,
     vad_audio_buffer: Vec<f32>,
     start_datetime: DateTime<Local>,
+    /// Cumulative offset in seconds from the start of the recording session
+    recording_offset_secs: f32,
 }
 
 impl FractorState {
@@ -32,6 +34,7 @@ impl FractorState {
             consecutive_silence_chunks: 0_u32,
             vad_audio_buffer: Vec::new(),
             start_datetime: Local::now(),
+            recording_offset_secs: 0.0,
         }
     }
 
@@ -41,6 +44,13 @@ impl FractorState {
         self.consecutive_silence_chunks = 0_u32;
         self.vad_audio_buffer.clear();
         self.start_datetime = Local::now();
+        // Note: recording_offset_secs is NOT reset here - it accumulates across the session
+    }
+
+    /// Reset the recording session (called when starting a new recording)
+    fn reset_session(&mut self) {
+        self.reset();
+        self.recording_offset_secs = 0.0;
     }
 }
 
@@ -171,6 +181,14 @@ impl Fractor {
         if !state.fragmentum_buffer.is_empty() {
             let samples_to_process = std::mem::take(&mut state.fragmentum_buffer);
 
+            // Calculate duration of this fragmentum
+            let duration_secs = samples_to_process.len() as f32
+                / (wav_config.sample_rate as f32 * wav_config.channels as f32);
+
+            // Calculate timestamps
+            let timestamp_start = state.recording_offset_secs;
+            let timestamp_end = state.recording_offset_secs + duration_secs;
+
             // Save fragmentum
             let fragmentum_path = Self::save_fragmentum(
                 wav_config,
@@ -180,17 +198,22 @@ impl Fractor {
             )
             .with_context(|| "Failed to save recording during flush")?;
 
-            // Create queue element
+            // Create queue element with timestamps
             let fragmentum_queue_element = FragmentumToTranscribe {
                 path: fragmentum_path,
                 start_datetime: state.start_datetime,
+                timestamp_start,
+                timestamp_end,
             };
 
             // Add to queue
             tx.send(fragmentum_queue_element)
                 .with_context(|| "Failed to send fragment to transcription queue during flush")?;
 
-            // Reset states for next fragmentum
+            // Update the cumulative offset for the next fragmentum
+            state.recording_offset_secs = timestamp_end;
+
+            // Reset states for next fragmentum (but not the offset)
             state.reset();
             vad.reset();
         }
@@ -259,8 +282,8 @@ impl Fractor {
         // Change status of recorder
         Self::start_recording(&mut recorder).with_context(|| "Unable to play")?;
 
-        // Reset the start_datetime to now (after clearing stale audio)
-        state.start_datetime = chrono::Local::now();
+        // Reset the entire session (including offset) for a fresh recording
+        state.reset_session();
 
         // We always store audio because it is needed by STT implementation.
         // If not required to save it, we remove it at the end of the processing
@@ -364,6 +387,14 @@ impl Fractor {
                 // Process the fragmentum (saves to file and runs STT)
                 let samples_to_process = std::mem::take(&mut state.fragmentum_buffer);
 
+                // Calculate duration of this fragmentum
+                let fragmentum_duration_secs = samples_to_process.len() as f32
+                    / (wav_config.sample_rate as f32 * wav_config.channels as f32);
+
+                // Calculate timestamps
+                let timestamp_start = state.recording_offset_secs;
+                let timestamp_end = state.recording_offset_secs + fragmentum_duration_secs;
+
                 // Save fragmentum
                 let fragmentum_path = Self::save_fragmentum(
                     &wav_config,
@@ -373,17 +404,22 @@ impl Fractor {
                 )
                 .with_context(|| "Failed to save recording")?;
 
-                // Create queue element
+                // Create queue element with timestamps
                 let fragmentum_queue_element = FragmentumToTranscribe {
                     path: fragmentum_path,
                     start_datetime: state.start_datetime,
+                    timestamp_start,
+                    timestamp_end,
                 };
 
                 // Add to queue
                 tx.send(fragmentum_queue_element)
                     .with_context(|| "Failed to send to transcription queue")?;
 
-                // Reset states for next fragmentum
+                // Update the cumulative offset for the next fragmentum
+                state.recording_offset_secs = timestamp_end;
+
+                // Reset states for next fragmentum (but not the offset)
                 state.reset(); // Reset state of fractor buffer
                 vad.reset(); // Reset LSTM state for new segment
             }

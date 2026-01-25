@@ -59,8 +59,8 @@ impl FoliaComponent {
         // Transcribe
         let transcription = stt_model.transcribe(audio_samples)?;
 
-        // Split the transcription in chunks (fragmenta) of 500 chars
-        let fragmenta = transcription.split_text(500);
+        // Split the transcription in chunks (fragmenta) of 500 chars with timestamps
+        let fragmenta = transcription.split_with_timestamps(500);
 
         // The default folio name is just the name of the target file, not the full path
         let folio_name = folio_path
@@ -86,9 +86,9 @@ impl FoliaComponent {
             .map(|f| NewFragmentum {
                 folio_id,
                 path: folio_path.display().to_string(),
-                content: f,
-                timestamp_start: None,
-                timestamp_end: None,
+                content: f.text,
+                timestamp_start: Some(f.start),
+                timestamp_end: Some(f.end),
             })
             .collect();
         Fragmentum::create_batch(pool, new_fragmenta).await?;
