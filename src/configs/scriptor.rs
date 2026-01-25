@@ -16,8 +16,6 @@ use std::path::PathBuf;
 pub struct ScriptorConfig {
     pub default: DefaultConfig,
     pub dbs: Vec<DBConfig>,
-    pub stts: Vec<STTConfig>,
-    pub vads: Vec<VADConfig>,
 }
 
 /// Default configurations for db, theme and speech-to-text options
@@ -38,8 +36,6 @@ impl Default for ScriptorConfig {
         Self {
             default: DefaultConfig::default(),
             dbs: vec![DBConfig::default()],
-            stts: vec![STTConfig::default()],
-            vads: vec![VADConfig::default()],
         }
     }
 }
