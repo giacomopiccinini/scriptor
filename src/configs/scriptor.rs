@@ -28,6 +28,7 @@ pub struct DefaultConfig {
     pub queue: QueueConfig,
     pub stt: STTConfig,
     pub theme: ThemeConfig,
+    pub input_device: Option<String>,
 }
 
 impl Default for ScriptorConfig {

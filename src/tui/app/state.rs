@@ -1,15 +1,19 @@
 use crate::configs::db::DBConfig;
 use crate::configs::scriptor::ScriptorConfig;
+use crate::configs::settings::SettingsState;
+use crate::configs::stt::AvailableSTTModel;
+use crate::configs::vad::AvailableVADModel;
 use crate::stt::fractor::Fractor;
 use crate::stt::model::STTModel;
 use crate::stt::playback::Player;
-use crate::stt::rec::RecorderConfig;
+use crate::stt::rec::{RecorderConfig, enumerate_input_devices};
 use crate::stt::vad::VADModel;
 use crate::tui::app::events::EventHandler;
 use crate::tui::db::connections::init_db;
 use crate::tui::ui::components::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, CodicesComponent,
     FragmentaComponent, InputState, ModifyCodexPopUp, ModifyFolioPopUp, RecordingScreen,
+    SettingsScreen,
 };
 use crate::tui::ui::cursor::CursorState;
 use crate::tui::ui::layout::AppLayout;
@@ -47,6 +51,8 @@ pub enum CurrentScreen {
     ChangeArchivum,
     /// Pop-up for adding a new archivum
     AddArchivum,
+    /// Settings screen for configuring input device and VAD threshold
+    Settings,
 }
 
 /// Current region to signal where the cursor is
@@ -61,7 +67,6 @@ pub struct STTTools {
     pub fractor: Option<Fractor>,
     pub stt_model: Option<STTModel>,
     pub player: Player,
-    /// Max queue elements for fragmentum channel
     pub max_queue_elements: usize,
 }
 
@@ -69,6 +74,8 @@ pub struct STTTools {
 pub struct App {
     /// App configuration (db, stt inference parameters, theme)
     pub config: ScriptorConfig,
+    /// Available models from models.toml (cached at startup)
+    pub available_models: ModelsConfig,
     // Collection of tools to perform speech to text
     pub stt_tools: STTTools,
     /// Current active screen
@@ -105,6 +112,8 @@ pub struct App {
     pub exit: bool,
     /// Flag to toggle timestamp display on fragmenta
     pub show_timestamp: bool,
+    /// State for the settings screen (populated when settings is opened)
+    pub settings_state: Option<SettingsState>,
 }
 
 impl STTTools {
@@ -113,9 +122,11 @@ impl STTTools {
         let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
 
         // Create recorder config (actual stream created inside thread for macOS compatibility)
-        let recorder_config =
-            RecorderConfig::new(config.default.fractor.max_fragmentum_duration_seconds)
-                .with_context(|| "Failed to create recorder config")?;
+        let recorder_config = RecorderConfig::new(
+            config.default.fractor.max_fragmentum_duration_seconds,
+            config.default.input_device.as_deref(),
+        )
+        .with_context(|| "Failed to create recorder config")?;
 
         // Create VAD model
         let vad_model = VADModel::new(&config.default.vad, config.default.inference.clone())
@@ -145,9 +156,11 @@ impl STTTools {
     ) -> anyhow::Result<()> {
         // Create recorder config (actual stream created inside thread for macOS compatibility)
         // This is cheap, just configuration, no model loading
-        let recorder_config =
-            RecorderConfig::new(config.default.fractor.max_fragmentum_duration_seconds)
-                .with_context(|| "Failed to create recorder config")?;
+        let recorder_config = RecorderConfig::new(
+            config.default.fractor.max_fragmentum_duration_seconds,
+            config.default.input_device.as_deref(),
+        )
+        .with_context(|| "Failed to create recorder config")?;
 
         // Create fractor with the existing VAD model (no model reloading!)
         let fractor = Fractor::new(recorder_config, vad_model);
@@ -221,6 +234,7 @@ impl App {
         // Return initial state of the app
         Self {
             config,
+            available_models,
             stt_tools,
             current_screen,
             current_region: CurrentRegion::CodexAndFolio,
@@ -239,6 +253,7 @@ impl App {
             last_playback_file_index: 0,
             exit: false,
             show_timestamp: false,
+            settings_state: None,
         }
     }
 
@@ -382,6 +397,7 @@ impl App {
             CurrentScreen::AddArchivum => {
                 EventHandler::handle_add_archivum_screen_key(self, key).await
             }
+            CurrentScreen::Settings => EventHandler::handle_settings_screen_key(self, key).await,
         }
     }
 
@@ -522,6 +538,168 @@ impl App {
         }
         Ok(())
     }
+
+    /// Enter the "Settings" screen by opening the settings overlay
+    pub fn enter_settings_screen(&mut self) {
+        // Enumerate available input devices
+        let available_devices = enumerate_input_devices();
+
+        // Get available models from cached config
+        let available_stt_models = self.available_models.available_stt_models();
+        let available_vad_models = self.available_models.available_vad_models();
+
+        // Create settings state with current config values
+        self.settings_state = Some(SettingsState::new(
+            available_devices,
+            self.config.default.input_device.as_deref(),
+            self.config.default.vad.threshold,
+            available_stt_models,
+            &self.config.default.stt.model,
+            available_vad_models,
+            &self.config.default.vad.model,
+        ));
+
+        self.current_screen = CurrentScreen::Settings;
+    }
+
+    /// Exit the Settings screen without saving (discard changes)
+    pub fn exit_settings_without_saving(&mut self) {
+        self.settings_state = None;
+        self.current_screen = CurrentScreen::Main;
+    }
+
+    /// Save settings to current session only (don't write to file)
+    pub async fn save_settings_to_session(&mut self) -> Result<()> {
+        self.apply_settings_changes(false).await
+    }
+
+    /// Save settings to session and write to scriptor.toml file
+    pub async fn save_settings_as_default(&mut self) -> Result<()> {
+        self.apply_settings_changes(true).await
+    }
+
+    /// Apply settings changes, optionally writing to file
+    async fn apply_settings_changes(&mut self, write_to_file: bool) -> Result<()> {
+        let settings = match &self.settings_state {
+            Some(s) => s.clone(),
+            None => {
+                self.current_screen = CurrentScreen::Main;
+                return Ok(());
+            }
+        };
+
+        // Check if STT model changed
+        let stt_model_changed = settings
+            .selected_stt_model_key()
+            .map(|key| key != self.config.default.stt.model.as_key())
+            .unwrap_or(false);
+
+        // Check if VAD model changed
+        let vad_model_changed = settings
+            .selected_vad_model_key()
+            .map(|key| key != self.config.default.vad.model.as_key())
+            .unwrap_or(false);
+
+        // Check if VAD threshold changed
+        let vad_threshold_changed =
+            (settings.vad_threshold - self.config.default.vad.threshold).abs() > 0.001;
+
+        // Update config values
+        self.config.default.vad.threshold = settings.vad_threshold;
+        self.config.default.input_device = settings.selected_device_name().map(|s| s.to_string());
+
+        // Update STT model in config if changed
+        if stt_model_changed {
+            if let Some(key) = settings.selected_stt_model_key() {
+                self.config.default.stt.model = AvailableSTTModel::from_key(key);
+            }
+        }
+
+        // Update VAD model in config if changed
+        if vad_model_changed {
+            if let Some(key) = settings.selected_vad_model_key() {
+                self.config.default.vad.model = AvailableVADModel::from_key(key);
+            }
+        }
+
+        // Write to file if requested
+        if write_to_file {
+            let config_dir = dirs::config_dir()
+                .ok_or_else(|| color_eyre::eyre::eyre!("Could not find config directory"))?
+                .join("scriptor");
+            let config_path = config_dir.join("scriptor.toml");
+
+            self.config
+                .write(&config_path)
+                .map_err(|e| color_eyre::eyre::eyre!("Failed to save config: {}", e))?;
+        }
+
+        // If any model changed, check for missing files and download
+        if stt_model_changed || vad_model_changed {
+            if let Some(missing_files) = self.config.check_missing(&self.available_models) {
+                let mut spinner = Spinner::new_with_stream(
+                    spinners::Dots,
+                    "Downloading models...",
+                    Color::Blue,
+                    Streams::Stderr,
+                );
+                download_missing_files(&missing_files).await;
+                spinner.success("Models downloaded!");
+            }
+        }
+
+        // Reload STT model if changed
+        if stt_model_changed {
+            let mut spinner = Spinner::new_with_stream(
+                spinners::Dots,
+                "Loading STT model...",
+                Color::Blue,
+                Streams::Stderr,
+            );
+            let stt_model = STTModel::new(
+                &self.config.default.stt,
+                self.config.default.inference.clone(),
+            )
+            .map_err(|e| color_eyre::eyre::eyre!("Failed to load STT model: {}", e))?;
+            self.stt_tools.stt_model = Some(stt_model);
+            spinner.success("STT model loaded!");
+        }
+
+        // Rebuild Fractor if VAD model or threshold changed (VAD is inside Fractor)
+        if vad_model_changed || vad_threshold_changed {
+            let mut spinner = Spinner::new_with_stream(
+                spinners::Dots,
+                "Loading VAD model...",
+                Color::Blue,
+                Streams::Stderr,
+            );
+
+            // Create new VAD model with updated config
+            let vad_model = VADModel::new(
+                &self.config.default.vad,
+                self.config.default.inference.clone(),
+            )
+            .map_err(|e| color_eyre::eyre::eyre!("Failed to load VAD model: {}", e))?;
+
+            // Create new recorder config
+            let recorder_config = RecorderConfig::new(
+                self.config.default.fractor.max_fragmentum_duration_seconds,
+                self.config.default.input_device.as_deref(),
+            )
+            .map_err(|e| color_eyre::eyre::eyre!("Failed to create recorder config: {}", e))?;
+
+            // Rebuild Fractor with new VAD model
+            let fractor = Fractor::new(recorder_config, vad_model);
+            self.stt_tools.fractor = Some(fractor);
+
+            spinner.success("VAD model loaded!");
+        }
+
+        self.settings_state = None;
+        self.current_screen = CurrentScreen::Main;
+
+        Ok(())
+    }
 }
 
 impl Widget for &mut App {
@@ -609,6 +787,12 @@ impl Widget for &mut App {
 
                 // Render recording overlay on top of the main UI
                 RecordingScreen::render(self.is_paused, selected_folio, area, buf, theme);
+            }
+            CurrentScreen::Settings => {
+                // Render settings overlay on top of the main UI
+                if let Some(settings_state) = &self.settings_state {
+                    SettingsScreen::render(settings_state, area, buf, theme);
+                }
             }
             _ => {}
         }

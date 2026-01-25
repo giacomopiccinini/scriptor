@@ -2828,6 +2828,7 @@ dependencies = [
  "futures-util",
  "hound",
  "lazy_static",
+ "libc",
  "ndarray",
  "once_cell",
  "ort",

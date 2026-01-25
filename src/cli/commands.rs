@@ -134,9 +134,11 @@ pub async fn record_and_transcribe(
     let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
 
     // Create recorder config (actual stream created inside thread for macOS compatibility)
-    let recorder_config =
-        RecorderConfig::new(config.default.fractor.max_fragmentum_duration_seconds)
-            .with_context(|| "Failed to create recorder config")?;
+    let recorder_config = RecorderConfig::new(
+        config.default.fractor.max_fragmentum_duration_seconds,
+        config.default.input_device.as_deref(),
+    )
+    .with_context(|| "Failed to create recorder config")?;
 
     // Create VAD model
     let vad_model = VADModel::new(&config.default.vad, config.default.inference.clone())

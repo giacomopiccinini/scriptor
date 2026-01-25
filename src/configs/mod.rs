@@ -4,6 +4,7 @@ pub mod inference;
 pub mod parakeet;
 pub mod queue;
 pub mod scriptor;
+pub mod settings;
 pub mod silero;
 pub mod stt;
 pub mod theme;

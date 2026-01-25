@@ -21,6 +21,15 @@ impl AvailableSTTModel {
             Self::ParakeetTdt06BV3Int8 => "parakeet-tdt-0_6b-v3-int8",
         }
     }
+
+    /// Convert a key string to the corresponding enum variant
+    pub fn from_key(key: &str) -> Self {
+        match key {
+            "parakeet-tdt-0_6b-v3-fp32" => Self::ParakeetTdt06BV3Fp32,
+            "parakeet-tdt-0_6b-v3-int8" => Self::ParakeetTdt06BV3Int8,
+            _ => Self::default(),
+        }
+    }
 }
 
 /// Wrapper for model-specific configurations

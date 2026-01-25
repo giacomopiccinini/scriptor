@@ -11,7 +11,7 @@ pub struct AppLayout;
 
 impl AppLayout {
     /// Calculate responsive layout areas
-    /// Returns: (codices_header_area, codices_area, bookmark_area, fragmenta_header_area, fragmenta_area)
+    /// Returns: (codices_header_area, codices_area, bookmark_area, fragmenta_header_area, fragmenta_area, codex_footer_area)
     pub fn calculate_main_layout(area: Rect) -> (Rect, Rect, Rect, Rect, Rect) {
         // Subdivide the content area into three columns: codex, folio, fragmentum
         let content_layout = Layout::horizontal([
