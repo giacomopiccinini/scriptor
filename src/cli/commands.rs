@@ -13,7 +13,6 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::style::Stylize;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use spinoff::{Color, Spinner, Streams, spinners};
-use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
