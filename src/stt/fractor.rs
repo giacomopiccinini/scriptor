@@ -117,6 +117,18 @@ impl Fractor {
     fn start_recording(&mut self) -> Result<()> {
         self.recorder.is_recording = Arc::new(AtomicBool::new(true));
         self.recorder.play().with_context(|| "Unable to play")?;
+
+        // On some Linux audio backends (PipeWire/PulseAudio), pause() only stops
+        // the stream callback but the driver continues buffering audio. When play()
+        // resumes, all that stale audio floods into the ring buffer. We need to:
+        // 1. Wait briefly for any OS-buffered audio to be delivered
+        // 2. Clear the ring buffer to discard stale samples
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        self.recorder.clear_buffer();
+
+        // Reset the start_datetime to now (after clearing stale audio)
+        self.state.start_datetime = chrono::Local::now();
+
         Ok(())
     }
 
