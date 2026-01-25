@@ -142,7 +142,7 @@ impl STTTools {
         stt_model: STTModel,
     ) -> anyhow::Result<()> {
         // Create recorder config (actual stream created inside thread for macOS compatibility)
-        // This is cheap - just configuration, no model loading
+        // This is cheap, just configuration, no model loading
         let recorder_config =
             RecorderConfig::new(config.default.fractor.max_fragmentum_duration_seconds)
                 .with_context(|| "Failed to create recorder config")?;
@@ -526,24 +526,6 @@ impl Widget for &mut App {
         // Get theme reference
         let theme = &self.config.default.theme;
 
-        // RecordFolio is a full-screen mode
-        if self.current_screen == CurrentScreen::RecordFolio {
-            // Get the selected folio for displaying fragmenta
-            let selected_folio =
-                if let Some(codex) = self.codices_component.get_selected_codex_mut() {
-                    if let Some(folio_idx) = codex.folio_state.selected() {
-                        codex.folia.get(folio_idx)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-
-            RecordingScreen::render(self.is_paused, selected_folio, area, buf, theme);
-            return;
-        }
-
         // Render background
         AppLayout::render_background(area, buf, theme);
 
@@ -607,6 +589,22 @@ impl Widget for &mut App {
             ),
             CurrentScreen::AddArchivum => {
                 AddArchivumPopUp::render(&self.input_state, bookmark_area, buf, theme)
+            }
+            CurrentScreen::RecordFolio => {
+                // Get the selected folio for displaying fragmenta
+                let selected_folio =
+                    if let Some(codex) = self.codices_component.get_selected_codex_mut() {
+                        if let Some(folio_idx) = codex.folio_state.selected() {
+                            codex.folia.get(folio_idx)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                // Render recording overlay on top of the main UI
+                RecordingScreen::render(self.is_paused, selected_folio, area, buf, theme);
             }
             _ => {}
         }

@@ -1,5 +1,6 @@
 use crate::configs::theme::ThemeConfig;
 use crate::tui::db::models::UIFolio;
+use crate::tui::ui::components::overlay_window::OverlayWindow;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::Style;
@@ -10,7 +11,8 @@ use textwrap::wrap;
 pub struct RecordingScreen;
 
 impl RecordingScreen {
-    /// Render the recording screen with status indicator and live fragmenta list
+    /// Render the recording screen inside an overlay window.
+    /// The overlay sits on top of the main UI, clearing only its own area.
     pub fn render(
         is_paused: bool,
         selected_folio: Option<&UIFolio>,
@@ -18,27 +20,54 @@ impl RecordingScreen {
         buf: &mut Buffer,
         theme: &ThemeConfig,
     ) {
-        // Clear background
-        let background =
-            Block::default().style(Style::default().bg(theme.background).fg(theme.foreground));
-        background.render(area, buf);
+        // Build footer command hints
+        let footer_hints = Self::build_footer_hints(is_paused, theme);
 
-        // Calculate layout: header, content, footer
+        // Render the overlay window and get the inner content area
+        let content_area =
+            OverlayWindow::render(footer_hints, Some(60), Some(80), area, buf, theme);
+
+        // Render the recording content inside the overlay
+        Self::render_content(is_paused, selected_folio, content_area, buf, theme);
+    }
+
+    /// Build the footer command hints line
+    fn build_footer_hints(is_paused: bool, theme: &ThemeConfig) -> Line<'static> {
+        let pause_text = if is_paused { "resume" } else { "pause" };
+
+        Line::from(vec![
+            Span::raw(" "),
+            Span::styled("[Space]", Style::default().fg(theme.highlight)),
+            Span::styled(
+                format!(" {} ", pause_text),
+                Style::default().fg(theme.foreground),
+            ),
+            Span::raw("  "),
+            Span::styled("[Esc]", Style::default().fg(theme.highlight)),
+            Span::styled(" stop ", Style::default().fg(theme.foreground)),
+        ])
+    }
+
+    /// Render the recording content (header + fragmenta) inside the given area
+    fn render_content(
+        is_paused: bool,
+        selected_folio: Option<&UIFolio>,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &ThemeConfig,
+    ) {
+        // Calculate layout: header, content
         let layout = Layout::vertical([
-            Constraint::Length(5), // Header with status
-            Constraint::Min(10),   // Fragmenta content
-            Constraint::Length(3), // Footer with commands
+            Constraint::Length(3), // Header with status
+            Constraint::Min(5),    // Fragmenta content
         ]);
-        let [header_area, content_area, footer_area] = layout.areas(area);
+        let [header_area, fragmenta_area] = layout.areas(area);
 
         // Render header with status indicator
         Self::render_header(is_paused, header_area, buf, theme);
 
         // Render fragmenta list
-        Self::render_fragmenta(selected_folio, content_area, buf, theme);
-
-        // Render footer with command hints
-        Self::render_footer(is_paused, footer_area, buf, theme);
+        Self::render_fragmenta(selected_folio, fragmenta_area, buf, theme);
     }
 
     fn render_header(is_paused: bool, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
@@ -96,7 +125,7 @@ impl RecordingScreen {
                     let mut lines = wrapped_lines;
                     lines.push(Line::from(""));
 
-                    ListItem::new(Text::from(lines))
+                    ListItem::new(Text::from(lines).style(Style::default().fg(theme.foreground)))
                 })
                 .collect();
 
@@ -116,27 +145,5 @@ impl RecordingScreen {
 
             waiting_text.render(area, buf);
         }
-    }
-
-    fn render_footer(is_paused: bool, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
-        let pause_text = if is_paused { "resume" } else { "pause" };
-
-        let command_hints = Line::from(vec![
-            Span::styled("[Space]", Style::default().fg(theme.highlight)),
-            Span::styled(
-                format!(" {} ", pause_text),
-                Style::default().fg(theme.foreground),
-            ),
-            Span::raw("   "),
-            Span::styled("[Esc]", Style::default().fg(theme.highlight)),
-            Span::styled(" stop ", Style::default().fg(theme.foreground)),
-        ])
-        .centered();
-
-        let paragraph = Paragraph::new(command_hints)
-            .style(Style::default().bg(theme.background))
-            .alignment(Alignment::Center);
-
-        paragraph.render(area, buf);
     }
 }
