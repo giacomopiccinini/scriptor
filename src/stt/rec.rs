@@ -26,7 +26,10 @@ pub struct RecorderConfig {
 }
 
 impl RecorderConfig {
-    fn new(max_fragmentum_duration_seconds: f32) -> Result<Self> {
+    /// Create a new RecorderConfig with the given max fragmentum duration.
+    /// This only sets up the configuration and doesn't create the audio stream yet,
+    /// allowing the config to be safely sent across threads.
+    pub fn new(max_fragmentum_duration_seconds: f32) -> Result<Self> {
         // Set up recording device
         let (input_device, input_config) =
             setup_recording().with_context(|| "Unable to set up recording")?;
@@ -52,11 +55,10 @@ impl RecorderConfig {
 }
 
 impl Recorder {
-    pub fn new(max_fragmentum_duration_seconds: f32) -> Result<Self> {
-        // Call construct for recorder config
-        let config = RecorderConfig::new(max_fragmentum_duration_seconds)
-            .with_context(|| "Unable to create recorder config")?;
-
+    /// Create a new Recorder from an existing RecorderConfig.
+    /// This creates the audio stream and should be called from the thread
+    /// where the stream will be used (required for macOS CoreAudio compatibility).
+    pub fn from_config(config: RecorderConfig) -> Result<Self> {
         // Create the audio stream
         let (stream, consumer) = setup_audio_stream(
             config.input_device.clone(),
@@ -71,6 +73,15 @@ impl Recorder {
             config,
             is_recording: Arc::new(AtomicBool::new(false)),
         })
+    }
+
+    /// Convenience constructor that creates both config and stream.
+    /// Note: On macOS, the returned Recorder cannot be sent across threads.
+    /// Use RecorderConfig::new() + Recorder::from_config() for cross-thread scenarios.
+    pub fn new(max_fragmentum_duration_seconds: f32) -> Result<Self> {
+        let config = RecorderConfig::new(max_fragmentum_duration_seconds)
+            .with_context(|| "Unable to create recorder config")?;
+        Self::from_config(config)
     }
 
     /// Start recording

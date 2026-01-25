@@ -4,7 +4,7 @@ use crate::stt::model::STTModel;
 use crate::stt::playback::Player;
 use crate::stt::queue::FragmentumToTranscribe;
 use crate::stt::queue::{transcriber_to_file_worker, transcriber_to_stdout_worker};
-use crate::stt::rec::Recorder;
+use crate::stt::rec::RecorderConfig;
 use crate::stt::text::create_file_if_not_exists;
 use crate::stt::vad::VADModel;
 use crate::utils::aws::{ModelsConfig, download_missing_files, download_models_list};
@@ -137,16 +137,17 @@ pub async fn record_and_transcribe(
     // Load STT model
     let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
 
-    // Create recorder with max fragmentum duration from config
-    let recorder = Recorder::new(config.default.fractor.max_fragmentum_duration_seconds)
-        .with_context(|| "Failed to create recorder")?;
+    // Create recorder config (actual stream created inside thread for macOS compatibility)
+    let recorder_config =
+        RecorderConfig::new(config.default.fractor.max_fragmentum_duration_seconds)
+            .with_context(|| "Failed to create recorder config")?;
 
     // Create VAD model
     let vad_model = VADModel::new(&config.default.vad, config.default.inference.clone())
         .with_context(|| "Failed to create voice activity detector")?;
 
     // Create fractor
-    let fractor = Fractor::new(recorder, vad_model);
+    let fractor = Fractor::new(recorder_config, vad_model);
 
     // Create stop signal
     let stop_signal = Arc::new(AtomicBool::new(false));

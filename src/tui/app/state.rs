@@ -3,7 +3,7 @@ use crate::configs::scriptor::ScriptorConfig;
 use crate::stt::fractor::Fractor;
 use crate::stt::model::STTModel;
 use crate::stt::playback::Player;
-use crate::stt::rec::Recorder;
+use crate::stt::rec::RecorderConfig;
 use crate::stt::vad::VADModel;
 use crate::tui::app::events::EventHandler;
 use crate::tui::db::connections::init_db;
@@ -110,16 +110,17 @@ impl STTTools {
         // Load STT model
         let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
 
-        // Create recorder with max fragmentum duration from config
-        let recorder = Recorder::new(config.default.fractor.max_fragmentum_duration_seconds)
-            .with_context(|| "Failed to create recorder")?;
+        // Create recorder config (actual stream created inside thread for macOS compatibility)
+        let recorder_config =
+            RecorderConfig::new(config.default.fractor.max_fragmentum_duration_seconds)
+                .with_context(|| "Failed to create recorder config")?;
 
         // Create VAD model
         let vad_model = VADModel::new(&config.default.vad, config.default.inference.clone())
             .with_context(|| "Failed to create voice activity detector")?;
 
         // Create fractor
-        let fractor = Fractor::new(recorder, vad_model);
+        let fractor = Fractor::new(recorder_config, vad_model);
 
         // Create the player with no files in the queue
         let player = Player::new(None).with_context(|| "Unable to setup player")?;
@@ -134,16 +135,17 @@ impl STTTools {
 
     /// Recreate the fractor and STT model (needed after recording completes)
     pub fn reinitialize(&mut self, config: &ScriptorConfig) -> anyhow::Result<()> {
-        // Create recorder with max fragmentum duration from config
-        let recorder = Recorder::new(config.default.fractor.max_fragmentum_duration_seconds)
-            .with_context(|| "Failed to create recorder")?;
+        // Create recorder config (actual stream created inside thread for macOS compatibility)
+        let recorder_config =
+            RecorderConfig::new(config.default.fractor.max_fragmentum_duration_seconds)
+                .with_context(|| "Failed to create recorder config")?;
 
         // Create VAD model
         let vad_model = VADModel::new(&config.default.vad, config.default.inference.clone())
             .with_context(|| "Failed to create voice activity detector")?;
 
         // Create fractor
-        let fractor = Fractor::new(recorder, vad_model);
+        let fractor = Fractor::new(recorder_config, vad_model);
 
         // Reload stt
         let stt_model = STTModel::new(&config.default.stt, config.default.inference.clone())?;
