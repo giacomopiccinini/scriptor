@@ -17,6 +17,8 @@ impl OverlayWindow {
     ///
     /// # Arguments
     /// * `footer_hints` - Command hints displayed at the bottom of the window
+    /// * `window_width_percentage` - The width of the window as a percentage of the terminal width
+    /// * `window_height_percentage` - The height of the window as a percentage of the terminal height
     /// * `area` - The full terminal area to center the window within
     /// * `buf` - The buffer to render into
     /// * `theme` - The theme configuration for styling
@@ -65,8 +67,6 @@ impl OverlayWindow {
 
         // Define the window block with styling
         let window_block = Block::new()
-            //.title(format!("  {}  ", title))
-            //.title_style(Style::new().fg(theme.foreground))
             .title_bottom(footer_hints)
             .borders(Borders::ALL)
             .border_style(Style::new().fg(theme.foreground))

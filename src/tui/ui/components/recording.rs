@@ -125,7 +125,7 @@ impl RecordingScreen {
                     let mut lines = wrapped_lines;
                     lines.push(Line::from(""));
 
-                    ListItem::new(Text::from(lines))
+                    ListItem::new(Text::from(lines).style(Style::default().fg(theme.foreground)))
                 })
                 .collect();
 
