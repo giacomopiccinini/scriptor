@@ -1,7 +1,9 @@
 use crate::stt::queue::{create_fragmentum_channel, transcriber_to_db_worker};
 use crate::tui::app::state::{App, CurrentRegion, CurrentScreen};
 use crate::tui::db::models::{Folio, Fragmentum, NewFolio};
-use crate::tui::ui::components::{CodicesComponent, FoliaComponent, FragmentaComponent};
+use crate::tui::ui::components::{
+    CodicesComponent, FoliaComponent, FragmentaComponent, format_timestamp,
+};
 use crate::tui::ui::cursor::CursorState;
 use arboard::Clipboard;
 #[cfg(target_os = "linux")]
@@ -341,8 +343,20 @@ impl EventHandler {
                     && let Some(fragmentum_idx) = selected_folio.fragmentum_state.selected()
                     && let Some(ui_fragmentum) = selected_folio.fragmenta.get(fragmentum_idx)
                 {
-                    // Clone content for the thread
-                    let content = ui_fragmentum.fragmentum.content.clone();
+                    // Build content with optional timestamp prefix
+                    let content = if app.show_timestamp {
+                        if let Some(ts) = ui_fragmentum.fragmentum.timestamp_start {
+                            format!(
+                                "[{}] {}",
+                                format_timestamp(ts),
+                                ui_fragmentum.fragmentum.content
+                            )
+                        } else {
+                            ui_fragmentum.fragmentum.content.clone()
+                        }
+                    } else {
+                        ui_fragmentum.fragmentum.content.clone()
+                    };
                     // Spawn thread to keep clipboard alive until content is read
                     #[cfg(target_os = "linux")]
                     std::thread::spawn(move || {
@@ -366,11 +380,22 @@ impl EventHandler {
                     && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
                     && let Some(selected_folio) = selected_codex.folia.get(selected_folio_idx)
                 {
-                    // Concatenate all fragmenta content with newlines
+                    // Concatenate all fragmenta content with newlines, optionally with timestamps
+                    let show_ts = app.show_timestamp;
                     let all_content: String = selected_folio
                         .fragmenta
                         .iter()
-                        .map(|f| f.fragmentum.content.as_str())
+                        .map(|f| {
+                            if show_ts {
+                                if let Some(ts) = f.fragmentum.timestamp_start {
+                                    format!("[{}] {}", format_timestamp(ts), f.fragmentum.content)
+                                } else {
+                                    f.fragmentum.content.clone()
+                                }
+                            } else {
+                                f.fragmentum.content.clone()
+                            }
+                        })
                         .collect::<Vec<_>>()
                         .join("\n\n");
 
