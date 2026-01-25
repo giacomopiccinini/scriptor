@@ -36,7 +36,7 @@ impl Default for ScriptorConfig {
     fn default() -> Self {
         Self {
             default: DefaultConfig::default(),
-            dbs: vec![DBConfig::default()],xs
+            dbs: vec![DBConfig::default()],
         }
     }
 }
