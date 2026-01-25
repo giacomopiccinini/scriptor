@@ -115,4 +115,77 @@ impl Transcription {
         }
         chunks
     }
+
+    /// Split transcription into chunks with timestamps, grouping segments up to target_size characters
+    pub fn split_with_timestamps(&self, target_size: usize) -> Vec<SegmentTranscription> {
+        // If no segments available, fall back to split_text with estimated timestamps
+        let segments = match &self.segments {
+            Some(segs) if !segs.is_empty() => segs,
+            _ => {
+                // Fallback: split text without timestamps
+                return self
+                    .split_text(target_size)
+                    .into_iter()
+                    .map(|text| SegmentTranscription {
+                        text,
+                        start: 0.0,
+                        end: 0.0,
+                    })
+                    .collect();
+            }
+        };
+
+        let mut chunks = Vec::new();
+        let mut current_text = String::new();
+        let mut chunk_start: Option<f32> = None;
+        let mut chunk_end: f32 = 0.0;
+
+        for segment in segments {
+            let segment_text = segment.text.trim();
+            if segment_text.is_empty() {
+                continue;
+            }
+
+            // Check if adding this segment would exceed target size
+            let would_exceed = !current_text.is_empty()
+                && current_text.len() + segment_text.len() + 1 > target_size;
+
+            if would_exceed {
+                // Save current chunk
+                if !current_text.is_empty() {
+                    chunks.push(SegmentTranscription {
+                        text: current_text.trim().to_string(),
+                        start: chunk_start.unwrap_or(0.0),
+                        end: chunk_end,
+                    });
+                }
+                // Start new chunk
+                current_text = String::new();
+                chunk_start = None;
+            }
+
+            // Add segment to current chunk
+            if !current_text.is_empty() {
+                current_text.push(' ');
+            }
+            current_text.push_str(segment_text);
+
+            // Track timestamps
+            if chunk_start.is_none() {
+                chunk_start = Some(segment.start);
+            }
+            chunk_end = segment.end;
+        }
+
+        // Don't forget the last chunk
+        if !current_text.is_empty() {
+            chunks.push(SegmentTranscription {
+                text: current_text.trim().to_string(),
+                start: chunk_start.unwrap_or(0.0),
+                end: chunk_end,
+            });
+        }
+
+        chunks
+    }
 }

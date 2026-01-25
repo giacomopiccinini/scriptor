@@ -11,6 +11,8 @@ use std::sync::mpsc::{Receiver, SyncSender};
 pub struct FragmentumToTranscribe {
     pub path: PathBuf,
     pub start_datetime: DateTime<Local>,
+    pub timestamp_start: f32,
+    pub timestamp_end: f32,
 }
 
 /// Create a new channel pair for fragmentum transcription queue
@@ -95,8 +97,8 @@ pub fn transcriber_to_db_worker(
             folio_id,
             path: item.path.display().to_string(),
             content: result.text,
-            timestamp_start: None,
-            timestamp_end: None,
+            timestamp_start: Some(item.timestamp_start),
+            timestamp_end: Some(item.timestamp_end),
         };
 
         // Run async DB operation on the existing runtime
