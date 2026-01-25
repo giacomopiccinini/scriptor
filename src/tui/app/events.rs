@@ -548,18 +548,25 @@ impl EventHandler {
                     stop_signal.store(true, Ordering::SeqCst);
                 }
 
-                // Wait for threads to finish processing
-                if let Some(fractor_handle) = app.fractor_handle.take() {
-                    fractor_handle
+                // Wait for threads to finish and extract the returned models for reuse
+                let vad_model = if let Some(fractor_handle) = app.fractor_handle.take() {
+                    let (_temp_dir, vad) = fractor_handle
                         .join()
                         .expect("Recording thread panicked")
                         .expect("Recording failed");
+                    Some(vad)
+                } else {
+                    None
                 };
-                if let Some(transcriber_handle) = app.transcriber_handle.take() {
-                    transcriber_handle
+
+                let stt_model = if let Some(transcriber_handle) = app.transcriber_handle.take() {
+                    let stt = transcriber_handle
                         .join()
                         .expect("Transcribing thread panicked")
                         .expect("Transcribing failed");
+                    Some(stt)
+                } else {
+                    None
                 };
 
                 // Refresh the folio's fragmenta from DB
@@ -571,9 +578,11 @@ impl EventHandler {
                     eprintln!("Failed to refresh fragmenta: {}", e);
                 }
 
-                // Reinitialize STT tools for next recording
-                if let Err(e) = app.stt_tools.reinitialize(&app.config) {
-                    eprintln!("Failed to reinitialize STT tools: {}", e);
+                // Restore STT tools using the returned models (no reloading from disk!)
+                if let (Some(vad), Some(stt)) = (vad_model, stt_model) {
+                    if let Err(e) = app.stt_tools.restore_from_recording(&app.config, vad, stt) {
+                        eprintln!("Failed to restore STT tools: {}", e);
+                    }
                 }
 
                 // Clear recording state
