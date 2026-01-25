@@ -70,8 +70,8 @@ impl SettingsScreen {
         // Calculate layout: header, device field, vad field
         let layout = Layout::vertical([
             Constraint::Length(3), // Header
-            Constraint::Length(4), // Input Device field
-            Constraint::Length(4), // VAD Threshold field
+            Constraint::Length(3), // Input Device field
+            Constraint::Length(3), // VAD Threshold field
             Constraint::Min(1),    // Spacing
         ]);
         let [header_area, device_area, vad_area, _] = layout.areas(area);
@@ -121,16 +121,16 @@ impl SettingsScreen {
         theme: &ThemeConfig,
         is_active: bool,
     ) {
-        let block = Block::default().padding(Padding::new(2, 2, 0, 0));
+        let block = Block::default().padding(Padding::new(2, 2, 1, 0));
 
         let device_name = settings_state.selected_device_display();
 
         // When active, swap colors (bg = highlight, fg = background)
         let (base_style, text_style, accent_style) = if is_active {
             (
-                Style::default().bg(theme.highlight).fg(theme.background),
-                Style::default().bg(theme.highlight).fg(theme.background),
-                Style::default().bg(theme.highlight).fg(theme.background),
+                Style::default().bg(theme.highlight),
+                Style::default().fg(theme.background),
+                Style::default().fg(theme.background),
             )
         } else {
             (
@@ -148,10 +148,7 @@ impl SettingsScreen {
             Span::styled(" >", text_style),
         ]);
 
-        let lines = vec![
-            selector_line,
-            Line::from(""), // Empty line for spacing
-        ];
+        let lines = vec![selector_line];
 
         let paragraph = Paragraph::new(lines).block(block).style(base_style);
 
@@ -165,7 +162,7 @@ impl SettingsScreen {
         theme: &ThemeConfig,
         is_active: bool,
     ) {
-        let block = Block::default().padding(Padding::new(2, 2, 0, 0));
+        let block = Block::default().padding(Padding::new(2, 2, 1, 0));
 
         // Build the gauge visualization
         let gauge_width = 20;
@@ -181,9 +178,9 @@ impl SettingsScreen {
         // When active, swap colors (bg = highlight, fg = background)
         let (base_style, text_style, accent_style) = if is_active {
             (
-                Style::default().bg(theme.highlight).fg(theme.background),
-                Style::default().bg(theme.highlight).fg(theme.background),
-                Style::default().bg(theme.highlight).fg(theme.background),
+                Style::default().bg(theme.highlight),
+                Style::default().fg(theme.background),
+                Style::default().fg(theme.background),
             )
         } else {
             (
@@ -203,10 +200,7 @@ impl SettingsScreen {
             Span::styled(format!("{:.2}", threshold), accent_style),
         ]);
 
-        let lines = vec![
-            gauge_line,
-            Line::from(""), // Empty line for spacing
-        ];
+        let lines = vec![gauge_line];
 
         let paragraph = Paragraph::new(lines).block(block).style(base_style);
 
