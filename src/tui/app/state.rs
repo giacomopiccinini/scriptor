@@ -720,7 +720,6 @@ impl Widget for &mut App {
             bookmark_area,
             fragmenta_header_area,
             fragmenta_area,
-            footer_area,
         ) = AppLayout::calculate_main_layout(area);
 
         // Render column headers
@@ -729,11 +728,6 @@ impl Widget for &mut App {
 
         // Render bookmark area (archivum selector in the middle)
         AppLayout::render_bookmark(bookmark_area, buf, "   A R C H I V U M", theme);
-
-        // Render footer hints (only on main screen)
-        if self.current_screen == CurrentScreen::Main {
-            AppLayout::render_footer_hints(footer_area, buf, theme);
-        }
 
         // Render the main areas
         self.codices_component.render(codices_area, buf, theme);

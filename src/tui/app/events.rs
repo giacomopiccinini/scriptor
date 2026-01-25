@@ -639,7 +639,7 @@ impl EventHandler {
     pub async fn handle_settings_screen_key(app: &mut App, key: KeyEvent) {
         match (key.code, key.modifiers) {
             // Discard changes and return to main screen
-            (KeyCode::Esc, KeyModifiers::NONE) | (KeyCode::Char('d'), KeyModifiers::NONE) => {
+            (KeyCode::Char('d'), KeyModifiers::NONE) => {
                 app.exit_settings_without_saving();
             }
 
