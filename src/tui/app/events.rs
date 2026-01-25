@@ -304,35 +304,32 @@ impl EventHandler {
                         .player
                         .pause()
                         .expect("Unable to pause player");
-                } else {
-                    if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
-                        && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
-                        && let Some(selected_folio) =
-                            selected_codex.folia.get_mut(selected_folio_idx)
-                        && let Some(fragmentum_idx) = selected_folio.fragmentum_state.selected()
-                        && let Some(ui_fragmentum) = selected_folio.fragmenta.get(fragmentum_idx)
-                    {
-                        // Find all audio files that come after the one corresponding to the selected fragmentum
-                        let audio_paths = Fragmentum::get_subsequent_fragmenta_audio_paths(
-                            &app.pool,
-                            selected_folio.folio.id,
-                            ui_fragmentum.fragmentum.id,
-                        )
-                        .await
-                        .expect("Unable to fetch audio paths");
+                } else if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
+                    && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
+                    && let Some(selected_folio) = selected_codex.folia.get_mut(selected_folio_idx)
+                    && let Some(fragmentum_idx) = selected_folio.fragmentum_state.selected()
+                    && let Some(ui_fragmentum) = selected_folio.fragmenta.get(fragmentum_idx)
+                {
+                    // Find all audio files that come after the one corresponding to the selected fragmentum
+                    let audio_paths = Fragmentum::get_subsequent_fragmenta_audio_paths(
+                        &app.pool,
+                        selected_folio.folio.id,
+                        ui_fragmentum.fragmentum.id,
+                    )
+                    .await
+                    .expect("Unable to fetch audio paths");
 
-                        // Add files to player queue
-                        app.stt_tools
-                            .player
-                            .load_files(audio_paths)
-                            .expect("Unable to enqueue fragmenta to player queue");
+                    // Add files to player queue
+                    app.stt_tools
+                        .player
+                        .load_files(audio_paths)
+                        .expect("Unable to enqueue fragmenta to player queue");
 
-                        // Reset playback file index tracker
-                        app.last_playback_file_index = 0;
+                    // Reset playback file index tracker
+                    app.last_playback_file_index = 0;
 
-                        // Play audio
-                        app.stt_tools.player.play().expect("Unable to play");
-                    }
+                    // Play audio
+                    app.stt_tools.player.play().expect("Unable to play");
                 }
             }
 
@@ -579,10 +576,10 @@ impl EventHandler {
                 }
 
                 // Restore STT tools using the returned models (no reloading from disk!)
-                if let (Some(vad), Some(stt)) = (vad_model, stt_model) {
-                    if let Err(e) = app.stt_tools.restore_from_recording(&app.config, vad, stt) {
-                        eprintln!("Failed to restore STT tools: {}", e);
-                    }
+                if let (Some(vad), Some(stt)) = (vad_model, stt_model)
+                    && let Err(e) = app.stt_tools.restore_from_recording(&app.config, vad, stt)
+                {
+                    eprintln!("Failed to restore STT tools: {}", e);
                 }
 
                 // Clear recording state
