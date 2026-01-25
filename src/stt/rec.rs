@@ -155,11 +155,64 @@ fn setup_recording(device_name: Option<&str>) -> Result<(Device, SupportedStream
 
 /// Enumerate all available input devices and return their names.
 /// Returns a list of device names that can be used with `RecorderConfig::new()`.
+///
+/// On Linux, this temporarily suppresses stderr to avoid ALSA warnings
+/// about unavailable OSS devices (/dev/dsp) which are harmless but noisy.
 pub fn enumerate_input_devices() -> Vec<String> {
+    #[cfg(target_os = "linux")]
+    let _guard = suppress_stderr();
+
     let host = cpal::default_host();
     host.input_devices()
         .map(|devices| devices.filter_map(|d| d.name().ok()).collect())
         .unwrap_or_default()
+}
+
+/// RAII guard that suppresses stderr on Linux during device enumeration.
+/// Stderr is restored when the guard is dropped.
+#[cfg(target_os = "linux")]
+struct StderrSuppressor {
+    original_fd: Option<std::os::unix::io::RawFd>,
+}
+
+#[cfg(target_os = "linux")]
+impl Drop for StderrSuppressor {
+    fn drop(&mut self) {
+        use std::os::unix::io::AsRawFd;
+        if let Some(original_fd) = self.original_fd {
+            // Restore original stderr
+            unsafe {
+                libc::dup2(original_fd, std::io::stderr().as_raw_fd());
+                libc::close(original_fd);
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn suppress_stderr() -> StderrSuppressor {
+    use std::os::unix::io::AsRawFd;
+
+    let stderr_fd = std::io::stderr().as_raw_fd();
+
+    // Duplicate the original stderr so we can restore it later
+    let original_fd = unsafe { libc::dup(stderr_fd) };
+    if original_fd == -1 {
+        return StderrSuppressor { original_fd: None };
+    }
+
+    // Open /dev/null and redirect stderr to it
+    let dev_null = unsafe { libc::open(b"/dev/null\0".as_ptr() as *const libc::c_char, libc::O_WRONLY) };
+    if dev_null != -1 {
+        unsafe {
+            libc::dup2(dev_null, stderr_fd);
+            libc::close(dev_null);
+        }
+    }
+
+    StderrSuppressor {
+        original_fd: Some(original_fd),
+    }
 }
 
 /// Estimate the capacity of the buffer by assuming it can store
