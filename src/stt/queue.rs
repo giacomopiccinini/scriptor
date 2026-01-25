@@ -95,6 +95,8 @@ pub fn transcriber_to_db_worker(
             folio_id,
             path: item.path.display().to_string(),
             content: result.text,
+            timestamp_start: None,
+            timestamp_end: None,
         };
 
         // Run async DB operation on the existing runtime

@@ -87,6 +87,8 @@ impl FoliaComponent {
                 folio_id,
                 path: folio_path.display().to_string(),
                 content: f,
+                timestamp_start: None,
+                timestamp_end: None,
             })
             .collect();
         Fragmentum::create_batch(pool, new_fragmenta).await?;
