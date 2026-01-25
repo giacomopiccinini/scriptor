@@ -28,7 +28,6 @@ pub struct DefaultConfig {
     pub queue: QueueConfig,
     pub stt: STTConfig,
     pub theme: ThemeConfig,
-    /// Input device name for recording. None means use system default.
     pub input_device: Option<String>,
 }
 
