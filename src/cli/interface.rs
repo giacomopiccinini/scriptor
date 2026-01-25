@@ -7,7 +7,6 @@ use std::path::PathBuf;
 /// Local speech-to-text CLI & TUI
 #[derive(Parser)]
 #[clap(name = "scriptor", version)]
-//#[command(version, about, long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
