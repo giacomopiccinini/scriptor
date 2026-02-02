@@ -553,6 +553,9 @@ impl App {
             available_devices,
             self.config.default.input_device.as_deref(),
             self.config.default.vad.threshold,
+            self.config.default.fractor.min_fragmentum_duration_seconds,
+            self.config.default.fractor.max_fragmentum_duration_seconds,
+            self.config.default.fractor.pause_threshold_in_chunks,
             available_stt_models,
             &self.config.default.stt.model,
             available_vad_models,
@@ -607,20 +610,23 @@ impl App {
         // Update config values
         self.config.default.vad.threshold = settings.vad_threshold;
         self.config.default.input_device = settings.selected_device_name().map(|s| s.to_string());
+        self.config.default.fractor.min_fragmentum_duration_seconds =
+            settings.min_fragmentum_duration_seconds;
+        self.config.default.fractor.max_fragmentum_duration_seconds =
+            settings.max_fragmentum_duration_seconds;
+        self.config.default.fractor.pause_threshold_in_chunks = settings.pause_threshold_in_chunks;
 
         // Update STT model in config if changed
-        if stt_model_changed {
-            if let Some(key) = settings.selected_stt_model_key() {
+        if stt_model_changed
+            && let Some(key) = settings.selected_stt_model_key() {
                 self.config.default.stt.model = AvailableSTTModel::from_key(key);
             }
-        }
 
         // Update VAD model in config if changed
-        if vad_model_changed {
-            if let Some(key) = settings.selected_vad_model_key() {
+        if vad_model_changed
+            && let Some(key) = settings.selected_vad_model_key() {
                 self.config.default.vad.model = AvailableVADModel::from_key(key);
             }
-        }
 
         // Write to file if requested
         if write_to_file {
@@ -635,8 +641,8 @@ impl App {
         }
 
         // If any model changed, check for missing files and download
-        if stt_model_changed || vad_model_changed {
-            if let Some(missing_files) = self.config.check_missing(&self.available_models) {
+        if (stt_model_changed || vad_model_changed)
+            && let Some(missing_files) = self.config.check_missing(&self.available_models) {
                 let mut spinner = Spinner::new_with_stream(
                     spinners::Dots,
                     "Downloading models...",
@@ -646,7 +652,6 @@ impl App {
                 download_missing_files(&missing_files).await;
                 spinner.success("Models downloaded!");
             }
-        }
 
         // Reload STT model if changed
         if stt_model_changed {

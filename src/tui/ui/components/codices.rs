@@ -469,6 +469,9 @@ impl CodicesComponent {
             Span::styled("[↵]", Style::default().fg(theme.highlight)),
             Span::styled("expand", Style::default().fg(theme.foreground)),
             Span::raw("   "),
+            Span::styled("[s]", Style::default().fg(theme.highlight)),
+            Span::styled("ettings", Style::default().fg(theme.foreground)),
+            Span::raw("   "),
             Span::styled("[q]", Style::default().fg(theme.highlight)),
             Span::styled("uit", Style::default().fg(theme.foreground)),
         ])

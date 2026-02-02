@@ -678,6 +678,15 @@ impl EventHandler {
                     match settings.active_field {
                         SettingsField::InputDevice => settings.previous_device(),
                         SettingsField::VadThreshold => settings.decrease_threshold(),
+                        SettingsField::MinFragmentumDurationSeconds => {
+                            settings.decrease_min_fragmentum_duration()
+                        }
+                        SettingsField::MaxFragmentumDurationSeconds => {
+                            settings.decrease_max_fragmentum_duration()
+                        }
+                        SettingsField::PauseThresholdInChunks => {
+                            settings.decrease_pause_threshold()
+                        }
                         SettingsField::STTModel => settings.previous_stt_model(),
                         SettingsField::VADModel => settings.previous_vad_model(),
                     }
@@ -690,6 +699,15 @@ impl EventHandler {
                     match settings.active_field {
                         SettingsField::InputDevice => settings.next_device(),
                         SettingsField::VadThreshold => settings.increase_threshold(),
+                        SettingsField::MinFragmentumDurationSeconds => {
+                            settings.increase_min_fragmentum_duration()
+                        }
+                        SettingsField::MaxFragmentumDurationSeconds => {
+                            settings.increase_max_fragmentum_duration()
+                        }
+                        SettingsField::PauseThresholdInChunks => {
+                            settings.increase_pause_threshold()
+                        }
                         SettingsField::STTModel => settings.next_stt_model(),
                         SettingsField::VADModel => settings.next_vad_model(),
                     }
