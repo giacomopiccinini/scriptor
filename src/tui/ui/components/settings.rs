@@ -72,6 +72,9 @@ impl SettingsScreen {
             Constraint::Length(3), // Header
             Constraint::Length(3), // Input Device field
             Constraint::Length(3), // VAD Threshold field
+            Constraint::Length(3), // Min Fragmentum Duration field
+            Constraint::Length(3), // Max Fragmentum Duration field
+            Constraint::Length(3), // Pause Threshold field
             Constraint::Length(3), // STT Model field
             Constraint::Length(3), // VAD Model field
             Constraint::Min(1),    // Spacing
@@ -80,6 +83,9 @@ impl SettingsScreen {
             header_area,
             device_area,
             vad_threshold_area,
+            min_fragmentum_duration_area,
+            max_fragmentum_duration_area,
+            pause_threshold_area,
             stt_model_area,
             vad_model_area,
             _,
@@ -104,6 +110,33 @@ impl SettingsScreen {
             buf,
             theme,
             settings_state.active_field == SettingsField::VadThreshold,
+        );
+
+        // Render min fragmentum duration slider
+        Self::render_min_fragmentum_duration_field(
+            settings_state,
+            min_fragmentum_duration_area,
+            buf,
+            theme,
+            settings_state.active_field == SettingsField::MinFragmentumDurationSeconds,
+        );
+
+        // Render max fragmentum duration slider
+        Self::render_max_fragmentum_duration_field(
+            settings_state,
+            max_fragmentum_duration_area,
+            buf,
+            theme,
+            settings_state.active_field == SettingsField::MaxFragmentumDurationSeconds,
+        );
+
+        // Render pause threshold slider
+        Self::render_pause_threshold_field(
+            settings_state,
+            pause_threshold_area,
+            buf,
+            theme,
+            settings_state.active_field == SettingsField::PauseThresholdInChunks,
         );
 
         // Render STT model selector
@@ -197,10 +230,10 @@ impl SettingsScreen {
         let filled = ((threshold * gauge_width as f32).round() as usize).min(gauge_width);
         let empty = gauge_width - filled;
 
-        // Create gauge string: [========>--------]
-        let gauge_filled: String = "=".repeat(filled.saturating_sub(1));
-        let gauge_pointer = if filled > 0 { ">" } else { "" };
-        let gauge_empty: String = "-".repeat(empty);
+        // Create gauge string: [████.......]
+        let gauge_filled: String = "█".repeat(filled.saturating_sub(1));
+        let gauge_pointer = if filled > 0 { "█" } else { "" };
+        let gauge_empty: String = ".".repeat(empty);
 
         // When active, swap colors (bg = highlight, fg = background)
         let (base_style, text_style, accent_style) = if is_active {
@@ -232,6 +265,203 @@ impl SettingsScreen {
         let paragraph = Paragraph::new(lines).block(block).style(base_style);
 
         paragraph.render(area, buf);
+    }
+
+    fn render_min_fragmentum_duration_field(
+        settings_state: &SettingsState,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &ThemeConfig,
+        is_active: bool,
+    ) {
+        let block = Block::default().padding(Padding::new(2, 2, 1, 0));
+
+        // Build the gauge visualization
+        let gauge_width = 20;
+        let duration = settings_state.min_fragmentum_duration_seconds;
+        let filled = ((duration / settings_state.max_fragmentum_duration_seconds
+            * gauge_width as f32)
+            .round() as usize)
+            .min(gauge_width);
+        let empty = gauge_width - filled;
+
+        // Create gauge string: [████.......]
+        let gauge_filled: String = "█".repeat(filled.saturating_sub(1));
+        let gauge_pointer = if filled > 0 { "█" } else { "" };
+        let gauge_empty: String = ".".repeat(empty);
+
+        // When active, swap colors (bg = highlight, fg = background)
+        let (base_style, text_style, accent_style) = if is_active {
+            (
+                Style::default().bg(theme.highlight),
+                Style::default().fg(theme.background),
+                Style::default().fg(theme.background),
+            )
+        } else {
+            (
+                Style::default().bg(theme.background),
+                Style::default().fg(theme.foreground),
+                Style::default().fg(theme.highlight),
+            )
+        };
+
+        let gauge_line = Line::from(vec![
+            Span::styled("Min Fragmentum Duration (s): ", text_style),
+            Span::styled("[", text_style),
+            Span::styled(gauge_filled, accent_style),
+            Span::styled(gauge_pointer, accent_style),
+            Span::styled(gauge_empty, text_style),
+            Span::styled("] ", text_style),
+            Span::styled(format!("{:.2}", duration), accent_style),
+        ]);
+
+        let lines = vec![gauge_line];
+
+        let paragraph = Paragraph::new(lines).block(block).style(base_style);
+
+        paragraph.render(area, buf);
+    }
+
+    fn render_max_fragmentum_duration_field(
+        settings_state: &SettingsState,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &ThemeConfig,
+        is_active: bool,
+    ) {
+        let block = Block::default().padding(Padding::new(2, 2, 1, 0));
+
+        // Build the gauge visualization
+        let gauge_width = 20;
+        let duration = settings_state.max_fragmentum_duration_seconds;
+        let filled = ((duration / 60.0 * gauge_width as f32).round() as usize).min(gauge_width);
+        let empty = gauge_width - filled;
+
+        // Create gauge string: [████.......]
+        let gauge_filled: String = "█".repeat(filled.saturating_sub(1));
+        let gauge_pointer = if filled > 0 { "█" } else { "" };
+        let gauge_empty: String = ".".repeat(empty);
+
+        // When active, swap colors (bg = highlight, fg = background)
+        let (base_style, text_style, accent_style) = if is_active {
+            (
+                Style::default().bg(theme.highlight),
+                Style::default().fg(theme.background),
+                Style::default().fg(theme.background),
+            )
+        } else {
+            (
+                Style::default().bg(theme.background),
+                Style::default().fg(theme.foreground),
+                Style::default().fg(theme.highlight),
+            )
+        };
+
+        let gauge_line = Line::from(vec![
+            Span::styled("Max Fragmentum Duration (s): ", text_style),
+            Span::styled("[", text_style),
+            Span::styled(gauge_filled, accent_style),
+            Span::styled(gauge_pointer, accent_style),
+            Span::styled(gauge_empty, text_style),
+            Span::styled("] ", text_style),
+            Span::styled(format!("{:.2}", duration), accent_style),
+        ]);
+
+        let lines = vec![gauge_line];
+
+        let paragraph = Paragraph::new(lines).block(block).style(base_style);
+
+        paragraph.render(area, buf);
+    }
+
+    fn render_pause_threshold_field(
+        settings_state: &SettingsState,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &ThemeConfig,
+        is_active: bool,
+    ) {
+        let block = Block::default().padding(Padding::new(2, 2, 1, 0));
+
+        // Convert quantitative number (# chunks) to qualitative to improve UX
+        let pause_duration_text = match settings_state.pause_threshold_in_chunks {
+            16_u32 => "Short".to_string(),
+            24_u32 => "Medium".to_string(),
+            32_u32 => "Long".to_string(),
+            _ => "Error".to_string(),
+        };
+
+        // When active, swap colors (bg = highlight, fg = background)
+        let (base_style, text_style, accent_style) = if is_active {
+            (
+                Style::default().bg(theme.highlight),
+                Style::default().fg(theme.background),
+                Style::default().fg(theme.background),
+            )
+        } else {
+            (
+                Style::default().bg(theme.background),
+                Style::default().fg(theme.foreground),
+                Style::default().fg(theme.highlight),
+            )
+        };
+
+        // Build the selector line: < Device Name >
+        let selector_line = Line::from(vec![
+            Span::styled("Pause Duration: ", text_style),
+            Span::styled("< ", text_style),
+            Span::styled(pause_duration_text, accent_style),
+            Span::styled(" >", text_style),
+        ]);
+
+        let lines = vec![selector_line];
+
+        let paragraph = Paragraph::new(lines).block(block).style(base_style);
+
+        paragraph.render(area, buf);
+        // let block = Block::default().padding(Padding::new(2, 2, 1, 0));
+
+        // // Build the gauge visualization
+        // let gauge_width = 20;
+        // let duration = settings_state.pause_threshold_in_chunks;
+        // let filled = ((duration * gauge_width as u32) as usize).min(gauge_width);
+        // let empty = gauge_width - filled;
+
+        // // Create gauge string: [========>--------]
+        // let gauge_filled: String = "=".repeat(filled.saturating_sub(1));
+        // let gauge_pointer = if filled > 0 { ">" } else { "" };
+        // let gauge_empty: String = "-".repeat(empty);
+
+        // // When active, swap colors (bg = highlight, fg = background)
+        // let (base_style, text_style, accent_style) = if is_active {
+        //     (
+        //         Style::default().bg(theme.highlight),
+        //         Style::default().fg(theme.background),
+        //         Style::default().fg(theme.background),
+        //     )
+        // } else {
+        //     (
+        //         Style::default().bg(theme.background),
+        //         Style::default().fg(theme.foreground),
+        //         Style::default().fg(theme.highlight),
+        //     )
+        // };
+
+        // let gauge_line = Line::from(vec![
+        //     Span::styled("Pause Duration: ", text_style),
+        //     Span::styled("[", text_style),
+        //     Span::styled(gauge_filled, accent_style),
+        //     Span::styled(gauge_pointer, accent_style),
+        //     Span::styled(gauge_empty, text_style),
+        //     Span::styled("] ", text_style),
+        //     Span::styled(format!("{:.2}", duration), accent_style),
+        // ]);
+
+        // let lines = vec![gauge_line];
+
+        // let paragraph = Paragraph::new(lines).block(block).style(base_style);
+
+        // paragraph.render(area, buf);
     }
 
     fn render_stt_model_field(

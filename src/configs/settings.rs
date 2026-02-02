@@ -1,12 +1,21 @@
 use crate::configs::stt::AvailableSTTModel;
 use crate::configs::vad::AvailableVADModel;
 
+/// Max and min duration for pause threshold in chunks
+/// We don't provide specific numbers to the user as it is harder to map chunks to seconds
+/// and would make it harder.
+const SHORT_PAUSE_DURATION: u32 = 16;
+const LONG_PAUSE_DURATION: u32 = 32;
+
 /// Which field is currently focused in the settings screen
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum SettingsField {
     #[default]
     InputDevice,
     VadThreshold,
+    MinFragmentumDurationSeconds,
+    MaxFragmentumDurationSeconds,
+    PauseThresholdInChunks,
     STTModel,
     VADModel,
 }
@@ -20,6 +29,12 @@ pub struct SettingsState {
     pub selected_device_index: usize,
     /// Current VAD threshold value (0.0 to 1.0)
     pub vad_threshold: f32,
+    /// Current minimum length in seconds for fragmenta
+    pub min_fragmentum_duration_seconds: f32,
+    /// Current maximum length in seconds for fragmenta
+    pub max_fragmentum_duration_seconds: f32,
+    /// Current length in chunks to trigger a pause
+    pub pause_threshold_in_chunks: u32,
     /// Which field is currently focused
     pub active_field: SettingsField,
     /// List of available STT model keys (from models.toml)
@@ -38,6 +53,9 @@ impl SettingsState {
         available_devices: Vec<String>,
         current_device: Option<&str>,
         vad_threshold: f32,
+        min_fragmentum_duration_seconds: f32,
+        max_fragmentum_duration_seconds: f32,
+        pause_threshold_in_chunks: u32,
         available_stt_models: Vec<String>,
         current_stt_model: &AvailableSTTModel,
         available_vad_models: Vec<String>,
@@ -73,6 +91,9 @@ impl SettingsState {
             available_devices,
             selected_device_index,
             vad_threshold,
+            min_fragmentum_duration_seconds,
+            max_fragmentum_duration_seconds,
+            pause_threshold_in_chunks,
             active_field: SettingsField::default(),
             available_stt_models,
             selected_stt_model_index,
@@ -123,21 +144,62 @@ impl SettingsState {
         }
     }
 
+    /// Decrease VAD threshold by 0.05, capped at 0.0
+    pub fn decrease_threshold(&mut self) {
+        self.vad_threshold = (self.vad_threshold - 0.05).max(0.0);
+    }
+
     /// Increase VAD threshold by 0.05, capped at 1.0
     pub fn increase_threshold(&mut self) {
         self.vad_threshold = (self.vad_threshold + 0.05).min(1.0);
     }
 
-    /// Decrease VAD threshold by 0.05, capped at 0.0
-    pub fn decrease_threshold(&mut self) {
-        self.vad_threshold = (self.vad_threshold - 0.05).max(0.0);
+    /// Decrease minimum fragmentum duration in seconds. Can't be less than 1 second.
+    pub fn decrease_min_fragmentum_duration(&mut self) {
+        self.min_fragmentum_duration_seconds =
+            (self.min_fragmentum_duration_seconds - 1.0).max(1.0);
+    }
+
+    /// Increase minimum fragmentum duration in seconds. Can't be more than the max duration
+    pub fn increase_min_fragmentum_duration(&mut self) {
+        self.min_fragmentum_duration_seconds =
+            (self.min_fragmentum_duration_seconds + 1.0).min(self.max_fragmentum_duration_seconds);
+    }
+
+    /// Decrease minimum fragmentum duration in seconds. Can't be less than 1 second.
+    pub fn decrease_max_fragmentum_duration(&mut self) {
+        self.max_fragmentum_duration_seconds =
+            (self.max_fragmentum_duration_seconds - 1.0).max(self.min_fragmentum_duration_seconds);
+    }
+
+    /// Increase maximum fragmentum duration in seconds. Can't be more than 60s
+    pub fn increase_max_fragmentum_duration(&mut self) {
+        self.max_fragmentum_duration_seconds =
+            (self.max_fragmentum_duration_seconds + 1.0).min(60.0);
+    }
+
+    /// Decrease pause threshold measured in chunks
+    pub fn decrease_pause_threshold(&mut self) {
+        self.pause_threshold_in_chunks =
+            (self.pause_threshold_in_chunks - 8_u32).max(SHORT_PAUSE_DURATION);
+    }
+
+    /// Increase pause threshold measured in chunks
+    pub fn increase_pause_threshold(&mut self) {
+        self.pause_threshold_in_chunks =
+            (self.pause_threshold_in_chunks + 8_u32).min(LONG_PAUSE_DURATION);
     }
 
     /// Cycle to the next field
     pub fn next_field(&mut self) {
         self.active_field = match self.active_field {
             SettingsField::InputDevice => SettingsField::VadThreshold,
-            SettingsField::VadThreshold => SettingsField::STTModel,
+            SettingsField::VadThreshold => SettingsField::MinFragmentumDurationSeconds,
+            SettingsField::MinFragmentumDurationSeconds => {
+                SettingsField::MaxFragmentumDurationSeconds
+            }
+            SettingsField::MaxFragmentumDurationSeconds => SettingsField::PauseThresholdInChunks,
+            SettingsField::PauseThresholdInChunks => SettingsField::STTModel,
             SettingsField::STTModel => SettingsField::VADModel,
             SettingsField::VADModel => SettingsField::InputDevice,
         };
@@ -148,7 +210,12 @@ impl SettingsState {
         self.active_field = match self.active_field {
             SettingsField::InputDevice => SettingsField::VADModel,
             SettingsField::VadThreshold => SettingsField::InputDevice,
-            SettingsField::STTModel => SettingsField::VadThreshold,
+            SettingsField::MinFragmentumDurationSeconds => SettingsField::VadThreshold,
+            SettingsField::MaxFragmentumDurationSeconds => {
+                SettingsField::MinFragmentumDurationSeconds
+            }
+            SettingsField::PauseThresholdInChunks => SettingsField::MaxFragmentumDurationSeconds,
+            SettingsField::STTModel => SettingsField::PauseThresholdInChunks,
             SettingsField::VADModel => SettingsField::STTModel,
         };
     }

@@ -553,6 +553,9 @@ impl App {
             available_devices,
             self.config.default.input_device.as_deref(),
             self.config.default.vad.threshold,
+            self.config.default.fractor.min_fragmentum_duration_seconds,
+            self.config.default.fractor.max_fragmentum_duration_seconds,
+            self.config.default.fractor.pause_threshold_in_chunks,
             available_stt_models,
             &self.config.default.stt.model,
             available_vad_models,
@@ -607,6 +610,11 @@ impl App {
         // Update config values
         self.config.default.vad.threshold = settings.vad_threshold;
         self.config.default.input_device = settings.selected_device_name().map(|s| s.to_string());
+        self.config.default.fractor.min_fragmentum_duration_seconds =
+            settings.min_fragmentum_duration_seconds;
+        self.config.default.fractor.max_fragmentum_duration_seconds =
+            settings.max_fragmentum_duration_seconds;
+        self.config.default.fractor.pause_threshold_in_chunks = settings.pause_threshold_in_chunks;
 
         // Update STT model in config if changed
         if stt_model_changed {
