@@ -15,8 +15,8 @@ pub use fragmenta::{FragmentaComponent, format_timestamp};
 pub use input_states::InputState;
 pub use overlay_window::OverlayWindow;
 pub use popups::{
-    AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, ModifyCodexPopUp,
-    ModifyFolioPopUp,
+    AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, ModifyArchivumPopUp,
+    ModifyCodexPopUp, ModifyFolioPopUp,
 };
 pub use recording::RecordingScreen;
 pub use settings::SettingsScreen;

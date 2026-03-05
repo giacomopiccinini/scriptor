@@ -529,6 +529,11 @@ impl EventHandler {
                 }
             }
             KeyCode::Char('a') => app.enter_add_archivum_screen(),
+            KeyCode::Char('m') => {
+                if let Some(archivum) = app.config.dbs.get(app.selected_archivum_index) {
+                    app.enter_modify_archivum_screen(archivum.name.clone());
+                }
+            }
             KeyCode::Char('s') => {
                 // Set selected archivum as default
                 if let Err(e) = app.set_selected_archivum_as_default().await {
@@ -539,10 +544,16 @@ impl EventHandler {
         }
     }
 
-    /// Handle key press from user in add archivum screen
-    pub async fn handle_add_archivum_screen_key(app: &mut App, key: KeyEvent) {
+    /// Handle key press from user in add or modify archivum screen
+    pub async fn handle_add_or_modify_archivum_screen_key(app: &mut App, key: KeyEvent) {
         match key.code {
-            KeyCode::Esc => app.exit_add_archivum_without_saving(),
+            KeyCode::Esc => {
+                if app.input_state.is_modifying {
+                    app.exit_modify_archivum_without_saving();
+                } else {
+                    app.exit_add_archivum_without_saving();
+                }
+            }
             KeyCode::Backspace => app.input_state.remove_char_before_cursor(),
             KeyCode::Delete => app.input_state.delete_char_after_cursor(),
             KeyCode::Char(value) => app.input_state.add_char(value),
@@ -551,7 +562,14 @@ impl EventHandler {
             KeyCode::Enter => {
                 let archivum_name = app.input_state.get_text().to_string();
                 if !archivum_name.trim().is_empty() {
-                    if let Err(e) = app.create_new_archivum(archivum_name, false).await {
+                    if app.input_state.is_modifying {
+                        if let Err(e) = app.rename_archivum(archivum_name) {
+                            eprintln!("Failed to rename archivum: {}", e);
+                        } else {
+                            app.current_screen = CurrentScreen::ChangeArchivum;
+                            app.input_state.clear();
+                        }
+                    } else if let Err(e) = app.create_new_archivum(archivum_name, false).await {
                         eprintln!("Failed to create archivum: {}", e);
                     } else {
                         app.current_screen = CurrentScreen::ChangeArchivum;
