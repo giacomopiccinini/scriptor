@@ -534,6 +534,12 @@ impl EventHandler {
                     app.enter_modify_archivum_screen(archivum.name.clone());
                 }
             }
+            KeyCode::Char('d') => {
+                // Can't delete a db if it's the only db left
+                if app.config.dbs.len() > 1 {
+                    app.enter_delete_archivum_screen();
+                }
+            }
             KeyCode::Char('s') => {
                 // Set selected archivum as default
                 if let Err(e) = app.set_selected_archivum_as_default().await {
@@ -575,6 +581,36 @@ impl EventHandler {
                         app.current_screen = CurrentScreen::ChangeArchivum;
                         app.input_state.clear();
                     }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Handle key press from user in delete archivum screen
+    pub async fn handle_delete_archivum_screen_key(app: &mut App, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => app.exit_delete_archivum_without_saving(),
+            KeyCode::Backspace => app.input_state.remove_char_before_cursor(),
+            KeyCode::Delete => app.input_state.delete_char_after_cursor(),
+            KeyCode::Char(value) => app.input_state.add_char(value),
+            KeyCode::Left => app.input_state.move_cursor_left(),
+            KeyCode::Right => app.input_state.move_cursor_right(),
+            KeyCode::Enter => {
+                if let Some(archivum) = app.config.dbs.get(app.selected_archivum_index) {
+                    let typed = app.input_state.get_text().trim();
+                    // AWS inspired: delete only if the typed in text matches the actual name
+                    if typed == archivum.name {
+                        if let Err(e) = app.delete_archivum().await {
+                            eprintln!("Failed to delete archivum: {}", e);
+                        } else {
+                            app.current_screen = CurrentScreen::ChangeArchivum;
+                            app.input_state.clear();
+                        }
+                    }
+                    // If no match, do nothing and stay in popup
+                    // That is, don't exit until the user gets the name right
+                    // or exits with esc on purpose
                 }
             }
             _ => {}

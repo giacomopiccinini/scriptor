@@ -12,8 +12,8 @@ use crate::tui::app::events::EventHandler;
 use crate::tui::db::connections::init_db;
 use crate::tui::ui::components::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, CodicesComponent,
-    FragmentaComponent, InputState, ModifyArchivumPopUp, ModifyCodexPopUp, ModifyFolioPopUp,
-    RecordingScreen, SettingsScreen,
+    DeleteArchivumPopUp, FragmentaComponent, InputState, ModifyArchivumPopUp, ModifyCodexPopUp,
+    ModifyFolioPopUp, RecordingScreen, SettingsScreen,
 };
 use crate::tui::ui::cursor::CursorState;
 use crate::tui::ui::layout::AppLayout;
@@ -53,6 +53,8 @@ pub enum CurrentScreen {
     AddArchivum,
     /// Pop-up for modifying an existing archivum
     ModifyArchivum,
+    /// Pop-up for deleting an archivum (confirmation required)
+    DeleteArchivum,
     /// Settings screen for configuring input device and VAD threshold
     Settings,
 }
@@ -427,6 +429,78 @@ impl App {
         Ok(())
     }
 
+    /// Delete an archivum (actual sqlite file and config entry in scriptor.toml)
+    pub async fn delete_archivum(&mut self) -> Result<()> {
+        // Last archivum cannot be deleted
+        if self.config.dbs.len() == 1 {
+            return Err(color_eyre::eyre::eyre!("Cannot delete the last archivum"));
+        }
+
+        // Get the selected db
+        let selected = self
+            .config
+            .dbs
+            .get(self.selected_archivum_index)
+            .ok_or_else(|| color_eyre::eyre::eyre!("No archivum selected"))?
+            .clone();
+
+        // Extract the path to the DB fro the connection string
+        let file_path = selected
+            .connection_str
+            .strip_prefix("sqlite:")
+            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid connection string"))?;
+
+        // Delete the file
+        std::fs::remove_file(file_path)
+            .map_err(|e| color_eyre::eyre::eyre!("Failed to delete archivum file: {}", e))?;
+
+        // Flag to signal if the deleted db was the actual default or not
+        // In this case, we would need to promote an existing db to default
+        let was_default = self.config.default.db.name == selected.name;
+
+        // Drop the db from the config
+        self.config.dbs.remove(self.selected_archivum_index);
+
+        self.selected_archivum_index = self
+            .selected_archivum_index
+            .min(self.config.dbs.len().saturating_sub(1));
+
+        // If it was default, the first remaining db becomes the default
+        if was_default {
+            let new_default = self
+                .config
+                .dbs
+                .first()
+                .ok_or_else(|| color_eyre::eyre::eyre!("No archivum remaining"))?
+                .clone();
+
+            self.config.default.db = new_default.clone();
+
+            let new_pool = init_db(&new_default.connection_str)
+                .await
+                .map_err(|e| color_eyre::eyre::eyre!("Failed to connect to archivum: {}", e))?;
+
+            self.pool = new_pool;
+
+            self.codices_component = CodicesComponent::new();
+            self.codices_component
+                .load_codices(&self.pool)
+                .await
+                .map_err(|e| color_eyre::eyre::eyre!("Failed to load codices: {}", e))?;
+        }
+
+        let config_dir = dirs::config_dir()
+            .ok_or_else(|| color_eyre::eyre::eyre!("Could not find config directory"))?
+            .join("scriptor");
+        let config_path = config_dir.join("scriptor.toml");
+
+        self.config
+            .write(&config_path)
+            .map_err(|e| color_eyre::eyre::eyre!("Failed to save config: {}", e))?;
+
+        Ok(())
+    }
+
     /// Handle key events and delegate to appropriate handler
     async fn handle_key_event(&mut self, key: KeyEvent) {
         match self.current_screen {
@@ -445,6 +519,9 @@ impl App {
             }
             CurrentScreen::AddArchivum | CurrentScreen::ModifyArchivum => {
                 EventHandler::handle_add_or_modify_archivum_screen_key(self, key).await
+            }
+            CurrentScreen::DeleteArchivum => {
+                EventHandler::handle_delete_archivum_screen_key(self, key).await
             }
             CurrentScreen::Settings => EventHandler::handle_settings_screen_key(self, key).await,
         }
@@ -537,6 +614,18 @@ impl App {
 
     /// Exit the Modify Archivum screen without saving
     pub fn exit_modify_archivum_without_saving(&mut self) {
+        self.current_screen = CurrentScreen::ChangeArchivum;
+        self.input_state.clear();
+    }
+
+    /// Enter the "Delete Archivum" screen by opening the confirmation pop-up
+    pub fn enter_delete_archivum_screen(&mut self) {
+        self.input_state = InputState::default();
+        self.current_screen = CurrentScreen::DeleteArchivum;
+    }
+
+    /// Exit the Delete Archivum screen without saving
+    pub fn exit_delete_archivum_without_saving(&mut self) {
         self.current_screen = CurrentScreen::ChangeArchivum;
         self.input_state.clear();
     }
@@ -902,7 +991,7 @@ impl Widget for &mut App {
                 AddArchivumPopUp::render(&self.input_state, fragmenta_area, buf, theme)
             }
             CurrentScreen::ModifyArchivum => {
-                // Render ChangeArchivum as background (archivum list), then AddArchivum popup on top
+                // Render ChangeArchivum as background (archivum list), then ModifyArchivum popup on top
                 ChangeArchivumPopUp::render(
                     &self.config,
                     self.selected_archivum_index,
@@ -911,6 +1000,25 @@ impl Widget for &mut App {
                     theme,
                 );
                 ModifyArchivumPopUp::render(&self.input_state, fragmenta_area, buf, theme)
+            }
+            CurrentScreen::DeleteArchivum => {
+                // Render ChangeArchivum as background (archivum list), then DeleteArchivum popup on top
+                if let Some(archivum) = self.config.dbs.get(self.selected_archivum_index) {
+                    ChangeArchivumPopUp::render(
+                        &self.config,
+                        self.selected_archivum_index,
+                        fragmenta_area,
+                        buf,
+                        theme,
+                    );
+                    DeleteArchivumPopUp::render(
+                        &self.input_state,
+                        &archivum.name,
+                        fragmenta_area,
+                        buf,
+                        theme,
+                    );
+                }
             }
             CurrentScreen::RecordFolio => {
                 let selected_folio =

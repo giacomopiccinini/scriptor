@@ -120,7 +120,9 @@ impl ChangeArchivumPopUp {
             Span::styled("[a]", Style::default().fg(theme.highlight)),
             Span::styled("dd", Style::default().fg(theme.dark_shadow)),
             Span::styled(" [m]", Style::default().fg(theme.highlight)),
-            Span::styled("odify", Style::default().fg(theme.dark_shadow)),
+            Span::styled("od", Style::default().fg(theme.dark_shadow)),
+            Span::styled(" [d]", Style::default().fg(theme.highlight)),
+            Span::styled("el", Style::default().fg(theme.dark_shadow)),
             Span::styled(" [s]", Style::default().fg(theme.highlight)),
             Span::styled("et default", Style::default().fg(theme.dark_shadow)),
             Span::raw(" "),
@@ -191,5 +193,26 @@ impl AddArchivumPopUp {
     /// Render popup for entering a new folio
     pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
         render_popup_kernel(state, area, buf, "Add Archivum", theme);
+    }
+}
+
+pub struct DeleteArchivumPopUp;
+
+impl DeleteArchivumPopUp {
+    /// Render popup for confirming archivum deletion
+    pub fn render<T: CursorState>(
+        state: &T,
+        archivum_name: &str,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &ThemeConfig,
+    ) {
+        render_popup_kernel(
+            state,
+            area,
+            buf,
+            &format!("Type '{}' to delete", archivum_name),
+            theme,
+        );
     }
 }
