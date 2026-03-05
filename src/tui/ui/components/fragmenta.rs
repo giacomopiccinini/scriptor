@@ -179,6 +179,7 @@ impl FragmentaComponent {
 
             let list: List = List::new(items)
                 .block(block)
+                .style(Style::default().fg(theme.medium_shadow))
                 .highlight_symbol(highlight_symbol)
                 .highlight_style(
                     // Swap foreground and background for selected item
