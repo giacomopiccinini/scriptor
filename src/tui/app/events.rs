@@ -433,14 +433,17 @@ impl EventHandler {
 
     /// Handle key press from user in add codex screen
     pub async fn handle_add_or_modify_codex_screen_key(app: &mut App, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc => app.exit_add_or_modify_codex_without_saving(),
-            KeyCode::Backspace => app.input_state.remove_char_before_cursor(),
-            KeyCode::Delete => app.input_state.delete_char_after_cursor(),
-            KeyCode::Char(value) => app.input_state.add_char(value),
-            KeyCode::Left => app.input_state.move_cursor_left(),
-            KeyCode::Right => app.input_state.move_cursor_right(),
-            KeyCode::Enter => {
+        match (key.code, key.modifiers) {
+            (KeyCode::Char('a'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_start(),
+            (KeyCode::Char('e'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_end(),
+            (KeyCode::Esc, KeyModifiers::NONE) => app.exit_add_or_modify_codex_without_saving(),
+            (KeyCode::Backspace, KeyModifiers::NONE) => app.input_state.remove_char_before_cursor(),
+            (KeyCode::Delete, KeyModifiers::NONE) => app.input_state.delete_char_after_cursor(),
+            (KeyCode::Char(value), KeyModifiers::NONE)
+            | (KeyCode::Char(value), KeyModifiers::SHIFT) => app.input_state.add_char(value),
+            (KeyCode::Left, KeyModifiers::NONE) => app.input_state.move_cursor_left(),
+            (KeyCode::Right, KeyModifiers::NONE) => app.input_state.move_cursor_right(),
+            (KeyCode::Enter, KeyModifiers::NONE) => {
                 let codex_name = app.input_state.get_text().to_string();
                 // Only do something if the codex has a name
                 if !codex_name.trim().is_empty() {
@@ -477,14 +480,17 @@ impl EventHandler {
 
     /// Handle key press from user in add folio screen
     pub async fn handle_add_or_modify_folio_screen_key(app: &mut App, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc => app.exit_add_or_modify_folio_without_saving(),
-            KeyCode::Backspace => app.input_state.remove_char_before_cursor(),
-            KeyCode::Delete => app.input_state.delete_char_after_cursor(),
-            KeyCode::Left => app.input_state.move_cursor_left(),
-            KeyCode::Right => app.input_state.move_cursor_right(),
-            KeyCode::Char(value) => app.input_state.add_char(value),
-            KeyCode::Enter => {
+        match (key.code, key.modifiers) {
+            (KeyCode::Char('a'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_start(),
+            (KeyCode::Char('e'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_end(),
+            (KeyCode::Esc, KeyModifiers::NONE) => app.exit_add_or_modify_folio_without_saving(),
+            (KeyCode::Backspace, KeyModifiers::NONE) => app.input_state.remove_char_before_cursor(),
+            (KeyCode::Delete, KeyModifiers::NONE) => app.input_state.delete_char_after_cursor(),
+            (KeyCode::Left, KeyModifiers::NONE) => app.input_state.move_cursor_left(),
+            (KeyCode::Right, KeyModifiers::NONE) => app.input_state.move_cursor_right(),
+            (KeyCode::Char(value), KeyModifiers::NONE)
+            | (KeyCode::Char(value), KeyModifiers::SHIFT) => app.input_state.add_char(value),
+            (KeyCode::Enter, KeyModifiers::NONE) => {
                 let folio_name = app.input_state.get_text().to_string();
                 if !folio_name.trim().is_empty()
                     && let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
@@ -552,20 +558,23 @@ impl EventHandler {
 
     /// Handle key press from user in add or modify archivum screen
     pub async fn handle_add_or_modify_archivum_screen_key(app: &mut App, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc => {
+        match (key.code, key.modifiers) {
+            (KeyCode::Char('a'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_start(),
+            (KeyCode::Char('e'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_end(),
+            (KeyCode::Esc, KeyModifiers::NONE) => {
                 if app.input_state.is_modifying {
                     app.exit_modify_archivum_without_saving();
                 } else {
                     app.exit_add_archivum_without_saving();
                 }
             }
-            KeyCode::Backspace => app.input_state.remove_char_before_cursor(),
-            KeyCode::Delete => app.input_state.delete_char_after_cursor(),
-            KeyCode::Char(value) => app.input_state.add_char(value),
-            KeyCode::Left => app.input_state.move_cursor_left(),
-            KeyCode::Right => app.input_state.move_cursor_right(),
-            KeyCode::Enter => {
+            (KeyCode::Backspace, KeyModifiers::NONE) => app.input_state.remove_char_before_cursor(),
+            (KeyCode::Delete, KeyModifiers::NONE) => app.input_state.delete_char_after_cursor(),
+            (KeyCode::Char(value), KeyModifiers::NONE)
+            | (KeyCode::Char(value), KeyModifiers::SHIFT) => app.input_state.add_char(value),
+            (KeyCode::Left, KeyModifiers::NONE) => app.input_state.move_cursor_left(),
+            (KeyCode::Right, KeyModifiers::NONE) => app.input_state.move_cursor_right(),
+            (KeyCode::Enter, KeyModifiers::NONE) => {
                 let archivum_name = app.input_state.get_text().to_string();
                 if !archivum_name.trim().is_empty() {
                     if app.input_state.is_modifying {
@@ -589,14 +598,17 @@ impl EventHandler {
 
     /// Handle key press from user in delete archivum screen
     pub async fn handle_delete_archivum_screen_key(app: &mut App, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc => app.exit_delete_archivum_without_saving(),
-            KeyCode::Backspace => app.input_state.remove_char_before_cursor(),
-            KeyCode::Delete => app.input_state.delete_char_after_cursor(),
-            KeyCode::Char(value) => app.input_state.add_char(value),
-            KeyCode::Left => app.input_state.move_cursor_left(),
-            KeyCode::Right => app.input_state.move_cursor_right(),
-            KeyCode::Enter => {
+        match (key.code, key.modifiers) {
+            (KeyCode::Char('a'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_start(),
+            (KeyCode::Char('e'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_end(),
+            (KeyCode::Esc, KeyModifiers::NONE) => app.exit_delete_archivum_without_saving(),
+            (KeyCode::Backspace, KeyModifiers::NONE) => app.input_state.remove_char_before_cursor(),
+            (KeyCode::Delete, KeyModifiers::NONE) => app.input_state.delete_char_after_cursor(),
+            (KeyCode::Char(value), KeyModifiers::NONE)
+            | (KeyCode::Char(value), KeyModifiers::SHIFT) => app.input_state.add_char(value),
+            (KeyCode::Left, KeyModifiers::NONE) => app.input_state.move_cursor_left(),
+            (KeyCode::Right, KeyModifiers::NONE) => app.input_state.move_cursor_right(),
+            (KeyCode::Enter, KeyModifiers::NONE) => {
                 if let Some(archivum) = app.config.dbs.get(app.selected_archivum_index) {
                     let typed = app.input_state.get_text().trim();
                     // AWS inspired: delete only if the typed in text matches the actual name
