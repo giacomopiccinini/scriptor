@@ -303,6 +303,7 @@ impl EventHandler {
 
                         // Switch to recording screen
                         app.current_screen = CurrentScreen::RecordFolio;
+                        app.recording_screen_start = Some(std::time::Instant::now());
 
                         // Scroll codices list (must be after codex borrow is released)
                         if scroll_amount > 0 {
@@ -707,6 +708,7 @@ impl EventHandler {
                 app.is_paused = false;
                 app.fractor_handle = None;
                 app.transcriber_handle = None;
+                app.recording_screen_start = None;
 
                 // Return to main screen
                 app.current_screen = CurrentScreen::Main;

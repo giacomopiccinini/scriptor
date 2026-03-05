@@ -17,7 +17,9 @@ impl RecordingScreen {
     /// The overlay sits on top of the main UI, clearing only its own area.
     pub fn render(
         is_paused: bool,
-        selected_folio: Option<&mut UIFolio>,
+        selected_folio: Option<&UIFolio>,
+        dots: &str,
+        list_state: &mut ratatui::widgets::ListState,
         area: Rect,
         buf: &mut Buffer,
         theme: &ThemeConfig,
@@ -38,7 +40,15 @@ impl RecordingScreen {
         );
 
         // Render the recording content inside the overlay
-        Self::render_content(is_paused, selected_folio, content_area, buf, theme);
+        Self::render_content(
+            is_paused,
+            selected_folio,
+            dots,
+            list_state,
+            content_area,
+            buf,
+            theme,
+        );
     }
 
     /// Build the footer command hints line (for right side)
@@ -59,7 +69,9 @@ impl RecordingScreen {
     /// Render the recording content (header + fragmenta) inside the given area
     fn render_content(
         is_paused: bool,
-        selected_folio: Option<&mut UIFolio>,
+        selected_folio: Option<&UIFolio>,
+        dots: &str,
+        list_state: &mut ratatui::widgets::ListState,
         area: Rect,
         buf: &mut Buffer,
         theme: &ThemeConfig,
@@ -75,7 +87,7 @@ impl RecordingScreen {
         Self::render_header(is_paused, header_area, buf, theme);
 
         // Render fragmenta list
-        Self::render_fragmenta(selected_folio, fragmenta_area, buf, theme);
+        Self::render_fragmenta(selected_folio, dots, list_state, fragmenta_area, buf, theme);
     }
 
     fn render_header(is_paused: bool, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
@@ -101,7 +113,9 @@ impl RecordingScreen {
     }
 
     fn render_fragmenta(
-        selected_folio: Option<&mut UIFolio>,
+        selected_folio: Option<&UIFolio>,
+        dots: &str,
+        list_state: &mut ratatui::widgets::ListState,
         area: Rect,
         buf: &mut Buffer,
         theme: &ThemeConfig,
@@ -113,7 +127,7 @@ impl RecordingScreen {
             let available_width = area.width.saturating_sub(4) as usize;
 
             // Create list items from fragmenta
-            let items: Vec<ListItem> = folio
+            let mut items: Vec<ListItem> = folio
                 .fragmenta
                 .iter()
                 .map(|ui_fragmentum| {
@@ -137,13 +151,22 @@ impl RecordingScreen {
                 })
                 .collect();
 
+            // Add animated dots loading indicator at the end (theme.highlight, no highlight/arrow)
+            items.push(ListItem::new(Line::from(Span::styled(
+                dots,
+                Style::default().fg(theme.highlight),
+            ))));
+
+            // Select last item (dots) for autoscroll; use empty symbol and matching style so nothing looks selected
+            list_state.select(Some(items.len() - 1));
+
             let list = List::new(items)
                 .block(block)
-                .highlight_symbol(" ▸ ")
-                .highlight_style(Style::default().bg(theme.dark_shadow).fg(theme.page))
-                .highlight_spacing(HighlightSpacing::Always);
+                .highlight_symbol("")
+                .highlight_style(Style::default().fg(theme.dark_shadow))
+                .highlight_spacing(HighlightSpacing::WhenSelected);
 
-            StatefulWidget::render(list, area, buf, &mut folio.fragmentum_state);
+            StatefulWidget::render(list, area, buf, list_state);
         } else {
             // No folio selected - show waiting message
             let waiting_text = Paragraph::new("Waiting for transcription...")
