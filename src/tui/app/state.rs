@@ -12,8 +12,8 @@ use crate::tui::app::events::EventHandler;
 use crate::tui::db::connections::init_db;
 use crate::tui::ui::components::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, CodicesComponent,
-    FragmentaComponent, InputState, ModifyCodexPopUp, ModifyFolioPopUp, RecordingScreen,
-    SettingsScreen,
+    FragmentaComponent, InputState, ModifyArchivumPopUp, ModifyCodexPopUp, ModifyFolioPopUp,
+    RecordingScreen, SettingsScreen,
 };
 use crate::tui::ui::cursor::CursorState;
 use crate::tui::ui::layout::AppLayout;
@@ -51,6 +51,8 @@ pub enum CurrentScreen {
     ChangeArchivum,
     /// Pop-up for adding a new archivum
     AddArchivum,
+    /// Pop-up for modifying an existing archivum
+    ModifyArchivum,
     /// Settings screen for configuring input device and VAD threshold
     Settings,
 }
@@ -330,7 +332,8 @@ impl App {
         // Use data directory to standardize storage
         let data_dir = dirs::data_dir()
             .ok_or_else(|| color_eyre::eyre::eyre!("Could not find data directory"))?
-            .join("scriptor");
+            .join("scriptor")
+            .join("databases");
 
         // Create directory if it doesn't exist
         std::fs::create_dir_all(&data_dir)
@@ -378,6 +381,52 @@ impl App {
         Ok(())
     }
 
+    /// Rename an existing archivum
+    pub fn rename_archivum(&mut self, new_name: String) -> Result<()> {
+        let selected = self
+            .config
+            .dbs
+            .get(self.selected_archivum_index)
+            .ok_or_else(|| color_eyre::eyre::eyre!("No archivum selected"))?
+            .clone();
+
+        let old_path = selected
+            .connection_str
+            .strip_prefix("sqlite:")
+            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid connection string"))?;
+        let old_path = std::path::Path::new(old_path);
+
+        let parent_dir = old_path
+            .parent()
+            .ok_or_else(|| color_eyre::eyre::eyre!("Could not get parent directory"))?;
+        let new_path = parent_dir.join(format!("{}.db", new_name));
+        let new_connection_str = format!("sqlite:{}", new_path.display());
+
+        std::fs::rename(old_path, &new_path)
+            .map_err(|e| color_eyre::eyre::eyre!("Failed to rename archivum file: {}", e))?;
+
+        let new_archivum_config = DBConfig {
+            name: new_name.clone(),
+            connection_str: new_connection_str,
+        };
+        self.config.dbs[self.selected_archivum_index] = new_archivum_config;
+
+        if self.config.default.db.name == selected.name {
+            self.config.default.db.name = new_name;
+        }
+
+        let config_dir = dirs::config_dir()
+            .ok_or_else(|| color_eyre::eyre::eyre!("Could not find config directory"))?
+            .join("scriptor");
+        let config_path = config_dir.join("scriptor.toml");
+
+        self.config
+            .write(&config_path)
+            .map_err(|e| color_eyre::eyre::eyre!("Failed to save config: {}", e))?;
+
+        Ok(())
+    }
+
     /// Handle key events and delegate to appropriate handler
     async fn handle_key_event(&mut self, key: KeyEvent) {
         match self.current_screen {
@@ -394,8 +443,8 @@ impl App {
             CurrentScreen::ChangeArchivum => {
                 EventHandler::handle_change_archivum_screen_key(self, key).await
             }
-            CurrentScreen::AddArchivum => {
-                EventHandler::handle_add_archivum_screen_key(self, key).await
+            CurrentScreen::AddArchivum | CurrentScreen::ModifyArchivum => {
+                EventHandler::handle_add_or_modify_archivum_screen_key(self, key).await
             }
             CurrentScreen::Settings => EventHandler::handle_settings_screen_key(self, key).await,
         }
@@ -472,6 +521,22 @@ impl App {
 
     /// Exit the Add Archivum screen without saving
     pub fn exit_add_archivum_without_saving(&mut self) {
+        self.current_screen = CurrentScreen::ChangeArchivum;
+        self.input_state.clear();
+    }
+
+    /// Enter the "Modify Archivum" screen by opening the corresponding pop-up
+    pub fn enter_modify_archivum_screen(&mut self, name: String) {
+        self.input_state = InputState {
+            current_input: name,
+            cursor_pos: 0,
+            is_modifying: true,
+        };
+        self.current_screen = CurrentScreen::ModifyArchivum;
+    }
+
+    /// Exit the Modify Archivum screen without saving
+    pub fn exit_modify_archivum_without_saving(&mut self) {
         self.current_screen = CurrentScreen::ChangeArchivum;
         self.input_state.clear();
     }
@@ -835,6 +900,17 @@ impl Widget for &mut App {
                     theme,
                 );
                 AddArchivumPopUp::render(&self.input_state, fragmenta_area, buf, theme)
+            }
+            CurrentScreen::ModifyArchivum => {
+                // Render ChangeArchivum as background (archivum list), then AddArchivum popup on top
+                ChangeArchivumPopUp::render(
+                    &self.config,
+                    self.selected_archivum_index,
+                    fragmenta_area,
+                    buf,
+                    theme,
+                );
+                ModifyArchivumPopUp::render(&self.input_state, fragmenta_area, buf, theme)
             }
             CurrentScreen::RecordFolio => {
                 let selected_folio =

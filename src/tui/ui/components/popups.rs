@@ -119,6 +119,8 @@ impl ChangeArchivumPopUp {
             Span::raw(" "),
             Span::styled("[a]", Style::default().fg(theme.highlight)),
             Span::styled("dd", Style::default().fg(theme.dark_shadow)),
+            Span::styled(" [m]", Style::default().fg(theme.highlight)),
+            Span::styled("odify", Style::default().fg(theme.dark_shadow)),
             Span::styled(" [s]", Style::default().fg(theme.highlight)),
             Span::styled("et default", Style::default().fg(theme.dark_shadow)),
             Span::raw(" "),
@@ -177,6 +179,13 @@ impl ChangeArchivumPopUp {
 pub struct AddArchivumPopUp;
 
 pub struct ModifyArchivumPopUp;
+
+impl ModifyArchivumPopUp {
+    /// Render popup for modifying an archivum name
+    pub fn render<T: CursorState>(state: &T, area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
+        render_popup_kernel(state, area, buf, "Modify Archivum", theme);
+    }
+}
 
 impl AddArchivumPopUp {
     /// Render popup for entering a new folio
