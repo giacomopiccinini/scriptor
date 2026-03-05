@@ -24,13 +24,14 @@ use crossterm::event::{self, KeyEvent};
 use ratatui::DefaultTerminal;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::widgets::Widget;
+use ratatui::widgets::{ListState, Widget};
 use spinoff::{Color, Spinner, Streams, spinners};
 use sqlx::SqlitePool;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::thread::JoinHandle;
+use std::time::Instant;
 
 /// Enum representing the different screens in the application
 #[derive(Debug, Clone, PartialEq)]
@@ -118,6 +119,10 @@ pub struct App {
     pub show_timestamp: bool,
     /// State for the settings screen (populated when settings is opened)
     pub settings_state: Option<SettingsState>,
+    /// List state for the recording overlay (separate from fragmentum_state for dots item)
+    pub recording_list_state: ListState,
+    /// When we entered RecordFolio screen (for animated dots)
+    pub recording_screen_start: Option<Instant>,
 }
 
 impl STTTools {
@@ -258,6 +263,8 @@ impl App {
             exit: false,
             show_timestamp: false,
             settings_state: None,
+            recording_list_state: ListState::default(),
+            recording_screen_start: None,
         }
     }
 
@@ -294,6 +301,12 @@ impl App {
             {
                 // Refresh fragmenta from DB (ignore errors during recording)
                 let _ = selected_folio.update_fragmenta(&self.pool).await;
+                // Autoscroll: select last fragmentum so both overlay and background scroll to show latest
+                if !selected_folio.fragmenta.is_empty() {
+                    selected_folio
+                        .fragmentum_state
+                        .select(Some(selected_folio.fragmenta.len() - 1));
+                }
             }
 
             // Sync UI with playback progress
@@ -1021,17 +1034,46 @@ impl Widget for &mut App {
                 }
             }
             CurrentScreen::RecordFolio => {
-                let selected_folio =
+                let mut selected_folio =
                     if let Some(codex) = self.codices_component.get_selected_codex_mut() {
                         if let Some(folio_idx) = codex.folio_state.selected() {
-                            codex.folia.get(folio_idx)
+                            codex.folia.get_mut(folio_idx)
                         } else {
                             None
                         }
                     } else {
                         None
                     };
-                RecordingScreen::render(self.is_paused, selected_folio, area, buf, theme);
+                // Autoscroll: ensure last fragmentum is selected for background
+                if let Some(ref mut folio) = selected_folio {
+                    if !folio.fragmenta.is_empty() {
+                        folio
+                            .fragmentum_state
+                            .select(Some(folio.fragmenta.len() - 1));
+                    }
+                }
+                // Animated dots: . .. ... cycling every ~400ms
+                let dots = self
+                    .recording_screen_start
+                    .map(|start| {
+                        let elapsed = start.elapsed().as_millis();
+                        let frame = (elapsed / 400) % 3;
+                        match frame {
+                            0 => ".",
+                            1 => "..",
+                            _ => "...",
+                        }
+                    })
+                    .unwrap_or(".");
+                RecordingScreen::render(
+                    self.is_paused,
+                    selected_folio.as_deref(),
+                    dots,
+                    &mut self.recording_list_state,
+                    area,
+                    buf,
+                    theme,
+                );
             }
             CurrentScreen::Settings => {
                 if let Some(settings_state) = &self.settings_state {

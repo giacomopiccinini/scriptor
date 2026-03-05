@@ -286,16 +286,31 @@ impl EventHandler {
 
                         // Open up codex
                         codex.expand();
-                        if folio_count > 0 {
+                        let scroll_amount = if folio_count > 0 {
                             codex.folio_state.select(Some(folio_count - 1));
-                            // FIX
-                            app.codices_component
-                                .list_state
-                                .scroll_down_by(folio_count as u16);
-                        }
+                            // Autoscroll: select last fragmentum when entering recording (for existing folia with content)
+                            if let Some(selected_folio) = codex.folia.get_mut(folio_count - 1) {
+                                if !selected_folio.fragmenta.is_empty() {
+                                    selected_folio
+                                        .fragmentum_state
+                                        .select(Some(selected_folio.fragmenta.len() - 1));
+                                }
+                            }
+                            folio_count as u16
+                        } else {
+                            0
+                        };
 
                         // Switch to recording screen
                         app.current_screen = CurrentScreen::RecordFolio;
+                        app.recording_screen_start = Some(std::time::Instant::now());
+
+                        // Scroll codices list (must be after codex borrow is released)
+                        if scroll_amount > 0 {
+                            app.codices_component
+                                .list_state
+                                .scroll_down_by(scroll_amount);
+                        }
                     }
                 }
             }
@@ -693,6 +708,7 @@ impl EventHandler {
                 app.is_paused = false;
                 app.fractor_handle = None;
                 app.transcriber_handle = None;
+                app.recording_screen_start = None;
 
                 // Return to main screen
                 app.current_screen = CurrentScreen::Main;
