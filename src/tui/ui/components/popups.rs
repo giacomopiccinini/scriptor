@@ -47,17 +47,17 @@ fn render_codex_popup_kernel<T: CursorState>(
     // Clear the background of the popup area first
     Clear.render(popup_area, buf);
     Block::default()
-        .style(Style::default().bg(theme.background))
+        .style(Style::default().bg(theme.page))
         .render(popup_area, buf);
 
     // Define the popup block with styling
     let popup_block = Block::new()
         .padding(Padding::new(2, 2, 1, 1))
         .title(format!("  {}  ", popup_title))
-        .title_style(Style::new().fg(theme.foreground))
+        .title_style(Style::new().fg(theme.dark_shadow))
         .title_bottom(add_or_modify_codex_command_hints)
         .borders(Borders::ALL)
-        .border_style(Style::new().fg(theme.foreground))
+        .border_style(Style::new().fg(theme.dark_shadow))
         .border_type(BorderType::Rounded)
         .padding(Padding::horizontal(1));
 
@@ -125,17 +125,17 @@ pub fn render_folio_popup_kernel<T: CursorState>(
     // Clear the background of the popup area first
     Clear.render(popup_area, buf);
     Block::default()
-        .style(Style::default().bg(theme.background))
+        .style(Style::default().bg(theme.page))
         .render(popup_area, buf);
 
     // Define the popup block with styling
     let popup_block = Block::new()
         .padding(Padding::new(2, 2, 1, 1))
         .title(format!("  {}  ", popup_title))
-        .title_style(Style::new().fg(theme.foreground))
+        .title_style(Style::new().fg(theme.dark_shadow))
         .title_bottom(add_folio_command_hints)
         .borders(Borders::ALL)
-        .border_style(Style::new().fg(theme.foreground))
+        .border_style(Style::new().fg(theme.dark_shadow))
         .border_type(BorderType::Rounded)
         .padding(Padding::horizontal(1));
 
@@ -179,25 +179,25 @@ impl ChangeArchivumPopUp {
         let change_archivum_command_hints = Line::from(vec![
             Span::raw(" "),
             Span::styled("[A]", Style::default().fg(theme.highlight)),
-            Span::styled("dd", Style::default().fg(theme.foreground)),
+            Span::styled("dd", Style::default().fg(theme.dark_shadow)),
             Span::styled(" [S]", Style::default().fg(theme.highlight)),
-            Span::styled("et Default", Style::default().fg(theme.foreground)),
+            Span::styled("et Default", Style::default().fg(theme.dark_shadow)),
             Span::styled(" [Esc]", Style::default().fg(theme.highlight)),
             Span::raw(" "),
         ]);
 
         Block::default()
-            .style(Style::default().bg(theme.background).fg(theme.foreground))
+            .style(Style::default().bg(theme.page).fg(theme.dark_shadow))
             .render(area, buf);
 
         // Define the popup block with styling
         let popup_block = Block::new()
             .padding(Padding::new(2, 2, 1, 1))
             .title(" Select Archivum ")
-            .title_style(Style::new().fg(theme.foreground))
+            .title_style(Style::new().fg(theme.dark_shadow))
             .title_bottom(change_archivum_command_hints)
             .borders(Borders::ALL)
-            .border_style(Style::new().fg(theme.foreground))
+            .border_style(Style::new().fg(theme.dark_shadow))
             .border_type(BorderType::Rounded);
 
         // Create list items from archiva (databases)
@@ -217,7 +217,7 @@ impl ChangeArchivumPopUp {
             .highlight_symbol(" ▸ ") // Selection indicator
             .highlight_style(
                 // Swap foreground and background for selected item
-                Style::default().bg(theme.foreground).fg(theme.background),
+                Style::default().bg(theme.dark_shadow).fg(theme.page),
             )
             .highlight_spacing(ratatui::widgets::HighlightSpacing::Always);
 
@@ -240,17 +240,17 @@ impl AddArchivumPopUp {
         // Clear the entire area background first
         Clear.render(area, buf);
         Block::default()
-            .style(Style::default().bg(theme.background).fg(theme.foreground))
+            .style(Style::default().bg(theme.page).fg(theme.dark_shadow))
             .render(area, buf);
 
         // Define the popup block with styling - use full width
         let popup_block = Block::new()
             .padding(Padding::new(2, 2, 1, 1))
             .title(" Add Archivum ")
-            .title_style(Style::new().fg(theme.foreground))
+            .title_style(Style::new().fg(theme.dark_shadow))
             .title_bottom(add_archivum_command_hints)
             .borders(Borders::ALL)
-            .border_style(Style::new().fg(theme.foreground))
+            .border_style(Style::new().fg(theme.dark_shadow))
             .border_type(BorderType::Rounded)
             .padding(Padding::horizontal(1));
 

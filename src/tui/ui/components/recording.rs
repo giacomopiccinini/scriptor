@@ -47,10 +47,10 @@ impl RecordingScreen {
             Span::styled("[Space]", Style::default().fg(theme.highlight)),
             Span::styled(
                 format!(" {} ", pause_text),
-                Style::default().fg(theme.foreground),
+                Style::default().fg(theme.dark_shadow),
             ),
             Span::styled("[Esc]", Style::default().fg(theme.highlight)),
-            Span::styled(" stop ", Style::default().fg(theme.foreground)),
+            Span::styled(" stop ", Style::default().fg(theme.dark_shadow)),
         ])
     }
 
@@ -93,7 +93,7 @@ impl RecordingScreen {
 
         let paragraph = Paragraph::new(header_text)
             .block(block)
-            .style(Style::default().bg(theme.background));
+            .style(Style::default().bg(theme.page));
 
         paragraph.render(area, buf);
     }
@@ -131,14 +131,14 @@ impl RecordingScreen {
                     let mut lines = wrapped_lines;
                     lines.push(Line::from(""));
 
-                    ListItem::new(Text::from(lines).style(Style::default().fg(theme.foreground)))
+                    ListItem::new(Text::from(lines).style(Style::default().fg(theme.dark_shadow)))
                 })
                 .collect();
 
             let list = List::new(items)
                 .block(block)
                 .highlight_symbol(" ▸ ")
-                .highlight_style(Style::default().bg(theme.foreground).fg(theme.background))
+                .highlight_style(Style::default().bg(theme.dark_shadow).fg(theme.page))
                 .highlight_spacing(HighlightSpacing::Always);
 
             list.render(area, buf);
@@ -146,7 +146,7 @@ impl RecordingScreen {
             // No folio selected - show waiting message
             let waiting_text = Paragraph::new("Waiting for transcription...")
                 .block(block)
-                .style(Style::default().fg(theme.foreground).bg(theme.background))
+                .style(Style::default().fg(theme.dark_shadow).bg(theme.page))
                 .alignment(Alignment::Center);
 
             waiting_text.render(area, buf);

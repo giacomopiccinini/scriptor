@@ -464,16 +464,16 @@ impl CodicesComponent {
         // Command hints for codices
         let codex_command_hints = Line::from(vec![
             Span::styled("[n]", Style::default().fg(theme.highlight)),
-            Span::styled("ew", Style::default().fg(theme.foreground)),
+            Span::styled("ew", Style::default().fg(theme.dark_shadow)),
             Span::raw("   "),
             Span::styled("[↵]", Style::default().fg(theme.highlight)),
-            Span::styled("expand", Style::default().fg(theme.foreground)),
+            Span::styled("expand", Style::default().fg(theme.dark_shadow)),
             Span::raw("   "),
             Span::styled("[s]", Style::default().fg(theme.highlight)),
-            Span::styled("ettings", Style::default().fg(theme.foreground)),
+            Span::styled("ettings", Style::default().fg(theme.dark_shadow)),
             Span::raw("   "),
             Span::styled("[q]", Style::default().fg(theme.highlight)),
-            Span::styled("uit", Style::default().fg(theme.foreground)),
+            Span::styled("uit", Style::default().fg(theme.dark_shadow)),
         ])
         .centered();
 
@@ -527,7 +527,7 @@ impl CodicesComponent {
             .highlight_symbol(LIST_HIGHLIGHT_SYMBOL) // No symbol, just space for padding
             .highlight_style(
                 // Swap foreground and background for selected item
-                Style::default().bg(theme.foreground).fg(theme.background),
+                Style::default().bg(theme.dark_shadow).fg(theme.page),
             )
             .highlight_spacing(HighlightSpacing::Always);
 

@@ -12,7 +12,7 @@ impl ArchivumSelector {
         let archivum_command_hints = Line::from(vec![
             Span::raw(" "),
             Span::styled("[Tab]", Style::default().fg(theme.highlight)),
-            Span::styled(" Change", Style::default().fg(theme.foreground)),
+            Span::styled(" Change", Style::default().fg(theme.dark_shadow)),
             Span::raw(" "),
         ])
         .left_aligned();

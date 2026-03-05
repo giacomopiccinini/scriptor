@@ -45,7 +45,7 @@ impl AppLayout {
     /// Render a background that fills the entire area
     pub fn render_background(area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
         let background =
-            Block::default().style(Style::default().bg(theme.background).fg(theme.foreground));
+            Block::default().style(Style::default().bg(theme.page).fg(theme.dark_shadow));
         background.render(area, buf);
     }
 
@@ -61,7 +61,7 @@ impl AppLayout {
 
         let paragraph = Paragraph::new(header_text)
             .block(block)
-            .style(Style::default().bg(theme.background));
+            .style(Style::default().bg(theme.page));
 
         paragraph.render(area, buf);
     }
@@ -70,7 +70,7 @@ impl AppLayout {
     pub fn render_bookmark(area: Rect, buf: &mut Buffer, archivum_name: &str, theme: &ThemeConfig) {
         // Red background for bookmark area
         let background =
-            Block::default().style(Style::default().bg(theme.highlight).fg(theme.background));
+            Block::default().style(Style::default().bg(theme.highlight).fg(theme.page));
         background.render(area, buf);
 
         // Render archivum name vertically (one char per line)
@@ -80,7 +80,7 @@ impl AppLayout {
             .collect();
 
         let paragraph =
-            Paragraph::new(chars).style(Style::default().bg(theme.highlight).fg(theme.background));
+            Paragraph::new(chars).style(Style::default().bg(theme.highlight).fg(theme.page));
 
         paragraph.render(area, buf);
     }
