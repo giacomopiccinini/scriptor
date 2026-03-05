@@ -294,6 +294,12 @@ impl App {
             {
                 // Refresh fragmenta from DB (ignore errors during recording)
                 let _ = selected_folio.update_fragmenta(&self.pool).await;
+                // Autoscroll: select last fragmentum so both overlay and background scroll to show latest
+                if !selected_folio.fragmenta.is_empty() {
+                    selected_folio
+                        .fragmentum_state
+                        .select(Some(selected_folio.fragmenta.len() - 1));
+                }
             }
 
             // Sync UI with playback progress
@@ -1021,16 +1027,24 @@ impl Widget for &mut App {
                 }
             }
             CurrentScreen::RecordFolio => {
-                let selected_folio =
+                let mut selected_folio =
                     if let Some(codex) = self.codices_component.get_selected_codex_mut() {
                         if let Some(folio_idx) = codex.folio_state.selected() {
-                            codex.folia.get(folio_idx)
+                            codex.folia.get_mut(folio_idx)
                         } else {
                             None
                         }
                     } else {
                         None
                     };
+                // Autoscroll: ensure last fragmentum is selected before render
+                if let Some(ref mut folio) = selected_folio {
+                    if !folio.fragmenta.is_empty() {
+                        folio
+                            .fragmentum_state
+                            .select(Some(folio.fragmenta.len() - 1));
+                    }
+                }
                 RecordingScreen::render(self.is_paused, selected_folio, area, buf, theme);
             }
             CurrentScreen::Settings => {

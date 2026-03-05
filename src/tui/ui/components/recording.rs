@@ -5,7 +5,9 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, HighlightSpacing, List, ListItem, Padding, Paragraph, Widget};
+use ratatui::widgets::{
+    Block, HighlightSpacing, List, ListItem, Padding, Paragraph, StatefulWidget, Widget,
+};
 use textwrap::wrap;
 
 pub struct RecordingScreen;
@@ -15,7 +17,7 @@ impl RecordingScreen {
     /// The overlay sits on top of the main UI, clearing only its own area.
     pub fn render(
         is_paused: bool,
-        selected_folio: Option<&UIFolio>,
+        selected_folio: Option<&mut UIFolio>,
         area: Rect,
         buf: &mut Buffer,
         theme: &ThemeConfig,
@@ -57,7 +59,7 @@ impl RecordingScreen {
     /// Render the recording content (header + fragmenta) inside the given area
     fn render_content(
         is_paused: bool,
-        selected_folio: Option<&UIFolio>,
+        selected_folio: Option<&mut UIFolio>,
         area: Rect,
         buf: &mut Buffer,
         theme: &ThemeConfig,
@@ -99,7 +101,7 @@ impl RecordingScreen {
     }
 
     fn render_fragmenta(
-        selected_folio: Option<&UIFolio>,
+        selected_folio: Option<&mut UIFolio>,
         area: Rect,
         buf: &mut Buffer,
         theme: &ThemeConfig,
@@ -141,7 +143,7 @@ impl RecordingScreen {
                 .highlight_style(Style::default().bg(theme.dark_shadow).fg(theme.page))
                 .highlight_spacing(HighlightSpacing::Always);
 
-            list.render(area, buf);
+            StatefulWidget::render(list, area, buf, &mut folio.fragmentum_state);
         } else {
             // No folio selected - show waiting message
             let waiting_text = Paragraph::new("Waiting for transcription...")
