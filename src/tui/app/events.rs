@@ -199,7 +199,13 @@ impl EventHandler {
 
             // Start recording
             (KeyCode::Char('r'), KeyModifiers::NONE) => {
-                if let (true, false) = app.codices_component.check_codex_folio_selection() {
+                // Ideally, you should only record from a codex, not a folio.
+                // Here we are improving the UX by letting the user launch a recording even from a folio
+                // The caveat is that we won't show the corresponding command hint but still allow the
+                // recording from the "parent" codex
+                if let (true, false) | (true, true) =
+                    app.codices_component.check_codex_folio_selection()
+                {
                     let codex = app
                         .codices_component
                         .get_selected_codex_mut()
@@ -283,6 +289,8 @@ impl EventHandler {
 
                         // Select the newly created folio
                         let folio_count = codex.folia.len();
+                        // Capture previous folio selection before we overwrite it (needed for scroll)
+                        let previous_folio_idx = codex.folio_state.selected();
 
                         // Open up codex
                         codex.expand();
@@ -296,7 +304,12 @@ impl EventHandler {
                                         .select(Some(selected_folio.fragmenta.len() - 1));
                                 }
                             }
-                            folio_count as u16
+                            // When on codex header: scroll from top to new folio = folio_count
+                            // When on folio K: already scrolled to K, only need (folio_count - 1 - K) more
+                            match previous_folio_idx {
+                                None => folio_count as u16,
+                                Some(k) => (folio_count - 1 - k) as u16,
+                            }
                         } else {
                             0
                         };
