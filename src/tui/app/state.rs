@@ -466,6 +466,7 @@ impl App {
 
     /// Enter the "Add Archivum" screen by opening the corresponding pop-up
     pub fn enter_add_archivum_screen(&mut self) {
+        self.input_state = InputState::default();
         self.current_screen = CurrentScreen::AddArchivum;
     }
 
@@ -820,12 +821,20 @@ impl Widget for &mut App {
             CurrentScreen::ChangeArchivum => ChangeArchivumPopUp::render(
                 &self.config,
                 self.selected_archivum_index,
-                right_page_area,
+                fragmenta_area,
                 buf,
                 theme,
             ),
             CurrentScreen::AddArchivum => {
-                AddArchivumPopUp::render(&self.input_state, right_page_area, buf, theme)
+                // Render ChangeArchivum as background (archivum list), then AddArchivum popup on top
+                ChangeArchivumPopUp::render(
+                    &self.config,
+                    self.selected_archivum_index,
+                    fragmenta_area,
+                    buf,
+                    theme,
+                );
+                AddArchivumPopUp::render(&self.input_state, fragmenta_area, buf, theme)
             }
             CurrentScreen::RecordFolio => {
                 let selected_folio =
