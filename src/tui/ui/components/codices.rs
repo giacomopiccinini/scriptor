@@ -524,7 +524,8 @@ impl CodicesComponent {
 
         let list: List = List::new(codices_and_folia)
             .block(block)
-            .highlight_symbol(LIST_HIGHLIGHT_SYMBOL) // No symbol, just space for padding
+            .style(Style::default().fg(theme.medium_shadow))
+            .highlight_symbol(LIST_HIGHLIGHT_SYMBOL)
             .highlight_style(
                 // Swap foreground and background for selected item
                 Style::default().bg(theme.dark_shadow).fg(theme.page),

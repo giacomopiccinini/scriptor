@@ -23,7 +23,7 @@ use color_eyre::Result;
 use crossterm::event::{self, KeyEvent};
 use ratatui::DefaultTerminal;
 use ratatui::buffer::Buffer;
-use ratatui::layout::Rect;
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::widgets::Widget;
 use spinoff::{Color, Spinner, Streams, spinners};
 use sqlx::SqlitePool;
@@ -708,27 +708,78 @@ impl App {
 
 impl Widget for &mut App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        // Get theme reference
         let theme = &self.config.default.theme;
 
-        // Render background
-        AppLayout::render_background(area, buf, theme);
-
-        // Calculate layout areas
+        // Destructure 13-area book-style layout
         let (
-            codices_header_area,
-            codices_area,
+            outer_area_0,
+            outer_area_1,
+            outer_area_2,
+            outer_area_3,
+            inner_area,
+            page_l,
+            light_shadow_l,
+            medium_shadow_l,
+            medium_shadow_r,
+            light_shadow_r,
+            right_page_area,
             bookmark_area,
-            fragmenta_header_area,
-            fragmenta_area,
+            _empty_area,
         ) = AppLayout::calculate_main_layout(area);
+
+        // Render layered book backgrounds (outermost → innermost)
+        AppLayout::render_table(theme.very_dark_shadow, outer_area_0, buf);
+        AppLayout::render_spine(theme.dark_shadow, theme.very_dark_shadow, outer_area_1, buf);
+        AppLayout::render_spine(
+            theme.medium_shadow,
+            theme.very_dark_shadow,
+            outer_area_2,
+            buf,
+        );
+        AppLayout::render_spine(
+            theme.light_shadow,
+            theme.very_dark_shadow,
+            outer_area_3,
+            buf,
+        );
+        AppLayout::render_inner_page(inner_area, buf, theme);
+
+        // Render spine separators
+        AppLayout::render_light_shadow(theme.light_shadow, light_shadow_l, buf);
+        AppLayout::render_medium_shadow(
+            theme.medium_shadow,
+            theme.dark_shadow,
+            medium_shadow_l,
+            buf,
+        );
+        AppLayout::render_medium_shadow(
+            theme.medium_shadow,
+            theme.dark_shadow,
+            medium_shadow_r,
+            buf,
+        );
+        AppLayout::render_light_shadow(theme.light_shadow, light_shadow_r, buf);
+
+        // Render bookmark tab with archivum name written vertically
+        AppLayout::render_bookmark(
+            bookmark_area,
+            buf,
+            &format!("  {}", &self.config.default.db.name),
+            theme,
+        );
+
+        // Split left/right pages into header (10%) + content + 2-row bottom margin
+        let page_split = Layout::vertical([
+            Constraint::Percentage(10),
+            Constraint::Min(0),
+            Constraint::Length(2),
+        ]);
+        let [codices_header_area, codices_area, _] = page_split.areas(page_l);
+        let [fragmenta_header_area, fragmenta_area, _] = page_split.areas(right_page_area);
 
         // Render column headers
         AppLayout::render_header(codices_header_area, buf, "C O D I C E S", theme);
         AppLayout::render_header(fragmenta_header_area, buf, "F R A G M E N T A", theme);
-
-        // Render bookmark area (archivum selector in the middle)
-        AppLayout::render_bookmark(bookmark_area, buf, "   A R C H I V U M", theme);
 
         // Render the main areas
         self.codices_component.render(codices_area, buf, theme);
@@ -769,15 +820,14 @@ impl Widget for &mut App {
             CurrentScreen::ChangeArchivum => ChangeArchivumPopUp::render(
                 &self.config,
                 self.selected_archivum_index,
-                bookmark_area,
+                right_page_area,
                 buf,
                 theme,
             ),
             CurrentScreen::AddArchivum => {
-                AddArchivumPopUp::render(&self.input_state, bookmark_area, buf, theme)
+                AddArchivumPopUp::render(&self.input_state, right_page_area, buf, theme)
             }
             CurrentScreen::RecordFolio => {
-                // Get the selected folio for displaying fragmenta
                 let selected_folio =
                     if let Some(codex) = self.codices_component.get_selected_codex_mut() {
                         if let Some(folio_idx) = codex.folio_state.selected() {
@@ -788,12 +838,9 @@ impl Widget for &mut App {
                     } else {
                         None
                     };
-
-                // Render recording overlay on top of the main UI
                 RecordingScreen::render(self.is_paused, selected_folio, area, buf, theme);
             }
             CurrentScreen::Settings => {
-                // Render settings overlay on top of the main UI
                 if let Some(settings_state) = &self.settings_state {
                     SettingsScreen::render(settings_state, area, buf, theme);
                 }

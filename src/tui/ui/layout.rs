@@ -1,87 +1,185 @@
 use crate::configs::theme::ThemeConfig;
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::Style;
-use ratatui::text::{Line, Span};
+use ratatui::layout::{Constraint, Direction, Layout, Margin, Rect};
+use ratatui::style::{Color, Style};
+use ratatui::symbols::merge::MergeStrategy;
+use ratatui::text::Line;
 use ratatui::widgets::Padding;
 use ratatui::widgets::Paragraph;
-use ratatui::widgets::{Block, Widget};
+use ratatui::widgets::{Block, BorderType, Borders, Widget};
 
 pub struct AppLayout;
 
 impl AppLayout {
-    /// Calculate responsive layout areas
-    /// Returns: (codices_header_area, codices_area, bookmark_area, fragmenta_header_area, fragmenta_area, codex_footer_area)
-    pub fn calculate_main_layout(area: Rect) -> (Rect, Rect, Rect, Rect, Rect) {
-        // Subdivide the content area into three columns: codex, folio, fragmentum
-        let content_layout = Layout::horizontal([
-            Constraint::Percentage(48), // Codex column
-            Constraint::Percentage(4),  // Bookmark column
-            Constraint::Percentage(48), // Fragmentum column
-        ]);
+    /// Calculate all layout areas for the main book-style UI.
+    ///
+    /// Returns, in order:
+    /// - `outer_area_0`: full terminal area (table background)
+    /// - `outer_area_1..3`: progressively inset spine layers
+    /// - `inner_area`: the inner page background
+    /// - `page_l`: left page content area
+    /// - `light_shadow_l/r`: thin light-shadow columns flanking the spine
+    /// - `medium_shadow_l/r`: thin medium-shadow columns at the spine center
+    /// - `right_page_area`: right page content area (excluding bookmark column)
+    /// - `bookmark_area`: the visible bookmark tab (top ~60% of the bookmark column)
+    /// - `empty_area`: the empty remainder below the bookmark tab
+    pub fn calculate_main_layout(
+        area: Rect,
+    ) -> (
+        Rect,
+        Rect,
+        Rect,
+        Rect,
+        Rect,
+        Rect,
+        Rect,
+        Rect,
+        Rect,
+        Rect,
+        Rect,
+        Rect,
+        Rect,
+    ) {
+        let table_margin = Margin {
+            horizontal: 4,
+            vertical: 2,
+        };
 
-        // Extract the areas for codices, folia, and fragmenta
+        let book_margin = Margin {
+            horizontal: 1,
+            vertical: 0,
+        };
+
+        let outer_area_0 = area;
+        let outer_area_1 = area.inner(table_margin);
+        let outer_area_2 = outer_area_1.inner(book_margin);
+        let outer_area_3 = outer_area_2.inner(book_margin);
+        let inner_area = outer_area_3.inner(book_margin);
+
+        // Split inner area horizontally into left page, spine separators, and right page
+        let page_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(50),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Percentage(50),
+            ]);
+
         let [
-            codices_and_header_area,
-            bookmark_area,
-            fragmenta_and_header_area,
-        ] = content_layout.areas(area);
+            page_l,
+            light_shadow_l,
+            medium_shadow_l,
+            medium_shadow_r,
+            light_shadow_r,
+            page_r,
+        ] = page_layout.areas(inner_area);
 
-        // Page layout for both codex and fragment
-        let page_layout =
-            Layout::vertical([Constraint::Percentage(10), Constraint::Percentage(80)]);
-        let [codices_header_area, codices_area] = page_layout.areas(codices_and_header_area);
-        let [fragmenta_header_area, fragmenta_area] = page_layout.areas(fragmenta_and_header_area);
+        // Split right page into a narrow bookmark column and the actual content area
+        let page_bookmark_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Max(4), Constraint::Min(20)]);
+
+        let [full_bookmark_area, right_page_area] = page_bookmark_layout.areas(page_r);
+
+        // Split the bookmark column into the visible tab and the empty area below
+        let bookmark_split = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)]);
+
+        let [bookmark_area, empty_area] = bookmark_split.areas(full_bookmark_area);
 
         (
-            codices_header_area,
-            codices_area,
+            outer_area_0,
+            outer_area_1,
+            outer_area_2,
+            outer_area_3,
+            inner_area,
+            page_l,
+            light_shadow_l,
+            medium_shadow_l,
+            medium_shadow_r,
+            light_shadow_r,
+            right_page_area,
             bookmark_area,
-            fragmenta_header_area,
-            fragmenta_area,
+            empty_area,
         )
     }
 
-    /// Render a background that fills the entire area
-    pub fn render_background(area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
-        let background =
-            Block::default().style(Style::default().bg(theme.page).fg(theme.dark_shadow));
-        background.render(area, buf);
+    /// Fill an area with a solid background color (used for the outermost table layer).
+    pub fn render_table(color: Color, area: Rect, buf: &mut Buffer) {
+        buf.set_style(area, Style::default().bg(color));
     }
 
-    /// Render a simple centered header title
+    /// Render a spine layer with a background color and double-line left/right borders.
+    pub fn render_spine(bg_color: Color, fg_color: Color, area: Rect, buf: &mut Buffer) {
+        Block::default()
+            .style(Style::default().bg(bg_color))
+            .border_style(Style::default().fg(fg_color))
+            .border_type(BorderType::Double)
+            .borders(Borders::LEFT | Borders::RIGHT)
+            .render(area, buf);
+    }
+
+    /// Fill an area with a solid block background color.
+    pub fn render_color(color: Color, area: Rect, buf: &mut Buffer) {
+        Block::default()
+            .style(Style::default().bg(color))
+            .render(area, buf);
+    }
+
+    /// Render a light-shadow spine separator column.
+    pub fn render_light_shadow(bg_color: Color, area: Rect, buf: &mut Buffer) {
+        Block::default()
+            .style(Style::default().bg(bg_color))
+            .render(area, buf);
+    }
+
+    /// Render a medium-shadow spine separator column with a thick left border line.
+    pub fn render_medium_shadow(bg_color: Color, line_color: Color, area: Rect, buf: &mut Buffer) {
+        Block::default()
+            .style(Style::default().bg(bg_color))
+            .border_style(Style::default().fg(line_color))
+            .border_type(BorderType::Thick)
+            .borders(Borders::LEFT)
+            .merge_borders(MergeStrategy::Exact)
+            .render(area, buf);
+    }
+
+    /// Render the inner page background.
+    pub fn render_inner_page(area: Rect, buf: &mut Buffer, theme: &ThemeConfig) {
+        Block::default()
+            .style(Style::default().bg(theme.page))
+            .render(area, buf);
+    }
+
+    /// Render a centered page header with the highlight color on the page background.
     pub fn render_header(area: Rect, buf: &mut Buffer, title: &str, theme: &ThemeConfig) {
         let block = Block::default().padding(Padding::new(0, 0, 2, 0));
-
-        let header_text = Line::from(vec![Span::styled(
-            title,
-            Style::default().fg(theme.highlight),
-        )])
-        .centered();
-
-        let paragraph = Paragraph::new(header_text)
+        let header_text = Line::from(title)
+            .style(Style::default().fg(theme.highlight))
+            .centered();
+        Paragraph::new(header_text)
             .block(block)
-            .style(Style::default().bg(theme.page));
-
-        paragraph.render(area, buf);
+            .style(Style::default().bg(theme.page))
+            .render(area, buf);
     }
 
-    /// Render the bookmark area (archivum selector) with red background and vertical text
+    /// Render the bookmark tab: highlight background with the archivum name written vertically.
     pub fn render_bookmark(area: Rect, buf: &mut Buffer, archivum_name: &str, theme: &ThemeConfig) {
-        // Red background for bookmark area
-        let background =
-            Block::default().style(Style::default().bg(theme.highlight).fg(theme.page));
-        background.render(area, buf);
+        Block::default()
+            .style(Style::default().bg(theme.highlight).fg(theme.page))
+            .render(area, buf);
 
-        // Render archivum name vertically (one char per line)
         let chars: Vec<Line> = archivum_name
             .chars()
             .map(|c| Line::from(c.to_string()).centered())
             .collect();
 
-        let paragraph =
-            Paragraph::new(chars).style(Style::default().bg(theme.highlight).fg(theme.page));
-
-        paragraph.render(area, buf);
+        Paragraph::new(chars)
+            .style(Style::default().bg(theme.highlight).fg(theme.page))
+            .render(area, buf);
     }
 }
