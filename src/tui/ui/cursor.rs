@@ -119,7 +119,7 @@ pub trait CursorState {
             } else {
                 Span::styled(
                     cursor_char,
-                    Style::default().fg(theme.page).bg(theme.dark_shadow),
+                    Style::default().fg(theme.page).bg(theme.highlight),
                 )
             },
             Span::styled(text_after, Style::default().fg(theme.dark_shadow)),
