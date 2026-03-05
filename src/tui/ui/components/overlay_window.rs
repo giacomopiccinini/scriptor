@@ -64,7 +64,7 @@ impl OverlayWindow {
 
         // Render background for the window
         Block::default()
-            .style(Style::default().bg(theme.background))
+            .style(Style::default().bg(theme.page))
             .render(window_area, buf);
 
         // Define the window block with styling
@@ -73,7 +73,7 @@ impl OverlayWindow {
             .title_bottom(footer_hints_left.left_aligned())
             .title_bottom(footer_hints_right.right_aligned())
             .borders(Borders::ALL)
-            .border_style(Style::new().fg(theme.foreground))
+            .border_style(Style::new().fg(theme.dark_shadow))
             .border_type(BorderType::Rounded)
             .padding(Padding::new(1, 1, 1, 1));
 

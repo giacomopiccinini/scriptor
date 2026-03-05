@@ -110,19 +110,19 @@ pub trait CursorState {
         };
 
         vec![
-            Span::styled(text_before, Style::default().fg(theme.foreground)),
+            Span::styled(text_before, Style::default().fg(theme.dark_shadow)),
             if cursor_char == "█" {
                 Span::styled(
                     cursor_char,
-                    Style::default().fg(theme.highlight).bg(theme.background),
+                    Style::default().fg(theme.highlight).bg(theme.page),
                 )
             } else {
                 Span::styled(
                     cursor_char,
-                    Style::default().fg(theme.background).bg(theme.foreground),
+                    Style::default().fg(theme.page).bg(theme.dark_shadow),
                 )
             },
-            Span::styled(text_after, Style::default().fg(theme.foreground)),
+            Span::styled(text_after, Style::default().fg(theme.dark_shadow)),
         ]
     }
 }

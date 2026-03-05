@@ -42,9 +42,9 @@ impl SettingsScreen {
         Line::from(vec![
             Span::raw(" "),
             Span::styled("↑/↓", Style::default().fg(theme.highlight)),
-            Span::styled(" switch  ", Style::default().fg(theme.foreground)),
+            Span::styled(" switch  ", Style::default().fg(theme.dark_shadow)),
             Span::styled("←/→", Style::default().fg(theme.highlight)),
-            Span::styled(" adjust ", Style::default().fg(theme.foreground)),
+            Span::styled(" adjust ", Style::default().fg(theme.dark_shadow)),
         ])
     }
 
@@ -52,11 +52,11 @@ impl SettingsScreen {
     fn build_command_hints(theme: &ThemeConfig) -> Line<'static> {
         Line::from(vec![
             Span::styled("[s]", Style::default().fg(theme.highlight)),
-            Span::styled("ave ", Style::default().fg(theme.foreground)),
+            Span::styled("ave ", Style::default().fg(theme.dark_shadow)),
             Span::styled("[d]", Style::default().fg(theme.highlight)),
-            Span::styled("iscard ", Style::default().fg(theme.foreground)),
+            Span::styled("iscard ", Style::default().fg(theme.dark_shadow)),
             Span::styled("[S]", Style::default().fg(theme.highlight)),
-            Span::styled("ave as default ", Style::default().fg(theme.foreground)),
+            Span::styled("ave as default ", Style::default().fg(theme.dark_shadow)),
         ])
     }
 
@@ -169,7 +169,7 @@ impl SettingsScreen {
 
         let paragraph = Paragraph::new(header_text)
             .block(block)
-            .style(Style::default().bg(theme.background));
+            .style(Style::default().bg(theme.page));
 
         paragraph.render(area, buf);
     }
@@ -189,13 +189,13 @@ impl SettingsScreen {
         let (base_style, text_style, accent_style) = if is_active {
             (
                 Style::default().bg(theme.highlight),
-                Style::default().fg(theme.background),
-                Style::default().fg(theme.background),
+                Style::default().fg(theme.page),
+                Style::default().fg(theme.page),
             )
         } else {
             (
-                Style::default().bg(theme.background),
-                Style::default().fg(theme.foreground),
+                Style::default().bg(theme.page),
+                Style::default().fg(theme.dark_shadow),
                 Style::default().fg(theme.highlight),
             )
         };
@@ -239,13 +239,13 @@ impl SettingsScreen {
         let (base_style, text_style, accent_style) = if is_active {
             (
                 Style::default().bg(theme.highlight),
-                Style::default().fg(theme.background),
-                Style::default().fg(theme.background),
+                Style::default().fg(theme.page),
+                Style::default().fg(theme.page),
             )
         } else {
             (
-                Style::default().bg(theme.background),
-                Style::default().fg(theme.foreground),
+                Style::default().bg(theme.page),
+                Style::default().fg(theme.dark_shadow),
                 Style::default().fg(theme.highlight),
             )
         };
@@ -294,13 +294,13 @@ impl SettingsScreen {
         let (base_style, text_style, accent_style) = if is_active {
             (
                 Style::default().bg(theme.highlight),
-                Style::default().fg(theme.background),
-                Style::default().fg(theme.background),
+                Style::default().fg(theme.page),
+                Style::default().fg(theme.page),
             )
         } else {
             (
-                Style::default().bg(theme.background),
-                Style::default().fg(theme.foreground),
+                Style::default().bg(theme.page),
+                Style::default().fg(theme.dark_shadow),
                 Style::default().fg(theme.highlight),
             )
         };
@@ -346,13 +346,13 @@ impl SettingsScreen {
         let (base_style, text_style, accent_style) = if is_active {
             (
                 Style::default().bg(theme.highlight),
-                Style::default().fg(theme.background),
-                Style::default().fg(theme.background),
+                Style::default().fg(theme.page),
+                Style::default().fg(theme.page),
             )
         } else {
             (
-                Style::default().bg(theme.background),
-                Style::default().fg(theme.foreground),
+                Style::default().bg(theme.page),
+                Style::default().fg(theme.dark_shadow),
                 Style::default().fg(theme.highlight),
             )
         };
@@ -395,13 +395,13 @@ impl SettingsScreen {
         let (base_style, text_style, accent_style) = if is_active {
             (
                 Style::default().bg(theme.highlight),
-                Style::default().fg(theme.background),
-                Style::default().fg(theme.background),
+                Style::default().fg(theme.page),
+                Style::default().fg(theme.page),
             )
         } else {
             (
-                Style::default().bg(theme.background),
-                Style::default().fg(theme.foreground),
+                Style::default().bg(theme.page),
+                Style::default().fg(theme.dark_shadow),
                 Style::default().fg(theme.highlight),
             )
         };
@@ -436,13 +436,13 @@ impl SettingsScreen {
         // let (base_style, text_style, accent_style) = if is_active {
         //     (
         //         Style::default().bg(theme.highlight),
-        //         Style::default().fg(theme.background),
-        //         Style::default().fg(theme.background),
+        //         Style::default().fg(theme.page),
+        //         Style::default().fg(theme.page),
         //     )
         // } else {
         //     (
-        //         Style::default().bg(theme.background),
-        //         Style::default().fg(theme.foreground),
+        //         Style::default().bg(theme.page),
+        //         Style::default().fg(theme.dark_shadow),
         //         Style::default().fg(theme.highlight),
         //     )
         // };
@@ -479,13 +479,13 @@ impl SettingsScreen {
         let (base_style, text_style, accent_style) = if is_active {
             (
                 Style::default().bg(theme.highlight),
-                Style::default().fg(theme.background),
-                Style::default().fg(theme.background),
+                Style::default().fg(theme.page),
+                Style::default().fg(theme.page),
             )
         } else {
             (
-                Style::default().bg(theme.background),
-                Style::default().fg(theme.foreground),
+                Style::default().bg(theme.page),
+                Style::default().fg(theme.dark_shadow),
                 Style::default().fg(theme.highlight),
             )
         };
@@ -520,13 +520,13 @@ impl SettingsScreen {
         let (base_style, text_style, accent_style) = if is_active {
             (
                 Style::default().bg(theme.highlight),
-                Style::default().fg(theme.background),
-                Style::default().fg(theme.background),
+                Style::default().fg(theme.page),
+                Style::default().fg(theme.page),
             )
         } else {
             (
-                Style::default().bg(theme.background),
-                Style::default().fg(theme.foreground),
+                Style::default().bg(theme.page),
+                Style::default().fg(theme.dark_shadow),
                 Style::default().fg(theme.highlight),
             )
         };

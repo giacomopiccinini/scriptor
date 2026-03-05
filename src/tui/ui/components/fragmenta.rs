@@ -83,16 +83,16 @@ impl FragmentaComponent {
     ) {
         // Create play/pause text based on status
         let play_text = if is_playing {
-            Span::styled("ause ", Style::default().fg(theme.foreground))
+            Span::styled("ause ", Style::default().fg(theme.dark_shadow))
         } else {
-            Span::styled("lay ", Style::default().fg(theme.foreground))
+            Span::styled("lay ", Style::default().fg(theme.dark_shadow))
         };
 
         // Create timestamp toggle text based on status
         let timestamp_text = if show_timestamp {
-            Span::styled("imestamp off ", Style::default().fg(theme.foreground))
+            Span::styled("imestamp off ", Style::default().fg(theme.dark_shadow))
         } else {
-            Span::styled("imestamp on ", Style::default().fg(theme.foreground))
+            Span::styled("imestamp on ", Style::default().fg(theme.dark_shadow))
         };
 
         // Command hints for fragmenta
@@ -101,10 +101,10 @@ impl FragmentaComponent {
             play_text,
             Span::raw("   "),
             Span::styled("[c]", Style::default().fg(theme.highlight)),
-            Span::styled("opy ", Style::default().fg(theme.foreground)),
+            Span::styled("opy ", Style::default().fg(theme.dark_shadow)),
             Span::raw("   "),
             Span::styled("[C]", Style::default().fg(theme.highlight)),
-            Span::styled("opy all ", Style::default().fg(theme.foreground)),
+            Span::styled("opy all ", Style::default().fg(theme.dark_shadow)),
             Span::raw("   "),
             Span::styled("[t]", Style::default().fg(theme.highlight)),
             timestamp_text,
@@ -182,7 +182,7 @@ impl FragmentaComponent {
                 .highlight_symbol(highlight_symbol)
                 .highlight_style(
                     // Swap foreground and background for selected item
-                    Style::default().bg(theme.foreground).fg(theme.background),
+                    Style::default().bg(theme.dark_shadow).fg(theme.page),
                 )
                 .highlight_spacing(HighlightSpacing::Always);
 
