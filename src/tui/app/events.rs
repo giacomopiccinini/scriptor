@@ -65,10 +65,10 @@ impl EventHandler {
             (KeyCode::Char('n'), KeyModifiers::NONE) => app.enter_add_codex_screen(),
 
             // Add new item
-            (KeyCode::Char('a'), KeyModifiers::NONE) => app.enter_add_folio_screen(),
+            (KeyCode::Char('i'), KeyModifiers::NONE) => app.enter_add_folio_screen(),
 
             // Change archivum
-            (KeyCode::Tab, KeyModifiers::NONE) => app.enter_change_archivum_screen(),
+            (KeyCode::Char('a'), KeyModifiers::NONE) => app.enter_change_archivum_screen(),
 
             // Modify existing item
             (KeyCode::Char('m'), KeyModifiers::NONE) => {
@@ -216,7 +216,7 @@ impl EventHandler {
                     // Create new folio in db
                     let folio = Folio::create(&app.pool, new_folio)
                         .await
-                        .expect("Unable to add folio to archivum");
+                        .expect("Unable to import folio to archivum");
                     let folio_id = folio.id;
 
                     // Take ownership of fractor and stt_model for threads
@@ -528,8 +528,8 @@ impl EventHandler {
                     eprintln!("Failed to switch archivum: {}", e);
                 }
             }
-            KeyCode::Char('A') => app.enter_add_archivum_screen(),
-            KeyCode::Char('S') => {
+            KeyCode::Char('a') => app.enter_add_archivum_screen(),
+            KeyCode::Char('s') => {
                 // Set selected archivum as default
                 if let Err(e) = app.set_selected_archivum_as_default().await {
                     eprintln!("Failed to set archivum as default: {}", e);
