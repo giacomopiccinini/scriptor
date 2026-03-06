@@ -117,6 +117,8 @@ pub struct App {
     pub transcriber_handle: Option<JoinHandle<anyhow::Result<STTModel>>>,
     /// Last observed playback file index (for tracking when to advance selection)
     pub last_playback_file_index: usize,
+    /// Fragmentum index when playback started (queue idx 0 = this fragmentum)
+    pub playback_start_fragmentum_idx: Option<usize>,
     /// Flag to indicate if the application should exit
     pub exit: bool,
     /// Flag to toggle timestamp display on fragmenta
@@ -264,6 +266,7 @@ impl App {
             fractor_handle: None,
             transcriber_handle: None,
             last_playback_file_index: 0,
+            playback_start_fragmentum_idx: None,
             exit: false,
             show_timestamp: false,
             settings_state: None,
@@ -322,10 +325,13 @@ impl App {
                     if let Some(selected_codex) = self.codices_component.get_selected_codex_mut()
                         && let Some(folio_idx) = selected_codex.folio_state.selected()
                         && let Some(selected_folio) = selected_codex.folia.get_mut(folio_idx)
+                        && let Some(start_idx) = self.playback_start_fragmentum_idx
                     {
-                        // Jump to the current file idx. This prevents that moving up/down with the arrows
-                        // renders the selected fragmentum out of sync with the player
-                        FragmentaComponent::jump_to_fragmentum(selected_folio, current_idx);
+                        // Queue index 0 = start fragmentum; queue index 1 = start+1, etc.
+                        let fragmentum_idx = start_idx
+                            .saturating_add(current_idx)
+                            .min(selected_folio.fragmenta.len().saturating_sub(1));
+                        FragmentaComponent::jump_to_fragmentum(selected_folio, fragmentum_idx);
                     }
                     self.last_playback_file_index = current_idx;
                 }
