@@ -1,4 +1,6 @@
 use crate::configs::settings::SettingsField;
+use crate::stt::fractor::Fractor;
+use crate::stt::model::STTModel;
 use crate::stt::queue::{create_fragmentum_channel, transcriber_to_db_worker};
 use crate::tui::app::state::{App, CurrentRegion, CurrentScreen};
 use crate::tui::db::models::{Folio, Fragmentum, NewFolio};
@@ -6,6 +8,7 @@ use crate::tui::ui::components::{
     CodicesComponent, FoliaComponent, FragmentaComponent, format_timestamp,
 };
 use crate::tui::ui::cursor::CursorState;
+use anyhow::Result;
 use arboard::Clipboard;
 #[cfg(target_os = "linux")]
 use arboard::SetExtLinux;
@@ -199,7 +202,7 @@ impl EventHandler {
                 CurrentRegion::Fragmentum => {}
             },
 
-            // Start recording
+            // Start recording (creates new folio)
             (KeyCode::Char('r'), KeyModifiers::NONE) => {
                 // Ideally, you should only record from a codex, not a folio.
                 // Here we are improving the UX by letting the user launch a recording even from a folio
@@ -212,120 +215,86 @@ impl EventHandler {
                         .codices_component
                         .get_selected_codex_mut()
                         .expect("Codex should exist but can't be reached");
-                    // Create new folio with datetime name. This is the default in the TUI.
-                    let folio_name = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+                    let codex_id = codex.codex.id;
 
-                    // Create ibject to be added to db
+                    // Create new folio with datetime name
+                    let folio_name = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
                     let new_folio = NewFolio {
-                        codex_id: codex.codex.id,
+                        codex_id,
                         name: folio_name,
                     };
-
-                    // Create new folio in db
                     let folio = Folio::create(&app.pool, new_folio)
                         .await
                         .expect("Unable to import folio to archivum");
                     let folio_id = folio.id;
 
-                    // Take ownership of fractor and stt_model for threads
                     if let (Some(fractor), Some(stt_model)) =
                         (app.stt_tools.fractor.take(), app.stt_tools.stt_model.take())
                     {
-                        // Create path to output directory for audio files
-                        let output_dir = dirs::data_dir()
-                            .expect("Unable to get data directory")
-                            .join("scriptor")
-                            .join("audios")
-                            .join(format!("{:04}", codex.codex.id))
-                            .join(format!("{:04}", folio_id));
+                        EventHandler::start_recording_for_folio(
+                            app, fractor, stt_model, codex_id, folio_id, false,
+                        )
+                        .await
+                        .expect("Unable to start recording");
 
-                        fs::create_dir_all(&output_dir).expect("Unable to create audio directory");
+                        {
+                            // Post-recording UI updates for new folio: refresh, select, expand, scroll
+                            let codex = app
+                                .codices_component
+                                .get_selected_codex_mut()
+                                .expect("Codex should exist");
+                            codex
+                                .update_folia(&app.pool)
+                                .await
+                                .expect("Unable to update folia");
 
-                        // Create stop and pause signals
-                        let stop_signal = Arc::new(AtomicBool::new(false));
-                        let pause_signal = Arc::new(AtomicBool::new(false));
-
-                        // Store signals in app state
-                        app.recording_stop_signal = Some(Arc::clone(&stop_signal));
-                        app.recording_pause_signal = Some(Arc::clone(&pause_signal));
-                        app.recording_folio_id = Some(folio_id);
-
-                        // Create channel for fragmenta
-                        let (tx, rx) = create_fragmentum_channel(app.stt_tools.max_queue_elements);
-
-                        // Clone pool for transcriber thread
-                        let pool_clone = app.pool.clone();
-
-                        // Capture runtime handle BEFORE spawning std::thread
-                        let runtime_handle = tokio::runtime::Handle::current();
-
-                        // Spawn fractor thread
-                        let fractor_handle = std::thread::spawn(move || {
-                            fractor.run(Some(output_dir), stop_signal, pause_signal, tx)
-                        });
-
-                        // Spawn transcriber thread
-                        let transcriber_handle = std::thread::spawn(move || {
-                            transcriber_to_db_worker(
-                                stt_model,
-                                folio_id,
-                                pool_clone,
-                                rx,
-                                runtime_handle,
-                            )
-                        });
-
-                        // Update thread state
-                        app.fractor_handle = Some(fractor_handle);
-                        app.transcriber_handle = Some(transcriber_handle);
-
-                        // Update UI state
-                        app.is_recording = true;
-                        app.is_paused = false;
-
-                        // Refresh folia to include the new one
-                        codex
-                            .update_folia(&app.pool)
-                            .await
-                            .expect("Unable to update folia");
-
-                        // Select the newly created folio
-                        let folio_count = codex.folia.len();
-                        // Capture previous folio selection before we overwrite it (needed for scroll)
-                        let previous_folio_idx = codex.folio_state.selected();
-
-                        // Open up codex
-                        codex.expand();
-                        let scroll_amount = if folio_count > 0 {
-                            codex.folio_state.select(Some(folio_count - 1));
-                            // Autoscroll: select last fragmentum when entering recording (for existing folia with content)
-                            if let Some(selected_folio) = codex.folia.get_mut(folio_count - 1) {
-                                if !selected_folio.fragmenta.is_empty() {
-                                    selected_folio
-                                        .fragmentum_state
-                                        .select(Some(selected_folio.fragmenta.len() - 1));
+                            let folio_count = codex.folia.len();
+                            let previous_folio_idx = codex.folio_state.selected();
+                            codex.expand();
+                            let scroll_amount = if folio_count > 0 {
+                                codex.folio_state.select(Some(folio_count - 1));
+                                if let Some(selected_folio) = codex.folia.get_mut(folio_count - 1) {
+                                    if !selected_folio.fragmenta.is_empty() {
+                                        selected_folio
+                                            .fragmentum_state
+                                            .select(Some(selected_folio.fragmenta.len() - 1));
+                                    }
                                 }
-                            }
-                            // When on codex header: scroll from top to new folio = folio_count
-                            // When on folio K: already scrolled to K, only need (folio_count - 1 - K) more
-                            match previous_folio_idx {
-                                None => folio_count as u16,
-                                Some(k) => (folio_count - 1 - k) as u16,
-                            }
-                        } else {
-                            0
-                        };
+                                match previous_folio_idx {
+                                    None => folio_count as u16,
+                                    Some(k) => (folio_count - 1 - k) as u16,
+                                }
+                            } else {
+                                0
+                            };
 
-                        // Switch to recording screen
-                        app.current_screen = CurrentScreen::RecordFolio;
-                        app.recording_screen_start = Some(std::time::Instant::now());
-
-                        // Scroll codices list (must be after codex borrow is released)
-                        if scroll_amount > 0 {
-                            app.codices_component
-                                .list_state
-                                .scroll_down_by(scroll_amount);
+                            if scroll_amount > 0 {
+                                app.codices_component
+                                    .list_state
+                                    .scroll_down_by(scroll_amount);
+                            }
                         }
+                    }
+                }
+            }
+
+            // Extend recording (append to existing folio when a folio is selected)
+            (KeyCode::Char('e'), KeyModifiers::NONE) => {
+                if app.codices_component.check_codex_folio_selection() == (true, true) {
+                    let codex_folio_ids = match app.codices_component.get_selected_codex_and_folio()
+                    {
+                        (Some(codex), Some(folio)) => Some((codex.codex.id, folio.folio.id)),
+                        _ => None,
+                    };
+                    if let Some((codex_id, folio_id)) = codex_folio_ids
+                        && let (Some(fractor), Some(stt_model)) =
+                            (app.stt_tools.fractor.take(), app.stt_tools.stt_model.take())
+                    {
+                        EventHandler::start_recording_for_folio(
+                            app, fractor, stt_model, codex_id, folio_id, true,
+                        )
+                        .await
+                        .expect("Unable to extend recording");
                     }
                 }
             }
@@ -872,5 +841,69 @@ impl EventHandler {
 
             _ => {}
         }
+    }
+
+    /// Starts the recording pipeline for a folio.
+    ///
+    /// When `is_extending` is true, appends to the existing folio (no new folio created,
+    /// timestamps continue from the last fragmentum). When false, use for a newly created folio.
+    async fn start_recording_for_folio(
+        app: &mut App,
+        fractor: Fractor,
+        stt_model: STTModel,
+        codex_id: i64,
+        folio_id: i64,
+        is_extending: bool,
+    ) -> Result<()> {
+        // Output directory: audios/{codex_id}/{folio_id}
+        let output_dir = dirs::data_dir()
+            .expect("Unable to get data directory")
+            .join("scriptor")
+            .join("audios")
+            .join(format!("{:04}", codex_id))
+            .join(format!("{:04}", folio_id));
+        fs::create_dir_all(&output_dir).expect("Unable to create audio directory");
+
+        // When extending, continue timestamps from the last fragmentum
+        let initial_offset_secs = if is_extending {
+            Fragmentum::get_max_timestamp_end_for_folio(&app.pool, folio_id)
+                .await
+                .unwrap_or(0.0)
+        } else {
+            0.0
+        };
+
+        let stop_signal = Arc::new(AtomicBool::new(false));
+        let pause_signal = Arc::new(AtomicBool::new(false));
+        app.recording_stop_signal = Some(Arc::clone(&stop_signal));
+        app.recording_pause_signal = Some(Arc::clone(&pause_signal));
+        app.recording_folio_id = Some(folio_id);
+
+        let (tx, rx) = create_fragmentum_channel(app.stt_tools.max_queue_elements);
+        let pool_clone = app.pool.clone();
+        let runtime_handle = tokio::runtime::Handle::current();
+
+        let fractor_handle = std::thread::spawn(move || {
+            fractor.run(
+                Some(output_dir),
+                stop_signal,
+                pause_signal,
+                tx,
+                initial_offset_secs,
+            )
+        });
+
+        let transcriber_handle = std::thread::spawn(move || {
+            transcriber_to_db_worker(stt_model, folio_id, pool_clone, rx, runtime_handle)
+        });
+
+        app.fractor_handle = Some(fractor_handle);
+        app.transcriber_handle = Some(transcriber_handle);
+        app.is_recording = true;
+        app.is_paused = false;
+        app.current_screen = CurrentScreen::RecordFolio;
+        app.recording_screen_start = Some(std::time::Instant::now());
+
+        Ok(())
     }
 }

@@ -256,12 +256,18 @@ impl Fractor {
 
     /// Run the fractor. Returns the temp directory to clean up (if any) after transcription completes,
     /// along with the VADModel so it can be reused for subsequent recordings.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_offset_secs` - When extending an existing folio, pass the max `timestamp_end` from
+    ///   its fragmenta so new timestamps continue from the last. Use `0.0` for a new recording.
     pub fn run(
         self,
         output_dir: Option<PathBuf>,
         stop_signal: Arc<AtomicBool>,
         pause_signal: Arc<AtomicBool>,
         tx: SyncSender<FragmentumToTranscribe>,
+        initial_offset_secs: f32,
     ) -> Result<(Option<PathBuf>, VADModel)> {
         // Destructure self to avoid partial move issues after moving recorder_config
         let Self {
@@ -284,6 +290,8 @@ impl Fractor {
 
         // Reset the entire session (including offset) for a fresh recording
         state.reset_session();
+        // When extending a folio, continue timestamps from the last fragmentum
+        state.recording_offset_secs = initial_offset_secs;
 
         // We always store audio because it is needed by STT implementation.
         // If not required to save it, we remove it at the end of the processing

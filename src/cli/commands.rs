@@ -167,9 +167,9 @@ pub async fn record_and_transcribe(
         "Press Esc or q to stop recording.".italic()
     );
 
-    // Run fractor in a separate thread
+    // Run fractor in a separate thread (0.0 = new recording, no timestamp offset)
     let fractor_handle =
-        thread::spawn(move || fractor.run(audio_dir, stop_signal_clone, pause_signal, tx));
+        thread::spawn(move || fractor.run(audio_dir, stop_signal_clone, pause_signal, tx, 0.0));
     let transcriber_handle = thread::spawn(move || {
         if let Some(transcription_file) = transcription_file {
             transcriber_to_file_worker(stt_model, transcription_file, rx)
