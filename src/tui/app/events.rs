@@ -179,15 +179,20 @@ impl EventHandler {
                 match app.current_region {
                     CurrentRegion::CodexAndFolio => {} // Already at leftmost
                     CurrentRegion::Fragmentum => {
-                        // Deselect fragmentum when leaving the region
-                        if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
-                            && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
-                            && let Some(selected_folio) =
-                                selected_codex.folia.get_mut(selected_folio_idx)
-                        {
-                            FragmentaComponent::remove_fragmentum_selection(selected_folio);
+                        // Block navigation during playback to prevent folio change (would desync playback)
+                        if !app.stt_tools.player.is_playing {
+                            // Deselect fragmentum when leaving the region
+                            if let Some(selected_codex) =
+                                app.codices_component.get_selected_codex_mut()
+                                && let Some(selected_folio_idx) =
+                                    selected_codex.folio_state.selected()
+                                && let Some(selected_folio) =
+                                    selected_codex.folia.get_mut(selected_folio_idx)
+                            {
+                                FragmentaComponent::remove_fragmentum_selection(selected_folio);
+                            }
+                            app.current_region = CurrentRegion::CodexAndFolio;
                         }
-                        app.current_region = CurrentRegion::CodexAndFolio;
                     }
                 }
             }
