@@ -1110,19 +1110,22 @@ impl Widget for &mut App {
                             .select(Some(folio.fragmenta.len() - 1));
                     }
                 }
-                // Animated dots: . .. ... cycling every ~400ms
-                let dots = self
-                    .recording_screen_start
-                    .map(|start| {
-                        let elapsed = start.elapsed().as_millis();
-                        let frame = (elapsed / 400) % 3;
-                        match frame {
-                            0 => ".",
-                            1 => "..",
-                            _ => "...",
-                        }
-                    })
-                    .unwrap_or(".");
+                // Animated dots: . .. ... cycling every ~400ms (only when recording, not paused)
+                let dots = if self.is_paused {
+                    ""
+                } else {
+                    self.recording_screen_start
+                        .map(|start| {
+                            let elapsed = start.elapsed().as_millis();
+                            let frame = (elapsed / 400) % 3;
+                            match frame {
+                                0 => ".",
+                                1 => "..",
+                                _ => "...",
+                            }
+                        })
+                        .unwrap_or(".")
+                };
                 RecordingScreen::render(
                     self.is_paused,
                     selected_folio.as_deref(),

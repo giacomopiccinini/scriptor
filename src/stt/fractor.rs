@@ -309,7 +309,7 @@ impl Fractor {
             let should_pause = pause_signal.load(Ordering::SeqCst);
 
             if should_pause && !is_paused {
-                // Entering pause state: flush buffer and pause stream
+                // Entering pause state: flush buffer (save pre-pause audio), then pause stream
                 Self::flush_current_buffer(
                     &mut recorder,
                     &mut state,
@@ -323,12 +323,21 @@ impl Fractor {
                 is_paused = true;
                 continue;
             } else if !should_pause && is_paused {
-                // Exiting pause state: resume stream
+                // Exiting pause state: resume stream, then discard stale audio.
+                // On Linux (PipeWire/PulseAudio), the OS buffers audio while "paused".
+                // When play() resumes, that buffered audio floods in.
+                // Discard it so
+                // speech said while paused does not appear after resume.
                 recorder.play().with_context(|| "Failed to resume stream")?;
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                recorder.clear_buffer();
                 is_paused = false;
                 continue;
             } else if is_paused {
-                // Still paused, sleep briefly to avoid busy-waiting
+                // Still paused. On some Linux backends (PipeWire/PulseAudio), cpal's pause()
+                // does not stop the stream callback, audio keeps accumulating in the ring buffer.
+                // Discard it so we don't process stale audio when resuming.
+                recorder.clear_buffer();
                 std::thread::sleep(std::time::Duration::from_millis(50));
                 continue;
             }
