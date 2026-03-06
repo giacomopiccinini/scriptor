@@ -90,10 +90,12 @@ impl EventHandler {
                 }
             }
 
-            // Delete folio or codex, depending on which one is selected
+            // Delete folio or codex - open confirmation popup
             (KeyCode::Char('d'), KeyModifiers::NONE) => {
-                if let Err(e) = app.codices_component.delete_selected(&app.pool).await {
-                    eprintln!("Failed to delete: {}", e);
+                match app.codices_component.get_selected_codex_and_folio() {
+                    (Some(_), Some(_)) => app.enter_delete_folio_screen(),
+                    (Some(_), None) => app.enter_delete_codex_screen(),
+                    (None, _) => {}
                 }
             }
 
@@ -651,6 +653,65 @@ impl EventHandler {
                     // If no match, do nothing and stay in popup
                     // That is, don't exit until the user gets the name right
                     // or exits with esc on purpose
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Handle key press from user in delete codex screen
+    pub async fn handle_delete_codex_screen_key(app: &mut App, key: KeyEvent) {
+        match (key.code, key.modifiers) {
+            (KeyCode::Char('a'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_start(),
+            (KeyCode::Char('e'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_end(),
+            (KeyCode::Esc, KeyModifiers::NONE) => app.exit_delete_codex_or_folio_without_saving(),
+            (KeyCode::Backspace, KeyModifiers::NONE) => app.input_state.remove_char_before_cursor(),
+            (KeyCode::Delete, KeyModifiers::NONE) => app.input_state.delete_char_after_cursor(),
+            (KeyCode::Char(value), KeyModifiers::NONE)
+            | (KeyCode::Char(value), KeyModifiers::SHIFT) => app.input_state.add_char(value),
+            (KeyCode::Left, KeyModifiers::NONE) => app.input_state.move_cursor_left(),
+            (KeyCode::Right, KeyModifiers::NONE) => app.input_state.move_cursor_right(),
+            (KeyCode::Enter, KeyModifiers::NONE) => {
+                if let (Some(codex), None) = app.codices_component.get_selected_codex_and_folio() {
+                    let typed = app.input_state.get_text().trim();
+                    if typed == codex.codex.name {
+                        if let Err(e) = app.codices_component.delete_selected(&app.pool).await {
+                            eprintln!("Failed to delete codex: {}", e);
+                        } else {
+                            app.current_screen = CurrentScreen::Main;
+                            app.input_state.clear();
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Handle key press from user in delete folio screen
+    pub async fn handle_delete_folio_screen_key(app: &mut App, key: KeyEvent) {
+        match (key.code, key.modifiers) {
+            (KeyCode::Char('a'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_start(),
+            (KeyCode::Char('e'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_end(),
+            (KeyCode::Esc, KeyModifiers::NONE) => app.exit_delete_codex_or_folio_without_saving(),
+            (KeyCode::Backspace, KeyModifiers::NONE) => app.input_state.remove_char_before_cursor(),
+            (KeyCode::Delete, KeyModifiers::NONE) => app.input_state.delete_char_after_cursor(),
+            (KeyCode::Char(value), KeyModifiers::NONE)
+            | (KeyCode::Char(value), KeyModifiers::SHIFT) => app.input_state.add_char(value),
+            (KeyCode::Left, KeyModifiers::NONE) => app.input_state.move_cursor_left(),
+            (KeyCode::Right, KeyModifiers::NONE) => app.input_state.move_cursor_right(),
+            (KeyCode::Enter, KeyModifiers::NONE) => {
+                if let (Some(_), Some(folio)) = app.codices_component.get_selected_codex_and_folio()
+                {
+                    let typed = app.input_state.get_text().trim();
+                    if typed == folio.folio.name {
+                        if let Err(e) = app.codices_component.delete_selected(&app.pool).await {
+                            eprintln!("Failed to delete folio: {}", e);
+                        } else {
+                            app.current_screen = CurrentScreen::Main;
+                            app.input_state.clear();
+                        }
+                    }
                 }
             }
             _ => {}

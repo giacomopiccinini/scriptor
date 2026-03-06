@@ -12,8 +12,8 @@ use crate::tui::app::events::EventHandler;
 use crate::tui::db::connections::init_db;
 use crate::tui::ui::components::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, CodicesComponent,
-    DeleteArchivumPopUp, FragmentaComponent, InputState, ModifyArchivumPopUp, ModifyCodexPopUp,
-    ModifyFolioPopUp, RecordingScreen, SettingsScreen,
+    DeleteArchivumPopUp, DeleteCodexPopUp, DeleteFolioPopUp, FragmentaComponent, InputState,
+    ModifyArchivumPopUp, ModifyCodexPopUp, ModifyFolioPopUp, RecordingScreen, SettingsScreen,
 };
 use crate::tui::ui::cursor::CursorState;
 use crate::tui::ui::layout::AppLayout;
@@ -56,6 +56,10 @@ pub enum CurrentScreen {
     ModifyArchivum,
     /// Pop-up for deleting an archivum (confirmation required)
     DeleteArchivum,
+    /// Pop-up for deleting a codex (confirmation required)
+    DeleteCodex,
+    /// Pop-up for deleting a folio (confirmation required)
+    DeleteFolio,
     /// Settings screen for configuring input device and VAD threshold
     Settings,
 }
@@ -536,6 +540,12 @@ impl App {
             CurrentScreen::DeleteArchivum => {
                 EventHandler::handle_delete_archivum_screen_key(self, key).await
             }
+            CurrentScreen::DeleteCodex => {
+                EventHandler::handle_delete_codex_screen_key(self, key).await
+            }
+            CurrentScreen::DeleteFolio => {
+                EventHandler::handle_delete_folio_screen_key(self, key).await
+            }
             CurrentScreen::Settings => EventHandler::handle_settings_screen_key(self, key).await,
         }
     }
@@ -640,6 +650,24 @@ impl App {
     /// Exit the Delete Archivum screen without saving
     pub fn exit_delete_archivum_without_saving(&mut self) {
         self.current_screen = CurrentScreen::ChangeArchivum;
+        self.input_state.clear();
+    }
+
+    /// Enter the "Delete Codex" screen by opening the confirmation pop-up
+    pub fn enter_delete_codex_screen(&mut self) {
+        self.input_state = InputState::default();
+        self.current_screen = CurrentScreen::DeleteCodex;
+    }
+
+    /// Enter the "Delete Folio" screen by opening the confirmation pop-up
+    pub fn enter_delete_folio_screen(&mut self) {
+        self.input_state = InputState::default();
+        self.current_screen = CurrentScreen::DeleteFolio;
+    }
+
+    /// Exit the Delete Codex or Folio screen without saving
+    pub fn exit_delete_codex_or_folio_without_saving(&mut self) {
+        self.current_screen = CurrentScreen::Main;
         self.input_state.clear();
     }
 
@@ -1028,6 +1056,30 @@ impl Widget for &mut App {
                         &self.input_state,
                         &archivum.name,
                         fragmenta_area,
+                        buf,
+                        theme,
+                    );
+                }
+            }
+            CurrentScreen::DeleteCodex => {
+                if let (Some(codex), None) = self.codices_component.get_selected_codex_and_folio() {
+                    DeleteCodexPopUp::render(
+                        &self.input_state,
+                        &codex.codex.name,
+                        codices_area,
+                        buf,
+                        theme,
+                    );
+                }
+            }
+            CurrentScreen::DeleteFolio => {
+                if let (Some(_codex), Some(folio)) =
+                    self.codices_component.get_selected_codex_and_folio()
+                {
+                    DeleteFolioPopUp::render(
+                        &self.input_state,
+                        &folio.folio.name,
+                        codices_area,
                         buf,
                         theme,
                     );
