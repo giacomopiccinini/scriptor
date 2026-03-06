@@ -335,6 +335,7 @@ impl EventHandler {
 
                     // Reset playback file index tracker
                     app.last_playback_file_index = 0;
+                    app.playback_start_fragmentum_idx = Some(fragmentum_idx);
 
                     // Play audio
                     app.stt_tools.player.play().expect("Unable to play");
