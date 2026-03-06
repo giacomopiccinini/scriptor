@@ -13,7 +13,7 @@ const LIST_HIGHLIGHT_SYMBOL: &str = "  ";
 const OPEN_CODEX_SYMBOL: &str = "❖";
 const CLOSED_CODEX_SYMBOL: &str = "◆";
 const CODEX_COMMANDS_INLINE: &str = "[r]ec  [i]mport  [m]od  [d]el  ";
-const FOLIO_COMMANDS_INLINE: &str = "[m]od  [d]el  ";
+const FOLIO_COMMANDS_INLINE: &str = "[e]xtend  [m]od  [d]el  ";
 
 /// Component for managing and displaying codices (projects)
 pub struct CodicesComponent {

@@ -426,6 +426,23 @@ impl Fragmentum {
         Ok(fragmenta)
     }
 
+    /// Returns the maximum `timestamp_end` among fragmenta in the given folio.
+    /// Used when extending a folio to continue timestamps from the last fragmentum.
+    /// Returns 0.0 if the folio has no fragmenta or all timestamps are NULL.
+    pub async fn get_max_timestamp_end_for_folio(pool: &SqlitePool, folio_id: i64) -> Result<f32> {
+        let result: Option<Option<f64>> = sqlx::query_scalar(
+            "SELECT MAX(timestamp_end) FROM fragmentum WHERE folio_id = ?1 AND timestamp_end IS NOT NULL",
+        )
+        .bind(folio_id)
+        .fetch_optional(pool)
+        .await
+        .with_context(|| "Failed to fetch max timestamp for folio")?;
+
+        let max_ts = result.flatten().map(|v| v as f32).unwrap_or(0.0);
+
+        Ok(max_ts)
+    }
+
     /// Get fragmentum by specific id
     pub async fn get_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Fragmentum>> {
         let fragmentum = sqlx::query_as::<_, Fragmentum>(
