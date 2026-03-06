@@ -216,3 +216,45 @@ impl DeleteArchivumPopUp {
         );
     }
 }
+
+pub struct DeleteCodexPopUp;
+
+impl DeleteCodexPopUp {
+    /// Render popup for confirming codex deletion
+    pub fn render<T: CursorState>(
+        state: &T,
+        codex_name: &str,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &ThemeConfig,
+    ) {
+        render_popup_kernel(
+            state,
+            area,
+            buf,
+            &format!("Type '{}' to delete", codex_name),
+            theme,
+        );
+    }
+}
+
+pub struct DeleteFolioPopUp;
+
+impl DeleteFolioPopUp {
+    /// Render popup for confirming folio deletion
+    pub fn render<T: CursorState>(
+        state: &T,
+        folio_name: &str,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &ThemeConfig,
+    ) {
+        render_popup_kernel(
+            state,
+            area,
+            buf,
+            &format!("Type '{}' to delete", folio_name),
+            theme,
+        );
+    }
+}

@@ -16,7 +16,7 @@ pub use input_states::InputState;
 pub use overlay_window::OverlayWindow;
 pub use popups::{
     AddArchivumPopUp, AddCodexPopUp, AddFolioPopUp, ChangeArchivumPopUp, DeleteArchivumPopUp,
-    ModifyArchivumPopUp, ModifyCodexPopUp, ModifyFolioPopUp,
+    DeleteCodexPopUp, DeleteFolioPopUp, ModifyArchivumPopUp, ModifyCodexPopUp, ModifyFolioPopUp,
 };
 pub use recording::RecordingScreen;
 pub use settings::SettingsScreen;
