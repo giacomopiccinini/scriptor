@@ -50,3 +50,60 @@ pub fn append_text_raw(path: &Path, text: &str) -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_file_if_not_exists_creates() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("new_file.txt");
+        assert!(!path.exists());
+        let created = create_file_if_not_exists(&path).unwrap();
+        assert!(created);
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn test_create_file_if_not_exists_already_exists() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("existing.txt");
+        std::fs::write(&path, "content").unwrap();
+        let created = create_file_if_not_exists(&path).unwrap();
+        assert!(!created);
+    }
+
+    #[test]
+    fn test_create_file_if_not_exists_creates_parent_dirs() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir
+            .path()
+            .join("subdir")
+            .join("nested")
+            .join("file.txt");
+        assert!(!path.exists());
+        create_file_if_not_exists(&path).unwrap();
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn test_append_text() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("append.txt");
+        append_text(&path, "line1").unwrap();
+        append_text(&path, "line2").unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(content, "line1\nline2\n");
+    }
+
+    #[test]
+    fn test_append_text_raw() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("append_raw.txt");
+        append_text_raw(&path, "part1").unwrap();
+        append_text_raw(&path, "part2").unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(content, "part1part2");
+    }
+}

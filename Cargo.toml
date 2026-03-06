@@ -57,6 +57,7 @@ strip = true
 
 [dev-dependencies]
 color-eyre = "0.6.5"
+tempfile = "3.16"
 directories = "6.0.0"
 lazy_static = "1.5.0"
 tracing = "0.1.41"

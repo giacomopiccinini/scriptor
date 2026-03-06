@@ -56,3 +56,46 @@ impl STTConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_available_stt_model_as_key() {
+        assert_eq!(
+            AvailableSTTModel::ParakeetTdt06BV3Fp32.as_key(),
+            "parakeet-tdt-0_6b-v3-fp32"
+        );
+        assert_eq!(
+            AvailableSTTModel::ParakeetTdt06BV3Int8.as_key(),
+            "parakeet-tdt-0_6b-v3-int8"
+        );
+    }
+
+    #[test]
+    fn test_available_stt_model_from_key() {
+        assert_eq!(
+            AvailableSTTModel::from_key("parakeet-tdt-0_6b-v3-fp32"),
+            AvailableSTTModel::ParakeetTdt06BV3Fp32
+        );
+        assert_eq!(
+            AvailableSTTModel::from_key("parakeet-tdt-0_6b-v3-int8"),
+            AvailableSTTModel::ParakeetTdt06BV3Int8
+        );
+        assert_eq!(
+            AvailableSTTModel::from_key("unknown"),
+            AvailableSTTModel::default()
+        );
+    }
+
+    #[test]
+    fn test_as_key_from_key_roundtrip() {
+        for model in [
+            AvailableSTTModel::ParakeetTdt06BV3Fp32,
+            AvailableSTTModel::ParakeetTdt06BV3Int8,
+        ] {
+            assert_eq!(AvailableSTTModel::from_key(model.as_key()), model);
+        }
+    }
+}

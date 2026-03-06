@@ -3170,6 +3170,7 @@ dependencies = [
  "serde",
  "spinoff",
  "sqlx",
+ "tempfile",
  "textwrap",
  "tokio",
  "toml",
