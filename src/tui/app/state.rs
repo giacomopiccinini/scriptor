@@ -1105,13 +1105,12 @@ impl Widget for &mut App {
                         None
                     };
                 // Autoscroll: ensure last fragmentum is selected for background
-                if let Some(ref mut folio) = selected_folio {
-                    if !folio.fragmenta.is_empty() {
+                if let Some(ref mut folio) = selected_folio
+                    && !folio.fragmenta.is_empty() {
                         folio
                             .fragmentum_state
                             .select(Some(folio.fragmenta.len() - 1));
                     }
-                }
                 // Animated dots: . .. ... cycling every ~400ms (only when recording, not paused)
                 let dots = if self.is_paused {
                     ""
