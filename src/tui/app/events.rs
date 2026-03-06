@@ -67,8 +67,14 @@ impl EventHandler {
             // Add new codex
             (KeyCode::Char('n'), KeyModifiers::NONE) => app.enter_add_codex_screen(),
 
-            // Add new item
-            (KeyCode::Char('i'), KeyModifiers::NONE) => app.enter_add_folio_screen(),
+            // Add new item (import folio)
+            (KeyCode::Char('i'), KeyModifiers::NONE) => {
+                if let (true, false) | (true, true) =
+                    app.codices_component.check_codex_folio_selection()
+                {
+                    app.enter_add_folio_screen();
+                }
+            }
 
             // Change archivum
             (KeyCode::Char('a'), KeyModifiers::NONE) => app.enter_change_archivum_screen(),
@@ -515,6 +521,36 @@ impl EventHandler {
                     } else {
                         app.current_screen = CurrentScreen::Main;
                         app.input_state.clear();
+
+                        // Post-import UI updates for new folio: select, expand, scroll
+                        let codex = app
+                            .codices_component
+                            .get_selected_codex_mut()
+                            .expect("Codex should exist");
+                        let folio_count = codex.folia.len();
+                        let previous_folio_idx = codex.folio_state.selected();
+                        codex.expand();
+                        let scroll_amount = if folio_count > 0 {
+                            codex.folio_state.select(Some(folio_count - 1));
+                            if let Some(selected_folio) = codex.folia.get_mut(folio_count - 1) {
+                                if !selected_folio.fragmenta.is_empty() {
+                                    selected_folio
+                                        .fragmentum_state
+                                        .select(Some(selected_folio.fragmenta.len() - 1));
+                                }
+                            }
+                            match previous_folio_idx {
+                                None => folio_count as u16,
+                                Some(k) => (folio_count - 1 - k) as u16,
+                            }
+                        } else {
+                            0
+                        };
+                        if scroll_amount > 0 {
+                            app.codices_component
+                                .list_state
+                                .scroll_down_by(scroll_amount);
+                        }
                     }
                 }
             }
