@@ -8,7 +8,7 @@ use crate::tui::ui::components::{
     CodicesComponent, FoliaComponent, FragmentaComponent, format_timestamp,
 };
 use crate::tui::ui::cursor::CursorState;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use arboard::Clipboard;
 #[cfg(target_os = "linux")]
 use arboard::SetExtLinux;
@@ -21,7 +21,7 @@ pub struct EventHandler;
 
 impl EventHandler {
     /// Handle key press from user in main screen
-    pub async fn handle_main_screen_key(app: &mut App, key: KeyEvent) {
+    pub async fn handle_main_screen_key(app: &mut App, key: KeyEvent) -> Result<()> {
         match (key.code, key.modifiers) {
             // Quit application
             (KeyCode::Char('q'), KeyModifiers::NONE) => app.exit = true,
@@ -114,25 +114,21 @@ impl EventHandler {
                     match app.codices_component.get_selected_codex_and_folio() {
                         // Folio selected - move folio down
                         (Some(_), Some(_)) => {
-                            if let Err(e) = CodicesComponent::move_selected_folio_down(
+                            CodicesComponent::move_selected_folio_down(
                                 &mut app.codices_component,
                                 &app.pool,
                             )
                             .await
-                            {
-                                eprintln!("Failed to move folio down: {}", e);
-                            }
+                            .with_context(|| "Failed to move folio down")?;
                         }
                         // Only codex selected - move codex down
                         (Some(_), None) => {
-                            if let Err(e) = CodicesComponent::move_selected_codex_down(
+                            CodicesComponent::move_selected_codex_down(
                                 &mut app.codices_component,
                                 &app.pool,
                             )
                             .await
-                            {
-                                eprintln!("Failed to move codex down: {}", e);
-                            }
+                            .with_context(|| "Failed to move codex down")?;
                         }
                         // Nothing selected
                         _ => {}
@@ -147,25 +143,21 @@ impl EventHandler {
                     match app.codices_component.get_selected_codex_and_folio() {
                         // Folio selected - move folio up
                         (Some(_), Some(_)) => {
-                            if let Err(e) = CodicesComponent::move_selected_folio_up(
+                            CodicesComponent::move_selected_folio_up(
                                 &mut app.codices_component,
                                 &app.pool,
                             )
                             .await
-                            {
-                                eprintln!("Failed to move folio up: {}", e);
-                            }
+                            .with_context(|| "Failed to move folio up")?;
                         }
                         // Only codex selected - move codex up
                         (Some(_), None) => {
-                            if let Err(e) = CodicesComponent::move_selected_codex_up(
+                            CodicesComponent::move_selected_codex_up(
                                 &mut app.codices_component,
                                 &app.pool,
                             )
                             .await
-                            {
-                                eprintln!("Failed to move codex up: {}", e);
-                            }
+                            .with_context(|| "Failed to move codex up")?;
                         }
                         // Nothing selected
                         _ => {}
@@ -222,10 +214,12 @@ impl EventHandler {
                 if let (true, false) | (true, true) =
                     app.codices_component.check_codex_folio_selection()
                 {
-                    let codex = app
-                        .codices_component
-                        .get_selected_codex_mut()
-                        .expect("Codex should exist but can't be reached");
+                    let codex =
+                        app.codices_component
+                            .get_selected_codex_mut()
+                            .ok_or_else(|| {
+                                anyhow::anyhow!("Codex should exist but can't be reached")
+                            })?;
                     let codex_id = codex.codex.id;
 
                     // Create new folio with datetime name
@@ -236,7 +230,7 @@ impl EventHandler {
                     };
                     let folio = Folio::create(&app.pool, new_folio)
                         .await
-                        .expect("Unable to import folio to archivum");
+                        .with_context(|| "Unable to import folio to archivum")?;
                     let folio_id = folio.id;
 
                     if let (Some(fractor), Some(stt_model)) =
@@ -246,18 +240,18 @@ impl EventHandler {
                             app, fractor, stt_model, codex_id, folio_id, false,
                         )
                         .await
-                        .expect("Unable to start recording");
+                        .with_context(|| "Unable to start recording")?;
 
                         {
                             // Post-recording UI updates for new folio: refresh, select, expand, scroll
                             let codex = app
                                 .codices_component
                                 .get_selected_codex_mut()
-                                .expect("Codex should exist");
+                                .ok_or_else(|| anyhow::anyhow!("Codex should exist"))?;
                             codex
                                 .update_folia(&app.pool)
                                 .await
-                                .expect("Unable to update folia");
+                                .with_context(|| "Unable to update folia")?;
 
                             let folio_count = codex.folia.len();
                             let previous_folio_idx = codex.folio_state.selected();
@@ -305,7 +299,7 @@ impl EventHandler {
                             app, fractor, stt_model, codex_id, folio_id, true,
                         )
                         .await
-                        .expect("Unable to extend recording");
+                        .with_context(|| "Unable to extend recording")?;
                     }
                 }
             }
@@ -316,7 +310,7 @@ impl EventHandler {
                     app.stt_tools
                         .player
                         .pause()
-                        .expect("Unable to pause player");
+                        .with_context(|| "Unable to pause player")?;
                 } else if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
                     && let Some(selected_folio_idx) = selected_codex.folio_state.selected()
                     && let Some(selected_folio) = selected_codex.folia.get_mut(selected_folio_idx)
@@ -330,20 +324,23 @@ impl EventHandler {
                         ui_fragmentum.fragmentum.id,
                     )
                     .await
-                    .expect("Unable to fetch audio paths");
+                    .with_context(|| "Unable to fetch audio paths")?;
 
                     // Add files to player queue
                     app.stt_tools
                         .player
                         .load_files(audio_paths)
-                        .expect("Unable to enqueue fragmenta to player queue");
+                        .with_context(|| "Unable to enqueue fragmenta to player queue")?;
 
                     // Reset playback file index tracker
                     app.last_playback_file_index = 0;
                     app.playback_start_fragmentum_idx = Some(fragmentum_idx);
 
                     // Play audio
-                    app.stt_tools.player.play().expect("Unable to play");
+                    app.stt_tools
+                        .player
+                        .play()
+                        .with_context(|| "Unable to play")?;
                 }
             }
 
@@ -440,57 +437,79 @@ impl EventHandler {
 
             _ => {}
         }
+        Ok(())
     }
 
     /// Handle key press from user in add codex screen
-    pub async fn handle_add_or_modify_codex_screen_key(app: &mut App, key: KeyEvent) {
+    pub async fn handle_add_or_modify_codex_screen_key(app: &mut App, key: KeyEvent) -> Result<()> {
         match (key.code, key.modifiers) {
-            (KeyCode::Char('a'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_start(),
-            (KeyCode::Char('e'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_end(),
-            (KeyCode::Esc, KeyModifiers::NONE) => app.exit_add_or_modify_codex_without_saving(),
-            (KeyCode::Backspace, KeyModifiers::NONE) => app.input_state.remove_char_before_cursor(),
-            (KeyCode::Delete, KeyModifiers::NONE) => app.input_state.delete_char_after_cursor(),
+            (KeyCode::Char('a'), KeyModifiers::CONTROL) => {
+                app.input_state.move_cursor_to_start();
+                Ok(())
+            }
+            (KeyCode::Char('e'), KeyModifiers::CONTROL) => {
+                app.input_state.move_cursor_to_end();
+                Ok(())
+            }
+            (KeyCode::Esc, KeyModifiers::NONE) => {
+                app.exit_add_or_modify_codex_without_saving();
+                Ok(())
+            }
+            (KeyCode::Backspace, KeyModifiers::NONE) => {
+                app.input_state.remove_char_before_cursor();
+                Ok(())
+            }
+            (KeyCode::Delete, KeyModifiers::NONE) => {
+                app.input_state.delete_char_after_cursor();
+                Ok(())
+            }
             (KeyCode::Char(value), KeyModifiers::NONE)
-            | (KeyCode::Char(value), KeyModifiers::SHIFT) => app.input_state.add_char(value),
-            (KeyCode::Left, KeyModifiers::NONE) => app.input_state.move_cursor_left(),
-            (KeyCode::Right, KeyModifiers::NONE) => app.input_state.move_cursor_right(),
+            | (KeyCode::Char(value), KeyModifiers::SHIFT) => {
+                app.input_state.add_char(value);
+                Ok(())
+            }
+            (KeyCode::Left, KeyModifiers::NONE) => {
+                app.input_state.move_cursor_left();
+                Ok(())
+            }
+            (KeyCode::Right, KeyModifiers::NONE) => {
+                app.input_state.move_cursor_right();
+                Ok(())
+            }
             (KeyCode::Enter, KeyModifiers::NONE) => {
                 let codex_name = app.input_state.get_text().to_string();
                 // Only do something if the codex has a name
                 if !codex_name.trim().is_empty() {
                     if app.input_state.is_modifying {
-                        if let Err(e) = CodicesComponent::update_codex(
+                        CodicesComponent::update_codex(
                             &mut app.codices_component,
                             codex_name,
                             &app.pool,
                         )
                         .await
-                        {
-                            eprintln!("Failed to update codex: {}", e);
-                        } else {
-                            app.current_screen = CurrentScreen::Main;
-                            app.input_state.clear();
-                        }
-                    } else if let Err(e) = CodicesComponent::create_codex(
-                        &mut app.codices_component,
-                        codex_name,
-                        &app.pool,
-                    )
-                    .await
-                    {
-                        eprintln!("Failed to create codex: {}", e);
+                        .with_context(|| "Failed to update codex")?;
+                        app.current_screen = CurrentScreen::Main;
+                        app.input_state.clear();
                     } else {
+                        CodicesComponent::create_codex(
+                            &mut app.codices_component,
+                            codex_name,
+                            &app.pool,
+                        )
+                        .await
+                        .with_context(|| "Failed to create codex")?;
                         app.current_screen = CurrentScreen::Main;
                         app.input_state.clear();
                     }
                 }
+                Ok(())
             }
-            _ => {}
+            _ => Ok(()),
         }
     }
 
     /// Handle key press from user in add folio screen
-    pub async fn handle_add_or_modify_folio_screen_key(app: &mut App, key: KeyEvent) {
+    pub async fn handle_add_or_modify_folio_screen_key(app: &mut App, key: KeyEvent) -> Result<()> {
         match (key.code, key.modifiers) {
             (KeyCode::Char('a'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_start(),
             (KeyCode::Char('e'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_end(),
@@ -507,24 +526,20 @@ impl EventHandler {
                     && let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
                 {
                     if app.input_state.is_modifying {
-                        if let Err(e) =
-                            FoliaComponent::update_item(selected_codex, folio_name, &app.pool).await
-                        {
-                            eprintln!("Failed to update item: {}", e);
-                        } else {
-                            app.current_screen = CurrentScreen::Main;
-                            app.input_state.clear();
-                        }
-                    } else if let Err(e) = FoliaComponent::create_item(
-                        selected_codex,
-                        folio_name,
-                        &mut app.stt_tools,
-                        &app.pool,
-                    )
-                    .await
-                    {
-                        eprintln!("Failed to create item: {}", e);
+                        FoliaComponent::update_item(selected_codex, folio_name, &app.pool)
+                            .await
+                            .with_context(|| "Failed to update item")?;
+                        app.current_screen = CurrentScreen::Main;
+                        app.input_state.clear();
                     } else {
+                        FoliaComponent::create_item(
+                            selected_codex,
+                            folio_name,
+                            &mut app.stt_tools,
+                            &app.pool,
+                        )
+                        .await
+                        .with_context(|| "Failed to create item")?;
                         app.current_screen = CurrentScreen::Main;
                         app.input_state.clear();
 
@@ -532,7 +547,7 @@ impl EventHandler {
                         let codex = app
                             .codices_component
                             .get_selected_codex_mut()
-                            .expect("Codex should exist");
+                            .ok_or_else(|| anyhow::anyhow!("Codex should exist"))?;
                         let folio_count = codex.folia.len();
                         let previous_folio_idx = codex.folio_state.selected();
                         codex.expand();
@@ -562,18 +577,19 @@ impl EventHandler {
             }
             _ => {}
         }
+        Ok(())
     }
 
     /// Handle change of archivum
-    pub async fn handle_change_archivum_screen_key(app: &mut App, key: KeyEvent) {
+    pub async fn handle_change_archivum_screen_key(app: &mut App, key: KeyEvent) -> Result<()> {
         match key.code {
             KeyCode::Esc => app.exit_change_archivum_without_saving(),
             KeyCode::Up => app.select_previous_archivum(),
             KeyCode::Down => app.select_next_archivum(),
             KeyCode::Enter => {
-                if let Err(e) = app.switch_to_selected_archivum().await {
-                    eprintln!("Failed to switch archivum: {}", e);
-                }
+                app.switch_to_selected_archivum()
+                    .await
+                    .with_context(|| "Failed to switch archivum")?;
             }
             KeyCode::Char('a') => app.enter_add_archivum_screen(),
             KeyCode::Char('m') => {
@@ -589,16 +605,20 @@ impl EventHandler {
             }
             KeyCode::Char('s') => {
                 // Set selected archivum as default
-                if let Err(e) = app.set_selected_archivum_as_default().await {
-                    eprintln!("Failed to set archivum as default: {}", e);
-                }
+                app.set_selected_archivum_as_default()
+                    .await
+                    .with_context(|| "Failed to set archivum as default")?;
             }
             _ => {}
         }
+        Ok(())
     }
 
     /// Handle key press from user in add or modify archivum screen
-    pub async fn handle_add_or_modify_archivum_screen_key(app: &mut App, key: KeyEvent) {
+    pub async fn handle_add_or_modify_archivum_screen_key(
+        app: &mut App,
+        key: KeyEvent,
+    ) -> Result<()> {
         match (key.code, key.modifiers) {
             (KeyCode::Char('a'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_start(),
             (KeyCode::Char('e'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_end(),
@@ -619,15 +639,14 @@ impl EventHandler {
                 let archivum_name = app.input_state.get_text().to_string();
                 if !archivum_name.trim().is_empty() {
                     if app.input_state.is_modifying {
-                        if let Err(e) = app.rename_archivum(archivum_name) {
-                            eprintln!("Failed to rename archivum: {}", e);
-                        } else {
-                            app.current_screen = CurrentScreen::ChangeArchivum;
-                            app.input_state.clear();
-                        }
-                    } else if let Err(e) = app.create_new_archivum(archivum_name, false).await {
-                        eprintln!("Failed to create archivum: {}", e);
+                        app.rename_archivum(archivum_name)
+                            .with_context(|| "Failed to rename archivum")?;
+                        app.current_screen = CurrentScreen::ChangeArchivum;
+                        app.input_state.clear();
                     } else {
+                        app.create_new_archivum(archivum_name, false)
+                            .await
+                            .with_context(|| "Failed to create archivum")?;
                         app.current_screen = CurrentScreen::ChangeArchivum;
                         app.input_state.clear();
                     }
@@ -635,10 +654,11 @@ impl EventHandler {
             }
             _ => {}
         }
+        Ok(())
     }
 
     /// Handle key press from user in delete archivum screen
-    pub async fn handle_delete_archivum_screen_key(app: &mut App, key: KeyEvent) {
+    pub async fn handle_delete_archivum_screen_key(app: &mut App, key: KeyEvent) -> Result<()> {
         match (key.code, key.modifiers) {
             (KeyCode::Char('a'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_start(),
             (KeyCode::Char('e'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_end(),
@@ -654,12 +674,11 @@ impl EventHandler {
                     let typed = app.input_state.get_text().trim();
                     // AWS inspired: delete only if the typed in text matches the actual name
                     if typed == archivum.name {
-                        if let Err(e) = app.delete_archivum().await {
-                            eprintln!("Failed to delete archivum: {}", e);
-                        } else {
-                            app.current_screen = CurrentScreen::ChangeArchivum;
-                            app.input_state.clear();
-                        }
+                        app.delete_archivum()
+                            .await
+                            .with_context(|| "Failed to delete archivum")?;
+                        app.current_screen = CurrentScreen::ChangeArchivum;
+                        app.input_state.clear();
                     }
                     // If no match, do nothing and stay in popup
                     // That is, don't exit until the user gets the name right
@@ -668,10 +687,11 @@ impl EventHandler {
             }
             _ => {}
         }
+        Ok(())
     }
 
     /// Handle key press from user in delete codex screen
-    pub async fn handle_delete_codex_screen_key(app: &mut App, key: KeyEvent) {
+    pub async fn handle_delete_codex_screen_key(app: &mut App, key: KeyEvent) -> Result<()> {
         match (key.code, key.modifiers) {
             (KeyCode::Char('a'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_start(),
             (KeyCode::Char('e'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_end(),
@@ -686,21 +706,22 @@ impl EventHandler {
                 if let (Some(codex), None) = app.codices_component.get_selected_codex_and_folio() {
                     let typed = app.input_state.get_text().trim();
                     if typed == codex.codex.name {
-                        if let Err(e) = app.codices_component.delete_selected(&app.pool).await {
-                            eprintln!("Failed to delete codex: {}", e);
-                        } else {
-                            app.current_screen = CurrentScreen::Main;
-                            app.input_state.clear();
-                        }
+                        app.codices_component
+                            .delete_selected(&app.pool)
+                            .await
+                            .with_context(|| "Failed to delete codex")?;
+                        app.current_screen = CurrentScreen::Main;
+                        app.input_state.clear();
                     }
                 }
             }
             _ => {}
         }
+        Ok(())
     }
 
     /// Handle key press from user in delete folio screen
-    pub async fn handle_delete_folio_screen_key(app: &mut App, key: KeyEvent) {
+    pub async fn handle_delete_folio_screen_key(app: &mut App, key: KeyEvent) -> Result<()> {
         match (key.code, key.modifiers) {
             (KeyCode::Char('a'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_start(),
             (KeyCode::Char('e'), KeyModifiers::CONTROL) => app.input_state.move_cursor_to_end(),
@@ -716,21 +737,22 @@ impl EventHandler {
                 {
                     let typed = app.input_state.get_text().trim();
                     if typed == folio.folio.name {
-                        if let Err(e) = app.codices_component.delete_selected(&app.pool).await {
-                            eprintln!("Failed to delete folio: {}", e);
-                        } else {
-                            app.current_screen = CurrentScreen::Main;
-                            app.input_state.clear();
-                        }
+                        app.codices_component
+                            .delete_selected(&app.pool)
+                            .await
+                            .with_context(|| "Failed to delete folio")?;
+                        app.current_screen = CurrentScreen::Main;
+                        app.input_state.clear();
                     }
                 }
             }
             _ => {}
         }
+        Ok(())
     }
 
     /// Handle key press from user in recording screen
-    pub async fn handle_record_folio_screen_key(app: &mut App, key: KeyEvent) {
+    pub async fn handle_record_folio_screen_key(app: &mut App, key: KeyEvent) -> Result<()> {
         match key.code {
             // Toggle pause/resume
             KeyCode::Char(' ') => {
@@ -752,8 +774,8 @@ impl EventHandler {
                 let vad_model = if let Some(fractor_handle) = app.fractor_handle.take() {
                     let (_temp_dir, vad) = fractor_handle
                         .join()
-                        .expect("Recording thread panicked")
-                        .expect("Recording failed");
+                        .map_err(|_| anyhow::anyhow!("Recording thread panicked"))?
+                        .with_context(|| "Recording failed")?;
                     Some(vad)
                 } else {
                     None
@@ -762,8 +784,8 @@ impl EventHandler {
                 let stt_model = if let Some(transcriber_handle) = app.transcriber_handle.take() {
                     let stt = transcriber_handle
                         .join()
-                        .expect("Transcribing thread panicked")
-                        .expect("Transcribing failed");
+                        .map_err(|_| anyhow::anyhow!("Transcribing thread panicked"))?
+                        .with_context(|| "Transcribing failed")?;
                     Some(stt)
                 } else {
                     None
@@ -773,16 +795,18 @@ impl EventHandler {
                 if let Some(selected_codex) = app.codices_component.get_selected_codex_mut()
                     && let Some(folio_idx) = selected_codex.folio_state.selected()
                     && let Some(selected_folio) = selected_codex.folia.get_mut(folio_idx)
-                    && let Err(e) = selected_folio.update_fragmenta(&app.pool).await
                 {
-                    eprintln!("Failed to refresh fragmenta: {}", e);
+                    selected_folio
+                        .update_fragmenta(&app.pool)
+                        .await
+                        .with_context(|| "Failed to refresh fragmenta")?;
                 }
 
                 // Restore STT tools using the returned models (no reloading from disk!)
-                if let (Some(vad), Some(stt)) = (vad_model, stt_model)
-                    && let Err(e) = app.stt_tools.restore_from_recording(&app.config, vad, stt)
-                {
-                    eprintln!("Failed to restore STT tools: {}", e);
+                if let (Some(vad), Some(stt)) = (vad_model, stt_model) {
+                    app.stt_tools
+                        .restore_from_recording(&app.config, vad, stt)
+                        .with_context(|| "Failed to restore STT tools")?;
                 }
 
                 // Clear recording state
@@ -801,10 +825,11 @@ impl EventHandler {
 
             _ => {}
         }
+        Ok(())
     }
 
     /// Handle key press from user in settings screen
-    pub async fn handle_settings_screen_key(app: &mut App, key: KeyEvent) {
+    pub async fn handle_settings_screen_key(app: &mut App, key: KeyEvent) -> Result<()> {
         match (key.code, key.modifiers) {
             // Discard changes and return to main screen
             (KeyCode::Char('d'), KeyModifiers::NONE) => {
@@ -813,16 +838,16 @@ impl EventHandler {
 
             // Save to session only (don't write to file)
             (KeyCode::Char('s'), KeyModifiers::NONE) => {
-                if let Err(e) = app.save_settings_to_session().await {
-                    eprintln!("Failed to save settings to session: {}", e);
-                }
+                app.save_settings_to_session()
+                    .await
+                    .with_context(|| "Failed to save settings to session")?;
             }
 
             // Save as default (write to file)
             (KeyCode::Char('S'), KeyModifiers::SHIFT) => {
-                if let Err(e) = app.save_settings_as_default().await {
-                    eprintln!("Failed to save settings as default: {}", e);
-                }
+                app.save_settings_as_default()
+                    .await
+                    .with_context(|| "Failed to save settings as default")?;
             }
 
             // Move to previous field
@@ -883,6 +908,7 @@ impl EventHandler {
 
             _ => {}
         }
+        Ok(())
     }
 
     /// Starts the recording pipeline for a folio.
@@ -899,12 +925,12 @@ impl EventHandler {
     ) -> Result<()> {
         // Output directory: audios/{codex_id}/{folio_id}
         let output_dir = dirs::data_dir()
-            .expect("Unable to get data directory")
+            .ok_or_else(|| anyhow::anyhow!("Unable to get data directory"))?
             .join("scriptor")
             .join("audios")
             .join(format!("{:04}", codex_id))
             .join(format!("{:04}", folio_id));
-        fs::create_dir_all(&output_dir).expect("Unable to create audio directory");
+        fs::create_dir_all(&output_dir).with_context(|| "Unable to create audio directory")?;
 
         // When extending, continue timestamps from the last fragmentum
         let initial_offset_secs = if is_extending {

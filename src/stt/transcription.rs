@@ -184,8 +184,8 @@ fn create_word(tokens: &[Token]) -> Word {
         };
     }
 
-    let t_start = tokens.first().unwrap().t_start;
-    let t_end = tokens.last().unwrap().t_end;
+    let t_start = tokens.first().expect("non-empty tokens").t_start;
+    let t_end = tokens.last().expect("non-empty tokens").t_end;
 
     // Combine tokens, removing word boundary markers
     let text = tokens
@@ -249,8 +249,8 @@ fn create_segment(words: &[Word]) -> Segment {
         };
     }
 
-    let t_start = words.first().unwrap().t_start;
-    let t_end = words.last().unwrap().t_end;
+    let t_start = words.first().expect("non-empty words").t_start;
+    let t_end = words.last().expect("non-empty words").t_end;
 
     let text = words
         .iter()

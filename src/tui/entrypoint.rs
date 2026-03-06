@@ -1,5 +1,5 @@
 use crate::tui::app::App;
-use color_eyre::Result;
+use anyhow::Result;
 
 /// Application entry point
 ///
@@ -10,7 +10,7 @@ pub async fn run_tui() -> Result<()> {
     let mut terminal = ratatui::init();
 
     // Set up the app
-    let app = App::new().await;
+    let app = App::new().await?;
 
     // Create and run the app
     let app_result = app.run(&mut terminal).await;

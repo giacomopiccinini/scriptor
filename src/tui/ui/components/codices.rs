@@ -118,7 +118,9 @@ impl CodicesComponent {
                             self.codex_state.select_next();
                             selected_codex.folio_state.select(None);
                         }
-                    } else if selected_folio_idx.unwrap() < n_folia - 1 {
+                    } else if selected_folio_idx.expect("folio selected in this branch")
+                        < n_folia - 1
+                    {
                         self.list_state.select_next();
                         selected_codex.folio_state.select_next();
                     } else if has_next_codex {
@@ -323,13 +325,17 @@ impl CodicesComponent {
 
         // A codex must be selected, or else neither a folio nor a codex are selected
         if codex_to_delete.is_some() {
-            // There has to be a valid codex idx, we can unwrap
-            let codex_idx = self.codex_state.selected().unwrap();
+            let codex_idx = self
+                .codex_state
+                .selected()
+                .expect("codex selected when codex_to_delete is some");
 
             // If also a folio is selected
             if let Some(folio) = folio_to_delete {
-                // There has to be a valid folio idx, we can unwrap
-                let folio_idx = self.codices[codex_idx].folio_state.selected().unwrap();
+                let folio_idx = self.codices[codex_idx]
+                    .folio_state
+                    .selected()
+                    .expect("folio selected when folio_to_delete is some");
 
                 // Remove from list and database
                 self.select_previous();

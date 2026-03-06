@@ -389,7 +389,7 @@ impl Fractor {
                         }
                     }
                     Err(e) => {
-                        eprintln!("VAD prediction error: {e}");
+                        tracing::error!("VAD prediction error: {e}");
                     }
                 }
             }

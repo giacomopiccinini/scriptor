@@ -36,7 +36,8 @@ where
     let s = String::deserialize(deserializer)?;
 
     // Try to parse as hex color, fall back to default background on error
-    Color::from_str(&s).or_else(|_| Ok(Color::from_str(DEFAULT_PAGE_COLOR).unwrap()))
+    Color::from_str(&s)
+        .or_else(|_| Ok(Color::from_str(DEFAULT_PAGE_COLOR).expect("valid default page color")))
 }
 
 /// Deserialize foreground color with fallback to default
@@ -47,7 +48,9 @@ where
     let s = String::deserialize(deserializer)?;
 
     // Try to parse as hex color, fall back to default foreground on error
-    Color::from_str(&s).or_else(|_| Ok(Color::from_str(DEFAULT_DARK_SHADOW_COLOR).unwrap()))
+    Color::from_str(&s).or_else(|_| {
+        Ok(Color::from_str(DEFAULT_DARK_SHADOW_COLOR).expect("valid default dark shadow color"))
+    })
 }
 
 /// Deserialize highlight color with fallback to default
@@ -58,7 +61,9 @@ where
     let s = String::deserialize(deserializer)?;
 
     // Try to parse as hex color, fall back to default highlight on error
-    Color::from_str(&s).or_else(|_| Ok(Color::from_str(DEFAULT_HIGHLIGHT_COLOR).unwrap()))
+    Color::from_str(&s).or_else(|_| {
+        Ok(Color::from_str(DEFAULT_HIGHLIGHT_COLOR).expect("valid default highlight color"))
+    })
 }
 
 /// Theme configuration
@@ -99,12 +104,17 @@ pub struct ThemeConfig {
 impl Default for ThemeConfig {
     fn default() -> Self {
         Self {
-            page: Color::from_str(DEFAULT_PAGE_COLOR).unwrap(),
-            light_shadow: Color::from_str(DEFAULT_LIGHT_SHADOW_COLOR).unwrap(),
-            medium_shadow: Color::from_str(DEFAULT_MEDIUM_SHADOW_COLOR).unwrap(),
-            dark_shadow: Color::from_str(DEFAULT_DARK_SHADOW_COLOR).unwrap(),
-            very_dark_shadow: Color::from_str(DEFAULT_VERY_DARK_SHADOW_COLOR).unwrap(),
-            highlight: Color::from_str(DEFAULT_HIGHLIGHT_COLOR).unwrap(),
+            page: Color::from_str(DEFAULT_PAGE_COLOR).expect("valid default page color"),
+            light_shadow: Color::from_str(DEFAULT_LIGHT_SHADOW_COLOR)
+                .expect("valid default light shadow color"),
+            medium_shadow: Color::from_str(DEFAULT_MEDIUM_SHADOW_COLOR)
+                .expect("valid default medium shadow color"),
+            dark_shadow: Color::from_str(DEFAULT_DARK_SHADOW_COLOR)
+                .expect("valid default dark shadow color"),
+            very_dark_shadow: Color::from_str(DEFAULT_VERY_DARK_SHADOW_COLOR)
+                .expect("valid default very dark shadow color"),
+            highlight: Color::from_str(DEFAULT_HIGHLIGHT_COLOR)
+                .expect("valid default highlight color"),
         }
     }
 }
