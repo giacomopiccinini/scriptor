@@ -23,9 +23,9 @@ Scriptor is a fully local, real-time speech-to-text tool. You speak into your mi
 
 Scriptor has two distinct interfaces. Run it with no arguments and you get the TUI. Pass a command and you get the CLI.
 
-**CLI** — Quick, throwaway transcription. You speak, it dumps the transcription to stdout. Nothing gets saved unless you explicitly ask for it: not the text, not the audio. Useful when you just want to capture something fast without any persistence.
+**CLI**. Quick, throwaway transcription. You speak, it dumps the transcription to stdout. Nothing gets saved unless you explicitly ask for it: not the text, not the audio. Useful when you just want to capture something fast without any persistence.
 
-**TUI** — A persistence layer for accumulating and organizing knowledge over time. Built for those moments when you've spent months on a project and have a ton of context in your head, but sitting down to write it all out would take forever. With Scriptor's TUI, you just talk. Everything gets captured, organized by project and date, stored in a local SQLite database, and available for playback later.
+**TUI**. A persistence layer for accumulating and organizing knowledge over time. Built for those moments when you've spent months on a project and have a ton of context in your head, but sitting down to write it all out would take forever. With Scriptor's TUI, you just talk. Everything gets captured, organized by project and date, stored in a local SQLite database, and available for playback later.
 
 Under the hood: Rust, NVIDIA Parakeet (ONNX) for speech-to-text, Silero VAD for splitting audio at natural pause points. Models are downloaded automatically on first run.
 
@@ -33,10 +33,10 @@ Under the hood: Rust, NVIDIA Parakeet (ONNX) for speech-to-text, Silero VAD for 
 
 Since this is a tool about capturing spoken knowledge, the naming reflects a medieval monk transcribing in a scriptorium:
 
-- **Codex** — A project
-- **Folio** — An audio recording
-- **Fragmentum** — A small chunk of transcribed audio
-- **Archivum** — The database, the archive of everything
+- **Codex**: A project
+- **Folio**: An audio recording
+- **Fragmentum**: A small chunk of transcribed audio
+- **Archivum**: The database, the archive of everything
 
 ## Installation
 
