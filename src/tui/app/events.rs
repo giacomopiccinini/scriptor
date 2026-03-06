@@ -259,11 +259,12 @@ impl EventHandler {
                             let scroll_amount = if folio_count > 0 {
                                 codex.folio_state.select(Some(folio_count - 1));
                                 if let Some(selected_folio) = codex.folia.get_mut(folio_count - 1)
-                                    && !selected_folio.fragmenta.is_empty() {
-                                        selected_folio
-                                            .fragmentum_state
-                                            .select(Some(selected_folio.fragmenta.len() - 1));
-                                    }
+                                    && !selected_folio.fragmenta.is_empty()
+                                {
+                                    selected_folio
+                                        .fragmentum_state
+                                        .select(Some(selected_folio.fragmenta.len() - 1));
+                                }
                                 match previous_folio_idx {
                                     None => folio_count as u16,
                                     Some(k) => (folio_count - 1 - k) as u16,
@@ -553,11 +554,12 @@ impl EventHandler {
                         let scroll_amount = if folio_count > 0 {
                             codex.folio_state.select(Some(folio_count - 1));
                             if let Some(selected_folio) = codex.folia.get_mut(folio_count - 1)
-                                && !selected_folio.fragmenta.is_empty() {
-                                    selected_folio
-                                        .fragmentum_state
-                                        .select(Some(selected_folio.fragmenta.len() - 1));
-                                }
+                                && !selected_folio.fragmenta.is_empty()
+                            {
+                                selected_folio
+                                    .fragmentum_state
+                                    .select(Some(selected_folio.fragmenta.len() - 1));
+                            }
                             match previous_folio_idx {
                                 None => folio_count as u16,
                                 Some(k) => (folio_count - 1 - k) as u16,
