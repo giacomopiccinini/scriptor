@@ -346,8 +346,6 @@ impl CodicesComponent {
                 self.codices.remove(codex_idx);
                 codex.delete(pool).await?;
             }
-
-            // self.select_previous();
         }
 
         Ok(())

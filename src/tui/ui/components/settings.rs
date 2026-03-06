@@ -419,49 +419,6 @@ impl SettingsScreen {
         let paragraph = Paragraph::new(lines).block(block).style(base_style);
 
         paragraph.render(area, buf);
-        // let block = Block::default().padding(Padding::new(2, 2, 1, 0));
-
-        // // Build the gauge visualization
-        // let gauge_width = 20;
-        // let duration = settings_state.pause_threshold_in_chunks;
-        // let filled = ((duration * gauge_width as u32) as usize).min(gauge_width);
-        // let empty = gauge_width - filled;
-
-        // // Create gauge string: [========>--------]
-        // let gauge_filled: String = "=".repeat(filled.saturating_sub(1));
-        // let gauge_pointer = if filled > 0 { ">" } else { "" };
-        // let gauge_empty: String = "-".repeat(empty);
-
-        // // When active, swap colors (bg = highlight, fg = background)
-        // let (base_style, text_style, accent_style) = if is_active {
-        //     (
-        //         Style::default().bg(theme.highlight),
-        //         Style::default().fg(theme.page),
-        //         Style::default().fg(theme.page),
-        //     )
-        // } else {
-        //     (
-        //         Style::default().bg(theme.page),
-        //         Style::default().fg(theme.dark_shadow),
-        //         Style::default().fg(theme.highlight),
-        //     )
-        // };
-
-        // let gauge_line = Line::from(vec![
-        //     Span::styled("Pause Duration: ", text_style),
-        //     Span::styled("[", text_style),
-        //     Span::styled(gauge_filled, accent_style),
-        //     Span::styled(gauge_pointer, accent_style),
-        //     Span::styled(gauge_empty, text_style),
-        //     Span::styled("] ", text_style),
-        //     Span::styled(format!("{:.2}", duration), accent_style),
-        // ]);
-
-        // let lines = vec![gauge_line];
-
-        // let paragraph = Paragraph::new(lines).block(block).style(base_style);
-
-        // paragraph.render(area, buf);
     }
 
     fn render_stt_model_field(
