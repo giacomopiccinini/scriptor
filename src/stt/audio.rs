@@ -304,3 +304,148 @@ pub fn wav_spec_from_config(config: &SupportedStreamConfig) -> hound::WavSpec {
         sample_format,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_temp_wav_mono(samples: &[f32], sr: u32) -> (tempfile::TempDir, std::path::PathBuf) {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("test.wav");
+        let spec = WavSpec {
+            channels: 1,
+            sample_rate: sr,
+            bits_per_sample: 16,
+            sample_format: SampleFormat::Int,
+        };
+        let mut writer = WavWriter::create(&path, spec).unwrap();
+        let max_val = 32767.0;
+        for &s in samples {
+            writer
+                .write_sample((s.clamp(-1.0, 1.0) * max_val) as i16)
+                .unwrap();
+        }
+        writer.finalize().unwrap();
+        (temp_dir, path)
+    }
+
+    #[test]
+    fn test_convert_to_mono_identity() {
+        let samples = vec![0.5, 0.3, -0.2];
+        let result = convert_to_mono(samples.clone(), 1);
+        assert_eq!(result, samples);
+    }
+
+    #[test]
+    fn test_convert_to_mono_stereo() {
+        let samples = vec![1.0, 1.0, 0.0, 0.0, -0.5, 0.5];
+        let result = convert_to_mono(samples, 2);
+        assert_eq!(result, vec![1.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_convert_to_stereo_identity() {
+        let samples = vec![0.5, 0.3, -0.2];
+        let result = convert_to_stereo(samples.clone(), 2);
+        assert_eq!(result, samples);
+    }
+
+    #[test]
+    fn test_convert_to_stereo_from_mono() {
+        let samples = vec![0.5, 0.3];
+        let result = convert_to_stereo(samples, 1);
+        assert_eq!(result, vec![0.5, 0.5, 0.3, 0.3]);
+    }
+
+    #[test]
+    fn test_resample_identity() {
+        let samples = vec![0.1, 0.2, 0.3];
+        let result = resample(samples.clone(), 16000, 16000).unwrap();
+        assert_eq!(result, samples);
+    }
+
+    #[test]
+    fn test_resample_downsample() {
+        let samples: Vec<f32> = (0..3200).map(|i| (i as f32 / 3200.0) * 0.5).collect();
+        let result = resample(samples, 16000, 8000).unwrap();
+        assert_eq!(result.len(), 1600);
+    }
+
+    #[test]
+    fn test_read_audio_roundtrip() {
+        let original = vec![0.5, -0.3, 0.0, 0.8];
+        let (_temp, path) = create_temp_wav_mono(&original, 16000);
+        let (read, spec) = read_audio(&path).unwrap();
+        assert_eq!(spec.channels, 1);
+        assert_eq!(spec.sample_rate, 16000);
+        assert_eq!(read.len(), 4);
+        for (a, b) in original.iter().zip(read.iter()) {
+            assert!((a - b).abs() < 1e-4, "expected {} got {}", a, b);
+        }
+    }
+
+    #[test]
+    fn test_read_audio_file_mono() {
+        let samples = vec![0.1, 0.2, 0.3];
+        let (_temp, path) = create_temp_wav_mono(&samples, 44100);
+        let (read, sr) = read_audio_file_mono(&path).unwrap();
+        assert_eq!(sr, 44100);
+        assert_eq!(read.len(), 3);
+    }
+
+    #[test]
+    fn test_read_audio_file_mono_unsupported_channels() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("multichannel.wav");
+        let spec = WavSpec {
+            channels: 4,
+            sample_rate: 16000,
+            bits_per_sample: 16,
+            sample_format: SampleFormat::Int,
+        };
+        let mut writer = WavWriter::create(&path, spec).unwrap();
+        for _ in 0..64000 {
+            writer.write_sample(0i16).unwrap();
+        }
+        writer.finalize().unwrap();
+        assert!(read_audio_file_mono(&path).is_err());
+    }
+
+    #[test]
+    fn test_write_wav_roundtrip() {
+        let samples = vec![0.5, -0.5, 0.0];
+        let spec = WavSpec {
+            channels: 1,
+            sample_rate: 16000,
+            bits_per_sample: 16,
+            sample_format: SampleFormat::Int,
+        };
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("out.wav");
+        write_wav(samples.clone(), spec, &path).unwrap();
+        let (read, _) = read_audio(&path).unwrap();
+        assert_eq!(read.len(), 3);
+        for (a, b) in samples.iter().zip(read.iter()) {
+            assert!((a - b).abs() < 1e-3);
+        }
+    }
+
+    #[test]
+    fn test_write_mono_wav_roundtrip() {
+        let samples = vec![0.25, -0.25];
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("mono.wav");
+        write_mono_wav(samples.clone(), 16000, 16, &path).unwrap();
+        let (read, sr) = read_audio_file_mono(&path).unwrap();
+        assert_eq!(sr, 16000);
+        assert_eq!(read.len(), 2);
+    }
+
+    #[test]
+    fn test_write_mono_wav_unsupported_bits() {
+        let samples = vec![0.5];
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("bad.wav");
+        assert!(write_mono_wav(samples, 16000, 4, &path).is_err());
+    }
+}

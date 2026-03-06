@@ -23,3 +23,16 @@ impl Default for FractorConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fractor_config_default() {
+        let config = FractorConfig::default();
+        assert_eq!(config.min_fragmentum_duration_seconds, 10.0);
+        assert_eq!(config.max_fragmentum_duration_seconds, 20.0);
+        assert_eq!(config.pause_threshold_in_chunks, 24);
+    }
+}

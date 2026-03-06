@@ -56,3 +56,32 @@ impl VADConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_available_vad_model_as_key() {
+        assert_eq!(AvailableVADModel::Silero.as_key(), "silero-v5");
+    }
+
+    #[test]
+    fn test_available_vad_model_from_key() {
+        assert_eq!(
+            AvailableVADModel::from_key("silero-v5"),
+            AvailableVADModel::Silero
+        );
+        assert_eq!(
+            AvailableVADModel::from_key("unknown"),
+            AvailableVADModel::default()
+        );
+    }
+
+    #[test]
+    fn test_vad_config_default() {
+        let config = VADConfig::default();
+        assert_eq!(config.model, AvailableVADModel::Silero);
+        assert!((config.threshold - 0.1).abs() < 1e-6);
+    }
+}

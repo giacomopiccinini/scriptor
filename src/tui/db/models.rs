@@ -81,3 +81,29 @@ impl UICodex {
         self.is_expanded = true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    #[test]
+    fn test_uicodex_expand() {
+        let codex = Codex {
+            id: 1,
+            name: "Test".to_string(),
+            ordering: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let mut ui_codex = UICodex {
+            codex: codex.clone(),
+            folio_state: ListState::default(),
+            folia: vec![],
+            is_expanded: false,
+        };
+        assert!(!ui_codex.is_expanded);
+        ui_codex.expand();
+        assert!(ui_codex.is_expanded);
+    }
+}

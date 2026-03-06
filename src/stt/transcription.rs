@@ -266,3 +266,80 @@ fn create_segment(words: &[Word]) -> Segment {
         words: words.to_vec(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_result(tokens: &[&str], timestamps: &[f32]) -> TimestampedResult {
+        TimestampedResult {
+            text: tokens.join(""),
+            tokens: tokens.iter().map(|s| (*s).to_string()).collect(),
+            timestamps: timestamps.to_vec(),
+        }
+    }
+
+    #[test]
+    fn test_convert_timestamps_token() {
+        let result = make_result(&["hello", " world", "."], &[0.0, 0.5, 1.0]);
+        let segments = convert_timestamps(&result, TimestampGranularity::Token);
+        assert_eq!(segments.len(), 3);
+        assert_eq!(segments[0].text, "hello");
+        assert_eq!(segments[0].start, 0.0);
+        assert_eq!(segments[0].end, 0.5);
+        assert_eq!(segments[1].text, " world");
+        assert_eq!(segments[2].text, ".");
+        assert_eq!(segments[2].end, 1.05); // fallback +0.05
+    }
+
+    #[test]
+    fn test_convert_timestamps_word() {
+        let result = make_result(&["▁hello", "▁world"], &[0.0, 0.3, 0.6]);
+        let segments = convert_timestamps(&result, TimestampGranularity::Word);
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].text, "hello");
+        assert_eq!(segments[0].start, 0.0);
+        assert_eq!(segments[0].end, 0.3);
+        assert_eq!(segments[1].text, "world");
+        assert_eq!(segments[1].end, 0.6);
+    }
+
+    #[test]
+    fn test_convert_timestamps_word_space_prefix() {
+        let result = make_result(&[" hello", " world"], &[0.0, 0.5, 1.0]);
+        let segments = convert_timestamps(&result, TimestampGranularity::Word);
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].text, "hello");
+        assert_eq!(segments[1].text, "world");
+    }
+
+    #[test]
+    fn test_convert_timestamps_segment() {
+        let result = make_result(
+            &["▁Hello", "▁world", ".", " ", "▁How", "▁are", "▁you", "?"],
+            &[0.0, 0.2, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2],
+        );
+        let segments = convert_timestamps(&result, TimestampGranularity::Segment);
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].text, "Hello world.");
+        assert_eq!(segments[0].start, 0.0);
+        // Segment end is the end of the last word (including punctuation)
+        assert!(segments[0].end >= 0.4 && segments[0].end <= 0.6);
+        assert_eq!(segments[1].text, "How are you?");
+    }
+
+    #[test]
+    fn test_convert_timestamps_segment_no_punctuation() {
+        let result = make_result(&["▁Hello", "▁world"], &[0.0, 0.5, 1.0]);
+        let segments = convert_timestamps(&result, TimestampGranularity::Segment);
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].text, "Hello world");
+    }
+
+    #[test]
+    fn test_convert_timestamps_empty_tokens_filtered() {
+        let result = make_result(&["▁hello", " ", "", "▁world"], &[0.0, 0.2, 0.3, 0.5]);
+        let segments = convert_timestamps(&result, TimestampGranularity::Word);
+        assert!(segments.len() >= 1);
+    }
+}

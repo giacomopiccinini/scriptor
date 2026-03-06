@@ -135,3 +135,27 @@ impl ScriptorConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scriptor_config_default() {
+        let config = ScriptorConfig::default();
+        assert_eq!(config.dbs.len(), 1);
+    }
+
+    #[test]
+    fn test_scriptor_config_write_read_roundtrip() {
+        let config = ScriptorConfig::default();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let config_path = temp_dir.path().join("scriptor.toml");
+
+        config.write(&config_path).unwrap();
+        let content = fs::read_to_string(&config_path).unwrap();
+        let parsed: ScriptorConfig = toml::from_str(&content).unwrap();
+
+        assert_eq!(parsed.dbs.len(), config.dbs.len());
+    }
+}

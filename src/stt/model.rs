@@ -189,3 +189,124 @@ impl Transcription {
         chunks
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_split_text_empty() {
+        let t = Transcription {
+            text: String::new(),
+            segments: None,
+        };
+        assert_eq!(t.split_text(10), Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_split_text_single_sentence() {
+        let t = Transcription {
+            text: "Hello world.".to_string(),
+            segments: None,
+        };
+        assert_eq!(t.split_text(100), vec!["Hello world."]);
+    }
+
+    #[test]
+    fn test_split_text_multiple_sentences() {
+        let t = Transcription {
+            text: "First. Second! Third?".to_string(),
+            segments: None,
+        };
+        // Use small target_size to force splitting at sentence boundaries
+        assert_eq!(t.split_text(8), vec!["First.", "Second!", "Third?"]);
+    }
+
+    #[test]
+    fn test_split_text_respects_target_size() {
+        let t = Transcription {
+            text: "A. B. C. D.".to_string(),
+            segments: None,
+        };
+        let chunks = t.split_text(3);
+        assert!(chunks.len() >= 2);
+        for chunk in &chunks {
+            assert!(chunk.len() <= 4, "chunk '{}' exceeds size", chunk);
+        }
+    }
+
+    #[test]
+    fn test_split_with_timestamps_fallback_no_segments() {
+        let t = Transcription {
+            text: "Hello. World.".to_string(),
+            segments: None,
+        };
+        let chunks = t.split_with_timestamps(8);
+        assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks[0].text, "Hello.");
+        assert_eq!(chunks[0].start, 0.0);
+        assert_eq!(chunks[0].end, 0.0);
+    }
+
+    #[test]
+    fn test_split_with_timestamps_fallback_empty_segments() {
+        let t = Transcription {
+            text: "Hi.".to_string(),
+            segments: Some(vec![]),
+        };
+        let chunks = t.split_with_timestamps(100);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].text, "Hi.");
+    }
+
+    #[test]
+    fn test_split_with_timestamps_with_segments() {
+        let t = Transcription {
+            text: "Hello world. How are you?".to_string(),
+            segments: Some(vec![
+                SegmentTranscription {
+                    start: 0.0,
+                    end: 1.0,
+                    text: "Hello world.".to_string(),
+                },
+                SegmentTranscription {
+                    start: 1.0,
+                    end: 2.0,
+                    text: "How are you?".to_string(),
+                },
+            ]),
+        };
+        let chunks = t.split_with_timestamps(15);
+        assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks[0].text, "Hello world.");
+        assert_eq!(chunks[0].start, 0.0);
+        assert_eq!(chunks[0].end, 1.0);
+        assert_eq!(chunks[1].text, "How are you?");
+    }
+
+    #[test]
+    fn test_split_with_timestamps_chunks_by_size() {
+        let t = Transcription {
+            text: "A. B. C.".to_string(),
+            segments: Some(vec![
+                SegmentTranscription {
+                    start: 0.0,
+                    end: 0.5,
+                    text: "A.".to_string(),
+                },
+                SegmentTranscription {
+                    start: 0.5,
+                    end: 1.0,
+                    text: "B.".to_string(),
+                },
+                SegmentTranscription {
+                    start: 1.0,
+                    end: 1.5,
+                    text: "C.".to_string(),
+                },
+            ]),
+        };
+        let chunks = t.split_with_timestamps(3);
+        assert_eq!(chunks.len(), 3);
+    }
+}
