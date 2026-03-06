@@ -345,6 +345,11 @@ impl CodicesComponent {
                 self.select_previous();
                 self.codices.remove(codex_idx);
                 codex.delete(pool).await?;
+                // When deleting the last codex, clear selection to avoid stale state
+                if self.codices.is_empty() {
+                    self.codex_state.select(None);
+                    self.list_state.select(None);
+                }
             }
         }
 
@@ -366,6 +371,11 @@ impl CodicesComponent {
             is_expanded: false,
         };
         codices_component.codices.push(ui_codex);
+        // When adding to an empty list, select the new codex (fixes highlight after delete-last-then-create)
+        if codices_component.codices.len() == 1 {
+            codices_component.list_state.select_first();
+            codices_component.codex_state.select_first();
+        }
         Ok(())
     }
 
