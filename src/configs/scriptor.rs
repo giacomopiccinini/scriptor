@@ -62,7 +62,9 @@ impl ScriptorConfig {
     /// Read and serialize a scriptor.toml file
     pub fn read() -> Result<Self> {
         // Use config directory to standardize storage of config file
-        let config_dir = dirs::config_dir().unwrap().join("scriptor");
+        let config_dir = dirs::config_dir()
+            .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
+            .join("scriptor");
 
         // Define the config file path
         let config_path = config_dir.join("scriptor.toml");
@@ -100,8 +102,10 @@ impl ScriptorConfig {
     }
 
     /// Check for missing model files based on the selected STT and VAD models
-    pub fn check_missing(&self, available_models: &ModelsConfig) -> Option<Vec<PathBuf>> {
-        let scriptor_dir = dirs::data_dir().unwrap().join("scriptor");
+    pub fn check_missing(&self, available_models: &ModelsConfig) -> Result<Option<Vec<PathBuf>>> {
+        let scriptor_dir = dirs::data_dir()
+            .ok_or_else(|| anyhow::anyhow!("Could not find data directory"))?
+            .join("scriptor");
         let mut missing = Vec::new();
 
         // Check STT model files
@@ -128,11 +132,11 @@ impl ScriptorConfig {
             }
         }
 
-        if missing.is_empty() {
+        Ok(if missing.is_empty() {
             None
         } else {
             Some(missing)
-        }
+        })
     }
 }
 

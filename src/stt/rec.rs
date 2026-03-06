@@ -131,8 +131,8 @@ fn setup_recording(device_name: Option<&str>) -> Result<(Device, SupportedStream
         match found_device {
             Some(device) => device,
             None => {
-                eprintln!(
-                    "Warning: Configured device '{}' not found, using system default",
+                tracing::warn!(
+                    "Configured device '{}' not found, using system default",
                     name
                 );
                 host.default_input_device()
@@ -260,14 +260,14 @@ fn setup_audio_stream(
             let written = producer.push_slice(data);
             if written < data.len() {
                 // This means the consumer isn't keeping up - buffer overflow
-                eprintln!(
-                    "Warning: Ring buffer overflow! Dropped {} samples",
+                tracing::warn!(
+                    "Ring buffer overflow! Dropped {} samples",
                     data.len() - written
                 );
             }
         },
-        |err| eprintln!("Stream error: {err}"), // Closure for error function
-        None,                                   // Timeout
+        |err| tracing::error!("Stream error: {err}"),
+        None, // Timeout
     )?;
 
     // Explicitly pause the stream after creation.

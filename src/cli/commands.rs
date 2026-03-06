@@ -34,7 +34,7 @@ pub async fn transcribe_from_file(file: &Path) -> Result<()> {
     }
 
     // Read the config (creates default if missing)
-    let config = ScriptorConfig::read().expect("Failed to read config file");
+    let config = ScriptorConfig::read().with_context(|| "Failed to read config file")?;
 
     // Fetch the list of available models
     let available_models = match ModelsConfig::read() {
@@ -42,20 +42,20 @@ pub async fn transcribe_from_file(file: &Path) -> Result<()> {
         Err(_) => {
             download_models_list()
                 .await
-                .expect("Failed to download available models list");
-            ModelsConfig::read().expect("Failed to read models config after download")
+                .with_context(|| "Failed to download available models list")?;
+            ModelsConfig::read().with_context(|| "Failed to read models config after download")?
         }
     };
 
     // Check if files are missing and, if so, download them
-    if let Some(missing_files) = config.check_missing(&available_models) {
+    if let Some(missing_files) = config.check_missing(&available_models)? {
         let mut spinner = Spinner::new_with_stream(
             spinners::Dots,
             "Downloading models...",
             Color::Blue,
             Streams::Stderr,
         );
-        download_missing_files(&missing_files).await;
+        download_missing_files(&missing_files).await?;
         spinner.success("Models downloaded!");
     };
 
@@ -97,7 +97,7 @@ pub async fn record_and_transcribe(
     };
 
     // Read the config (creates default if missing)
-    let config = ScriptorConfig::read().expect("Failed to read config file");
+    let config = ScriptorConfig::read().with_context(|| "Failed to read config file")?;
 
     // Fetch the list of available models
     let available_models = match ModelsConfig::read() {
@@ -105,20 +105,20 @@ pub async fn record_and_transcribe(
         Err(_) => {
             download_models_list()
                 .await
-                .expect("Failed to download available models list");
-            ModelsConfig::read().expect("Failed to read models config after download")
+                .with_context(|| "Failed to download available models list")?;
+            ModelsConfig::read().with_context(|| "Failed to read models config after download")?
         }
     };
 
     // Check if files are missing and, if so, download them
-    if let Some(missing_files) = config.check_missing(&available_models) {
+    if let Some(missing_files) = config.check_missing(&available_models)? {
         let mut spinner = Spinner::new_with_stream(
             spinners::Dots,
             "Downloading models...",
             Color::Blue,
             Streams::Stderr,
         );
-        download_missing_files(&missing_files).await;
+        download_missing_files(&missing_files).await?;
         spinner.success("Models downloaded!");
     };
 
@@ -161,7 +161,7 @@ pub async fn record_and_transcribe(
 
     // Signal successful model loading
     spinner.success("Models loaded!");
-    eprintln!(
+    println!(
         "{} {}",
         "● [ON AIR]".red().bold(),
         "Press Esc or q to stop recording.".italic()
@@ -265,7 +265,7 @@ pub fn play(input: PathBuf) -> Result<()> {
     let mut player = Player::new(Some(files)).with_context(|| "Failed to create player")?;
     player.play().with_context(|| "Failed to play recordings")?;
 
-    eprintln!(
+    println!(
         "{} {}",
         "▶ Playing...".green().bold(),
         "[Space] play/pause | [Esc/q] exit".italic()

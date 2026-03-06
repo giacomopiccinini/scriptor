@@ -19,7 +19,7 @@ use crate::tui::ui::cursor::CursorState;
 use crate::tui::ui::layout::AppLayout;
 use crate::utils::aws::{ModelsConfig, download_missing_files, download_models_list};
 use anyhow::Context;
-use color_eyre::Result;
+use anyhow::Result;
 use crossterm::event::{self, KeyEvent};
 use ratatui::DefaultTerminal;
 use ratatui::buffer::Buffer;
@@ -193,9 +193,9 @@ impl App {
     ///
     /// Initializes the archivum connection, loads existing codices from the archivum,
     /// and sets up the initial UI state.
-    pub async fn new() -> Self {
+    pub async fn new() -> Result<Self> {
         // Read the config (creates default if missing)
-        let config = ScriptorConfig::read().expect("Failed to read config file");
+        let config = ScriptorConfig::read().with_context(|| "Failed to read config file")?;
 
         // Fetch the list of available models
         let available_models = match ModelsConfig::read() {
@@ -203,20 +203,21 @@ impl App {
             Err(_) => {
                 download_models_list()
                     .await
-                    .expect("Failed to download available models list");
-                ModelsConfig::read().expect("Failed to read models config after download")
+                    .with_context(|| "Failed to download available models list")?;
+                ModelsConfig::read()
+                    .with_context(|| "Failed to read models config after download")?
             }
         };
 
         // Check if files are missing and, if so, download them
-        if let Some(missing_files) = config.check_missing(&available_models) {
+        if let Some(missing_files) = config.check_missing(&available_models)? {
             let mut spinner = Spinner::new_with_stream(
                 spinners::Dots,
                 "Downloading models...",
                 Color::Blue,
                 Streams::Stderr,
             );
-            download_missing_files(&missing_files).await;
+            download_missing_files(&missing_files).await?;
             spinner.success("Models downloaded!");
         };
 
@@ -228,13 +229,13 @@ impl App {
             Color::Blue,
             Streams::Stderr,
         );
-        let stt_tools = STTTools::new(&config).expect("Failed to setup STT tools");
+        let stt_tools = STTTools::new(&config).with_context(|| "Failed to setup STT tools")?;
         spinner.success("STT tools loaded!");
 
         // Connect to default archivum (db)
         let pool = init_db(&config.default.db.connection_str)
             .await
-            .expect("Failed to connect to archivum");
+            .with_context(|| "Failed to connect to archivum")?;
 
         // Start from main screen
         let current_screen = CurrentScreen::Main;
@@ -244,10 +245,10 @@ impl App {
         codices_component
             .load_codices(&pool)
             .await
-            .expect("Failed to read codices");
+            .with_context(|| "Failed to read codices")?;
 
         // Return initial state of the app
-        Self {
+        Ok(Self {
             config,
             available_models,
             stt_tools,
@@ -272,7 +273,7 @@ impl App {
             settings_state: None,
             recording_list_state: ListState::default(),
             recording_screen_start: None,
-        }
+        })
     }
 
     /// Run the application
@@ -297,7 +298,7 @@ impl App {
             if event::poll(poll_timeout)?
                 && let Some(key) = event::read()?.as_key_press_event()
             {
-                self.handle_key_event(key).await;
+                self.handle_key_event(key).await?;
             }
 
             // Periodic refresh of fragmenta during recording
@@ -356,13 +357,13 @@ impl App {
     ) -> Result<()> {
         // Use data directory to standardize storage
         let data_dir = dirs::data_dir()
-            .ok_or_else(|| color_eyre::eyre::eyre!("Could not find data directory"))?
+            .ok_or_else(|| anyhow::anyhow!("Could not find data directory"))?
             .join("scriptor")
             .join("databases");
 
         // Create directory if it doesn't exist
         std::fs::create_dir_all(&data_dir)
-            .map_err(|e| color_eyre::eyre::eyre!("Failed to create data directory: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to create data directory: {}", e))?;
 
         // Create path to new archivum file
         let archivum_file = format!("{}.db", archivum_name);
@@ -380,7 +381,7 @@ impl App {
         // Initialize the new archivum (this creates the file and runs migrations)
         init_db(&connection_str)
             .await
-            .map_err(|e| color_eyre::eyre::eyre!("Failed to initialize new archivum: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to initialize new archivum: {}", e))?;
 
         // Add to config
         self.config.dbs.push(new_archivum_config);
@@ -392,13 +393,13 @@ impl App {
 
         // Write updated config to file
         let config_dir = dirs::config_dir()
-            .ok_or_else(|| color_eyre::eyre::eyre!("Could not find config directory"))?
+            .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
             .join("scriptor");
         let config_path = config_dir.join("scriptor.toml");
 
         self.config
             .write(&config_path)
-            .map_err(|e| color_eyre::eyre::eyre!("Failed to save config: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to save config: {}", e))?;
 
         // Update selected index to point to the new archivum
         self.selected_archivum_index = self.config.dbs.len() - 1;
@@ -412,23 +413,23 @@ impl App {
             .config
             .dbs
             .get(self.selected_archivum_index)
-            .ok_or_else(|| color_eyre::eyre::eyre!("No archivum selected"))?
+            .ok_or_else(|| anyhow::anyhow!("No archivum selected"))?
             .clone();
 
         let old_path = selected
             .connection_str
             .strip_prefix("sqlite:")
-            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid connection string"))?;
+            .ok_or_else(|| anyhow::anyhow!("Invalid connection string"))?;
         let old_path = std::path::Path::new(old_path);
 
         let parent_dir = old_path
             .parent()
-            .ok_or_else(|| color_eyre::eyre::eyre!("Could not get parent directory"))?;
+            .ok_or_else(|| anyhow::anyhow!("Could not get parent directory"))?;
         let new_path = parent_dir.join(format!("{}.db", new_name));
         let new_connection_str = format!("sqlite:{}", new_path.display());
 
         std::fs::rename(old_path, &new_path)
-            .map_err(|e| color_eyre::eyre::eyre!("Failed to rename archivum file: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to rename archivum file: {}", e))?;
 
         let new_archivum_config = DBConfig {
             name: new_name.clone(),
@@ -441,13 +442,13 @@ impl App {
         }
 
         let config_dir = dirs::config_dir()
-            .ok_or_else(|| color_eyre::eyre::eyre!("Could not find config directory"))?
+            .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
             .join("scriptor");
         let config_path = config_dir.join("scriptor.toml");
 
         self.config
             .write(&config_path)
-            .map_err(|e| color_eyre::eyre::eyre!("Failed to save config: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to save config: {}", e))?;
 
         Ok(())
     }
@@ -456,7 +457,7 @@ impl App {
     pub async fn delete_archivum(&mut self) -> Result<()> {
         // Last archivum cannot be deleted
         if self.config.dbs.len() == 1 {
-            return Err(color_eyre::eyre::eyre!("Cannot delete the last archivum"));
+            return Err(anyhow::anyhow!("Cannot delete the last archivum"));
         }
 
         // Get the selected db
@@ -464,18 +465,18 @@ impl App {
             .config
             .dbs
             .get(self.selected_archivum_index)
-            .ok_or_else(|| color_eyre::eyre::eyre!("No archivum selected"))?
+            .ok_or_else(|| anyhow::anyhow!("No archivum selected"))?
             .clone();
 
         // Extract the path to the DB fro the connection string
         let file_path = selected
             .connection_str
             .strip_prefix("sqlite:")
-            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid connection string"))?;
+            .ok_or_else(|| anyhow::anyhow!("Invalid connection string"))?;
 
         // Delete the file
         std::fs::remove_file(file_path)
-            .map_err(|e| color_eyre::eyre::eyre!("Failed to delete archivum file: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to delete archivum file: {}", e))?;
 
         // Flag to signal if the deleted db was the actual default or not
         // In this case, we would need to promote an existing db to default
@@ -494,14 +495,14 @@ impl App {
                 .config
                 .dbs
                 .first()
-                .ok_or_else(|| color_eyre::eyre::eyre!("No archivum remaining"))?
+                .ok_or_else(|| anyhow::anyhow!("No archivum remaining"))?
                 .clone();
 
             self.config.default.db = new_default.clone();
 
             let new_pool = init_db(&new_default.connection_str)
                 .await
-                .map_err(|e| color_eyre::eyre::eyre!("Failed to connect to archivum: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to connect to archivum: {}", e))?;
 
             self.pool = new_pool;
 
@@ -509,51 +510,52 @@ impl App {
             self.codices_component
                 .load_codices(&self.pool)
                 .await
-                .map_err(|e| color_eyre::eyre::eyre!("Failed to load codices: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to load codices: {}", e))?;
         }
 
         let config_dir = dirs::config_dir()
-            .ok_or_else(|| color_eyre::eyre::eyre!("Could not find config directory"))?
+            .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
             .join("scriptor");
         let config_path = config_dir.join("scriptor.toml");
 
         self.config
             .write(&config_path)
-            .map_err(|e| color_eyre::eyre::eyre!("Failed to save config: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to save config: {}", e))?;
 
         Ok(())
     }
 
     /// Handle key events and delegate to appropriate handler
-    async fn handle_key_event(&mut self, key: KeyEvent) {
+    async fn handle_key_event(&mut self, key: KeyEvent) -> Result<()> {
         match self.current_screen {
-            CurrentScreen::Main => EventHandler::handle_main_screen_key(self, key).await,
+            CurrentScreen::Main => EventHandler::handle_main_screen_key(self, key).await?,
             CurrentScreen::AddCodex | CurrentScreen::ModifyCodex => {
-                EventHandler::handle_add_or_modify_codex_screen_key(self, key).await
+                EventHandler::handle_add_or_modify_codex_screen_key(self, key).await?
             }
             CurrentScreen::AddFolio | CurrentScreen::ModifyFolio => {
-                EventHandler::handle_add_or_modify_folio_screen_key(self, key).await
+                EventHandler::handle_add_or_modify_folio_screen_key(self, key).await?
             }
             CurrentScreen::RecordFolio => {
-                EventHandler::handle_record_folio_screen_key(self, key).await
+                EventHandler::handle_record_folio_screen_key(self, key).await?
             }
             CurrentScreen::ChangeArchivum => {
-                EventHandler::handle_change_archivum_screen_key(self, key).await
+                EventHandler::handle_change_archivum_screen_key(self, key).await?
             }
             CurrentScreen::AddArchivum | CurrentScreen::ModifyArchivum => {
-                EventHandler::handle_add_or_modify_archivum_screen_key(self, key).await
+                EventHandler::handle_add_or_modify_archivum_screen_key(self, key).await?
             }
             CurrentScreen::DeleteArchivum => {
-                EventHandler::handle_delete_archivum_screen_key(self, key).await
+                EventHandler::handle_delete_archivum_screen_key(self, key).await?
             }
             CurrentScreen::DeleteCodex => {
-                EventHandler::handle_delete_codex_screen_key(self, key).await
+                EventHandler::handle_delete_codex_screen_key(self, key).await?
             }
             CurrentScreen::DeleteFolio => {
-                EventHandler::handle_delete_folio_screen_key(self, key).await
+                EventHandler::handle_delete_folio_screen_key(self, key).await?
             }
-            CurrentScreen::Settings => EventHandler::handle_settings_screen_key(self, key).await,
+            CurrentScreen::Settings => EventHandler::handle_settings_screen_key(self, key).await?,
         }
+        Ok(())
     }
 
     /// Enter the "Add Codex" screen by opening the corresponding pop-up
@@ -703,7 +705,7 @@ impl App {
             // Initialize connection to the new archivum
             let new_pool = init_db(&selected_archivum.connection_str)
                 .await
-                .map_err(|e| color_eyre::eyre::eyre!("Failed to connect to archivum: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to connect to archivum: {}", e))?;
 
             // Update app state
             self.config.default.db = selected_archivum.clone();
@@ -714,7 +716,7 @@ impl App {
             self.codices_component
                 .load_codices(&self.pool)
                 .await
-                .map_err(|e| color_eyre::eyre::eyre!("Failed to load codices: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to load codices: {}", e))?;
 
             // Return to main screen
             self.current_screen = CurrentScreen::Main;
@@ -730,13 +732,13 @@ impl App {
 
             // Write updated config to file
             let config_dir = dirs::config_dir()
-                .ok_or_else(|| color_eyre::eyre::eyre!("Could not find config directory"))?
+                .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
                 .join("scriptor");
             let config_path = config_dir.join("scriptor.toml");
 
             self.config
                 .write(&config_path)
-                .map_err(|e| color_eyre::eyre::eyre!("Failed to save config: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to save config: {}", e))?;
         }
         Ok(())
     }
@@ -831,18 +833,18 @@ impl App {
         // Write to file if requested
         if write_to_file {
             let config_dir = dirs::config_dir()
-                .ok_or_else(|| color_eyre::eyre::eyre!("Could not find config directory"))?
+                .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
                 .join("scriptor");
             let config_path = config_dir.join("scriptor.toml");
 
             self.config
                 .write(&config_path)
-                .map_err(|e| color_eyre::eyre::eyre!("Failed to save config: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to save config: {}", e))?;
         }
 
         // If any model changed, check for missing files and download
         if (stt_model_changed || vad_model_changed)
-            && let Some(missing_files) = self.config.check_missing(&self.available_models)
+            && let Some(missing_files) = self.config.check_missing(&self.available_models)?
         {
             let mut spinner = Spinner::new_with_stream(
                 spinners::Dots,
@@ -850,7 +852,7 @@ impl App {
                 Color::Blue,
                 Streams::Stderr,
             );
-            download_missing_files(&missing_files).await;
+            download_missing_files(&missing_files).await?;
             spinner.success("Models downloaded!");
         }
 
@@ -866,7 +868,7 @@ impl App {
                 &self.config.default.stt,
                 self.config.default.inference.clone(),
             )
-            .map_err(|e| color_eyre::eyre::eyre!("Failed to load STT model: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to load STT model: {}", e))?;
             self.stt_tools.stt_model = Some(stt_model);
             spinner.success("STT model loaded!");
         }
@@ -885,14 +887,14 @@ impl App {
                 &self.config.default.vad,
                 self.config.default.inference.clone(),
             )
-            .map_err(|e| color_eyre::eyre::eyre!("Failed to load VAD model: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to load VAD model: {}", e))?;
 
             // Create new recorder config
             let recorder_config = RecorderConfig::new(
                 self.config.default.fractor.max_fragmentum_duration_seconds,
                 self.config.default.input_device.as_deref(),
             )
-            .map_err(|e| color_eyre::eyre::eyre!("Failed to create recorder config: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to create recorder config: {}", e))?;
 
             // Rebuild Fractor with new VAD model
             let fractor = Fractor::new(recorder_config, vad_model);
@@ -1103,13 +1105,12 @@ impl Widget for &mut App {
                         None
                     };
                 // Autoscroll: ensure last fragmentum is selected for background
-                if let Some(ref mut folio) = selected_folio {
-                    if !folio.fragmenta.is_empty() {
+                if let Some(ref mut folio) = selected_folio
+                    && !folio.fragmenta.is_empty() {
                         folio
                             .fragmentum_state
                             .select(Some(folio.fragmenta.len() - 1));
                     }
-                }
                 // Animated dots: . .. ... cycling every ~400ms (only when recording, not paused)
                 let dots = if self.is_paused {
                     ""

@@ -341,19 +341,19 @@ impl Player {
             SampleFormat::F32 => device.build_output_stream(
                 config,
                 move |data: &mut [f32], _| fill_buffer(data, &state),
-                |e| eprintln!("{e}"),
+                |e| tracing::error!("{e}"),
                 None,
             ),
             SampleFormat::I16 => device.build_output_stream(
                 config,
                 move |data: &mut [i16], _| fill_buffer(data, &state),
-                |e| eprintln!("{e}"),
+                |e| tracing::error!("{e}"),
                 None,
             ),
             SampleFormat::I32 => device.build_output_stream(
                 config,
                 move |data: &mut [i32], _| fill_buffer(data, &state),
-                |e| eprintln!("{e}"),
+                |e| tracing::error!("{e}"),
                 None,
             ),
             _ => anyhow::bail!("Unsupported sample format"),
@@ -439,7 +439,10 @@ fn fill_buffer<S: Sample>(data: &mut [S], state: &PlaybackState) {
     while written < data.len() {
         // Try to read from current audio
         {
-            let guard = state.active_audio.read().unwrap();
+            let guard = state
+                .active_audio
+                .read()
+                .expect("Audio lock poisoned in fill_buffer");
             if let Some(ref audio) = *guard {
                 let p = state.position.load(Ordering::SeqCst);
                 let available = audio.len().saturating_sub(p);
@@ -472,8 +475,14 @@ fn fill_buffer<S: Sample>(data: &mut [S], state: &PlaybackState) {
 
         // Try to swap in next audio
         {
-            let mut active_guard = state.active_audio.write().unwrap();
-            let mut next_guard = state.next_audio.write().unwrap();
+            let mut active_guard = state
+                .active_audio
+                .write()
+                .expect("Audio lock poisoned in fill_buffer");
+            let mut next_guard = state
+                .next_audio
+                .write()
+                .expect("Audio lock poisoned in fill_buffer");
 
             if next_guard.is_some() {
                 *active_guard = next_guard.take();

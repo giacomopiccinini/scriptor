@@ -54,7 +54,9 @@ pub async fn download_file(file_url: &str, local_destination: PathBuf) -> Result
 /// Specific instance of download for latest models available
 pub async fn download_models_list() -> Result<()> {
     // Use config directory to standardize storage of config file
-    let config_dir = dirs::config_dir().unwrap().join("scriptor");
+    let config_dir = dirs::config_dir()
+        .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
+        .join("scriptor");
 
     // Define the config file path
     let config_path = config_dir.join("models.toml");
@@ -71,10 +73,12 @@ pub async fn download_models_list() -> Result<()> {
 }
 
 /// Download all the missing files in parallel
-pub async fn download_missing_files(missing_files: &[PathBuf]) {
+pub async fn download_missing_files(missing_files: &[PathBuf]) -> Result<()> {
     // Set up source and directory
     let base_url = PathBuf::from("https://www.scriptor.giacomopiccinini.xyz");
-    let scriptor_dir = dirs::data_dir().unwrap().join("scriptor");
+    let scriptor_dir = dirs::data_dir()
+        .ok_or_else(|| anyhow::anyhow!("Could not find data directory"))?
+        .join("scriptor");
 
     let download_tasks: Vec<_> = missing_files
         .iter()
@@ -88,7 +92,12 @@ pub async fn download_missing_files(missing_files: &[PathBuf]) {
                 if let Some(parent) = local_path.parent() {
                     tokio::fs::create_dir_all(parent).await?;
                 }
-                download_file(url.to_str().unwrap(), local_path).await
+                download_file(
+                    url.to_str()
+                        .ok_or_else(|| anyhow::anyhow!("Invalid URL path"))?,
+                    local_path,
+                )
+                .await
             }
         })
         .collect();
@@ -98,15 +107,18 @@ pub async fn download_missing_files(missing_files: &[PathBuf]) {
 
     // Check for errors
     for result in results {
-        result.expect("Failed to download model file");
+        result.with_context(|| "Failed to download model file")?;
     }
+    Ok(())
 }
 
 impl ModelsConfig {
     /// Read and serialize a models.toml file
     pub fn read() -> Result<Self> {
         // Use config directory to standardize storage of config file
-        let config_dir = dirs::config_dir().unwrap().join("scriptor");
+        let config_dir = dirs::config_dir()
+            .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
+            .join("scriptor");
 
         // Define the config file path
         let config_path = config_dir.join("models.toml");
