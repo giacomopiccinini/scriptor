@@ -1,5 +1,6 @@
 # Scriptor
 
+[![Crates.io](https://img.shields.io/crates/v/scriptor.svg)](https://crates.io/crates/scriptor)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Scriptor is a fully local, real-time speech-to-text tool. You speak into your microphone, and it transcribes what you say as you say it. No cloud calls, no API tokens, no privacy concerns. The name comes from the Latin word for scribe: someone who copies and records.
